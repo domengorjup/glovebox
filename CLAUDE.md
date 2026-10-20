@@ -5,7 +5,7 @@ A self-hosted Home Assistant add-on for tracking car running costs across multip
 
 ## Key constraints
 - Runs as a Home Assistant OS add-on: Docker container, web UI served through HA Ingress (sidebar panel), data kept in a SQLite database under `/data`.
-- Publishes a small set of HA sensors (e.g. last L/100km, monthly cost, next service due).
+- Exposes a read-only stats API (/api/v1); HA sensors come later via a companion integration (see Next steps).
 - Python backend; dependencies managed with `uv` (`pyproject.toml`).
 - Import: Drivvo CSV, Fuelio CSV, Fuelly CSV. Export: a native full CSV and a Fuelly-compatible CSV.
 - Scope is only the features listed above; no feature creep.
