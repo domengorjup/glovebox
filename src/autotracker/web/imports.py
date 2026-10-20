@@ -15,9 +15,9 @@ from sqlalchemy.orm import Session
 
 from autotracker.importers import pipeline
 from autotracker.importers.base import ImportOptions
-from autotracker.importers.pipeline import VehicleMapping
+from autotracker.importers.pipeline import CHOOSE_VEHICLE_MESSAGE, VehicleMapping
 from autotracker.services import records
-from autotracker.services.records import RecordsError
+from autotracker.services.records import NotFoundError, RecordsError
 from autotracker.web.common import SessionDep, redirect, render
 
 router = APIRouter(prefix="/import")
@@ -140,6 +140,10 @@ def _preview_page(
         by_name = next((v for v in vehicles if v.name.lower() == name.lower()), None)
         default = str(by_name.id) if by_name else "new"
         selection[name] = chosen.get(name, default) or "new"
+    # "Which vehicle?" is a question for the picker, not a failure of the file.
+    shown_errors = [
+        e for e in [*(errors or []), *preview.errors] if e != CHOOSE_VEHICLE_MESSAGE
+    ]
     blocked = bool(preview.errors or preview.header_mismatch or preview.ambiguities)
     return render(
         request,
@@ -152,7 +156,7 @@ def _preview_page(
         formats=_format_names(),
         blocked=blocked,
         ambiguities=[a.value for a in preview.ambiguities],
-        errors=errors or [],
+        errors=shown_errors,
     )
 
 
@@ -189,5 +193,8 @@ def import_commit(
 @router.post("/{batch_id}/undo")
 def import_undo(request: Request, batch_id: int, session: SessionDep):
     """Undo one import batch."""
-    pipeline.undo_batch(session, batch_id)
+    try:
+        pipeline.undo_batch(session, batch_id)
+    except NotFoundError as exc:
+        raise HTTPException(404, detail=str(exc)) from None
     return redirect(request, "/import")

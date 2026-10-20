@@ -15,7 +15,7 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from autotracker import __version__
-from autotracker.config import load_settings
+from autotracker.config import Settings
 from autotracker.models import Expense, Refuel, Station, Vehicle
 
 VEHICLE_COLUMNS = [
@@ -34,7 +34,9 @@ EXPENSE_COLUMNS = [
 ]  # fmt: skip
 
 
-def export_native(session: Session, vehicle_ids: Sequence[int] | None = None) -> bytes:
+def export_native(
+    session: Session, settings: Settings, vehicle_ids: Sequence[int] | None = None
+) -> bytes:
     """
     Build the native export ZIP.
 
@@ -47,6 +49,8 @@ def export_native(session: Session, vehicle_ids: Sequence[int] | None = None) ->
     ----------
     session : Session
         Open database session.
+    settings : Settings
+        Settings of the running app (the manifest records its currency).
     vehicle_ids : Sequence[int] | None, optional
         Vehicles to export; ``None`` exports all. With a selection, only
         stations used by the exported refuels are included.
@@ -78,7 +82,7 @@ def export_native(session: Session, vehicle_ids: Sequence[int] | None = None) ->
         "stations.csv": _csv(STATION_COLUMNS, map(_station_row, stations)),
         "refuels.csv": _csv(REFUEL_COLUMNS, map(_refuel_row, refuels)),
         "expenses.csv": _csv(EXPENSE_COLUMNS, map(_expense_row, expenses)),
-        "manifest.json": json.dumps(_manifest(session), indent=2) + "\n",
+        "manifest.json": json.dumps(_manifest(session, settings), indent=2) + "\n",
     }
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
@@ -87,7 +91,7 @@ def export_native(session: Session, vehicle_ids: Sequence[int] | None = None) ->
     return buffer.getvalue()
 
 
-def _manifest(session: Session) -> dict[str, Any]:
+def _manifest(session: Session, settings: Settings) -> dict[str, Any]:
     """Return export metadata: app and schema version, timestamp, currency."""
     schema_version = session.execute(
         text("SELECT version_num FROM alembic_version")
@@ -96,7 +100,7 @@ def _manifest(session: Session) -> dict[str, Any]:
         "app_version": __version__,
         "schema_version": schema_version,
         "exported_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "currency": load_settings().currency,
+        "currency": settings.currency,
     }
 
 

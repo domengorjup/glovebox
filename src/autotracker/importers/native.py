@@ -57,9 +57,23 @@ class NativeVehicleRef(CanonicalVehicleRef):
 
 @dataclass(frozen=True)
 class NativeRefuel(CanonicalRefuel):
-    """A refuel that also knows its station's location."""
+    """
+    A refuel that also knows its station's location and where it came from.
+
+    ``source`` and ``derived_field`` are restored as exported, so a backup
+    restore keeps them (the pipeline would otherwise stamp ``native``).
+    """
 
     station_location: str | None = None
+    source: str | None = None
+    derived_field: str | None = None
+
+
+@dataclass(frozen=True)
+class NativeExpense(CanonicalExpense):
+    """An expense that keeps its exported ``source``."""
+
+    source: str | None = None
 
 
 @dataclass(frozen=True)
@@ -186,6 +200,8 @@ def _refuel(
         missed_previous=parse_flag(row.get("missed_previous") or ""),
         notes=_text(row, "notes"),
         source_ref=_text(row, "source_ref"),
+        source=_text(row, "source"),
+        derived_field=_text(row, "derived_field"),
     )
 
 
@@ -194,7 +210,7 @@ def _expense(
 ) -> CanonicalExpense:
     odometer = _text(row, "odometer_km")
     start, end = _text(row, "coverage_start"), _text(row, "coverage_end")
-    return CanonicalExpense(
+    return NativeExpense(
         vehicle_name=vehicles[row["vehicle_id"]]["name"],
         date=date.fromisoformat(row["date"]),
         category=ExpenseCategory(row["category"]),
@@ -205,4 +221,5 @@ def _expense(
         coverage_end=date.fromisoformat(end) if end else None,
         notes=_text(row, "notes"),
         source_ref=_text(row, "source_ref"),
+        source=_text(row, "source"),
     )

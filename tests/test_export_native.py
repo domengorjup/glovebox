@@ -11,6 +11,7 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from autotracker import __version__
+from autotracker.config import Settings
 from autotracker.exporters.native import export_native
 from autotracker.models import (
     DerivedField,
@@ -66,7 +67,7 @@ def _populate(session: Session) -> tuple[Vehicle, Vehicle]:
 
 def test_export_contents(session: Session) -> None:
     _populate(session)
-    files = _read(export_native(session))
+    files = _read(export_native(session, Settings()))
 
     assert set(files) == {
         "vehicles.csv", "stations.csv", "refuels.csv", "expenses.csv",
@@ -88,16 +89,16 @@ def test_export_contents(session: Session) -> None:
 
 
 def test_manifest(session: Session) -> None:
-    manifest = json.loads(_read(export_native(session))["manifest.json"])
+    manifest = json.loads(_read(export_native(session, Settings()))["manifest.json"])
     assert manifest["app_version"] == __version__
     assert manifest["schema_version"] == "0001"
-    assert manifest["currency"]
+    assert manifest["currency"] == "EUR"
     assert manifest["exported_at"]
 
 
 def test_selected_vehicle(session: Session) -> None:
     car, _ = _populate(session)
-    files = _read(export_native(session, [car.id]))
+    files = _read(export_native(session, Settings(), [car.id]))
 
     assert [r["name"] for r in _rows(files["vehicles.csv"])] == ["Car"]
     assert len(_rows(files["refuels.csv"])) == 1
@@ -109,9 +110,19 @@ def test_selected_vehicle_without_station_use_omits_stations(
     session: Session,
 ) -> None:
     _, van = _populate(session)
-    files = _read(export_native(session, [van.id]))
+    files = _read(export_native(session, Settings(), [van.id]))
     assert _rows(files["stations.csv"]) == []
 
 
 # TODO: round trip (export, import into empty DB, export again) belongs to the
 # native importer task 3.7 and is left to integration.
+
+
+def test_manifest_uses_given_settings_not_environment(
+    session: Session, monkeypatch
+) -> None:
+    monkeypatch.setenv("CURRENCY", "USD")
+    manifest = json.loads(
+        _read(export_native(session, Settings(currency="CHF")))["manifest.json"]
+    )
+    assert manifest["currency"] == "CHF"

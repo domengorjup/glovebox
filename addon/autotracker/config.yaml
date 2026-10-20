@@ -2,7 +2,7 @@ name: Autotracker
 version: "0.1.0"
 slug: autotracker
 description: Track car running costs: refuelling, maintenance and insurance, with statistics.
-url: https://github.com/CHANGE_ME/autotracker_app
+url: https://github.com/domengorjup/autotracker_app
 arch:
   - amd64
   - aarch64

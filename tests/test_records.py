@@ -94,7 +94,7 @@ def test_delete_requires_confirmation(session, vehicle):
     create_refuel(session, refuel_input(vehicle.id))
     create_expense(
         session,
-        ExpenseInput(vehicle.id, date(2026, 1, 1), ExpenseCategory.OTHER, 100),
+        ExpenseInput(vehicle.id, date(2026, 1, 1), ExpenseCategory.OTHER, 100, title="x"),
     )
     assert count_vehicle_records(session, vehicle.id).refuels == 1
     with pytest.raises(ConfirmationRequired) as info:
@@ -276,11 +276,21 @@ def test_unknown_category_rejected(session, vehicle):
     assert ok.category == ExpenseCategory.OTHER
 
 
+@pytest.mark.parametrize("title", ["", "   "])
+def test_expense_title_required(session, vehicle, title):
+    with pytest.raises(ValidationError, match="Title is required"):
+        create_expense(
+            session,
+            ExpenseInput(vehicle.id, date(2026, 3, 1), "other", 500, title=title),
+        )
+
+
 def test_coverage_period_stored(session, vehicle):
     expense = create_expense(
         session,
         ExpenseInput(
             vehicle.id, date(2026, 3, 1), ExpenseCategory.INSURANCE, 42000,
+            title="Annual policy",
             coverage_start=date(2026, 3, 1), coverage_end=date(2027, 2, 28),
         ),
     )
@@ -299,7 +309,7 @@ def test_coverage_period_stored(session, vehicle):
 def test_incomplete_or_reversed_coverage_rejected(session, vehicle, start, end):
     data = ExpenseInput(
         vehicle.id, date(2026, 3, 1), ExpenseCategory.INSURANCE, 100,
-        coverage_start=start, coverage_end=end,
+        title="x", coverage_start=start, coverage_end=end,
     )
     with pytest.raises(ValidationError):
         create_expense(session, data)
@@ -308,12 +318,12 @@ def test_incomplete_or_reversed_coverage_rejected(session, vehicle, start, end):
 def test_same_day_coverage_allowed_and_update_validates(session, vehicle):
     data = ExpenseInput(
         vehicle.id, date(2026, 3, 1), ExpenseCategory.OTHER, 100,
-        coverage_start=date(2026, 3, 1), coverage_end=date(2026, 3, 1),
+        title="x", coverage_start=date(2026, 3, 1), coverage_end=date(2026, 3, 1),
     )
     expense = create_expense(session, data)
     bad = ExpenseInput(
         vehicle.id, date(2026, 3, 1), ExpenseCategory.OTHER, 100,
-        coverage_start=date(2026, 3, 2), coverage_end=date(2026, 3, 1),
+        title="x", coverage_start=date(2026, 3, 2), coverage_end=date(2026, 3, 1),
     )
     with pytest.raises(ValidationError):
         update_expense(session, expense.id, bad)
@@ -322,10 +332,10 @@ def test_same_day_coverage_allowed_and_update_validates(session, vehicle):
 def test_filtered_expense_list(session, vehicle):
     for month, cat in [(1, "maintenance"), (2, "insurance"), (3, "maintenance")]:
         create_expense(
-            session, ExpenseInput(vehicle.id, date(2026, month, 1), cat, 1000)
+            session, ExpenseInput(vehicle.id, date(2026, month, 1), cat, 1000, title="x")
         )
     create_expense(
-        session, ExpenseInput(vehicle.id, date(2025, 5, 1), "maintenance", 1000)
+        session, ExpenseInput(vehicle.id, date(2025, 5, 1), "maintenance", 1000, title="x")
     )
     flt = StatsFilter(
         date_from=date(2026, 1, 1),

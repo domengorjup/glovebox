@@ -51,6 +51,12 @@ class TestImportFormat:
         assert result.vehicles == []
         assert all(r.vehicle_name is None for r in result.refuels)
 
+    def test_tags_column_becomes_station_name(self, fixtures_dir) -> None:
+        first, second, _ = parse(fixtures_dir, "fuelly_import_metric.csv").refuels
+        assert first.station_name == "OMV Celje"
+        assert first.station_brand is None
+        assert second.station_name is None  # empty tags
+
     def test_gallons_converted(self, fixtures_dir) -> None:
         first = parse(fixtures_dir, "fuelly_import_gallons.csv").refuels[0]
         assert first.litres_milli == 37854

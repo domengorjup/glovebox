@@ -26,6 +26,7 @@ from autotracker.importers.fuelly import FuellyAdapter
 from autotracker.importers.native import NativeAdapter
 from autotracker.models import (
     Expense,
+    DerivedField,
     ExpenseCategory,
     ImportBatch,
     Refuel,
@@ -40,6 +41,7 @@ from autotracker.services.records import (
 )
 
 HEAD_BYTES = 64 * 1024
+CHOOSE_VEHICLE_MESSAGE = "Choose a target vehicle for this file."
 _ADAPTERS: list[ImporterAdapter] = [
     DrivvoAdapter(),
     FuelioAdapter(),
@@ -76,12 +78,19 @@ class ImportPreview:
     errors: list[str] = field(default_factory=list)
     ambiguities: list[Ambiguity] = field(default_factory=list)
     header_mismatch: HeaderMismatch | None = None
+    needs_vehicle_choice: bool = False  # question for the user, not a file fault
 
 
 @dataclass(frozen=True)
 class VehicleMapping:
-    """File vehicle name -> existing vehicle id, or ``None`` to create it.
-    ``default_vehicle_id`` serves files without vehicle names."""
+    """
+    File vehicle name -> existing vehicle id, or ``None`` to create it.
+
+    A name that is absent from ``by_name`` is matched to the active vehicle of
+    the same name, else created. A name mapped to ``None`` is always created
+    (the preview reports an error if an active vehicle already has that name).
+    ``default_vehicle_id`` serves files without vehicle names.
+    """
 
     by_name: dict[str, int | None] = field(default_factory=dict)
     default_vehicle_id: int | None = None
@@ -131,10 +140,11 @@ def preview_import(
     """
     Parse and count without writing. ``format`` overrides detection.
 
-    A file vehicle name that is not mapped is matched to the active vehicle
+    A file vehicle name that is absent from the mapping is matched to the active vehicle
     of the same name, or else counted as a vehicle to create. Records of a
     file without vehicle names need ``mapping.default_vehicle_id``; without
-    it the preview carries an error.
+    it the preview carries an error and ``needs_vehicle_choice`` is set, so
+    a UI can ask for the vehicle instead of reporting a failed file.
     """
     return _plan(session, data, format, options, mapping).preview
 
@@ -248,11 +258,18 @@ def _map_and_dedupe(
     preview = plan.preview
     for name in preview.vehicle_names:
         plan.vehicle_ids[name] = _resolve_vehicle(session, name, mapping)
+        if name in mapping.by_name and mapping.by_name[name] is None:
+            if _active_vehicle_id(session, name) is not None:
+                preview.errors.append(
+                    f'A vehicle named "{name}" already exists; '
+                    "choose it instead of creating a new one."
+                )
     needs_default = any(
         r.vehicle_name is None for r in [*result.refuels, *result.expenses]
     )
     if needs_default and mapping.default_vehicle_id is None:
-        preview.errors.append("Choose a target vehicle for this file.")
+        preview.errors.append(CHOOSE_VEHICLE_MESSAGE)
+        preview.needs_vehicle_choice = True
         return
     refuel_keys: set[tuple] = set()
     expense_keys: set[tuple] = set()
@@ -296,9 +313,13 @@ def _hundredths(figures: DerivedFigures) -> int:
 def _resolve_vehicle(
     session: Session, name: str, mapping: VehicleMapping
 ) -> int | None:
-    """Mapped id, else the active vehicle with that name, else ``None``."""
-    if mapping.by_name.get(name) is not None:
+    """Mapped id (``None`` = create), else the active vehicle with that name."""
+    if name in mapping.by_name:
         return mapping.by_name[name]
+    return _active_vehicle_id(session, name)
+
+
+def _active_vehicle_id(session: Session, name: str) -> int | None:
     return session.scalar(
         select(Vehicle.id).where(Vehicle.name == name, Vehicle.archived.is_(False))
     )
@@ -469,15 +490,22 @@ def _new_refuel(
         litres_milli=figures.litres_milli,
         price_per_litre_milli=figures.price_per_litre_milli,
         total_cents=figures.total_cents,
-        derived_field=figures.derived_field,
+        derived_field=_derived_field(record, figures),
         station_id=station_id,
         is_full=record.is_full,
         missed_previous=record.missed_previous,
         notes=record.notes,
-        source=batch.format,
+        source=(getattr(record, "source", None) or batch.format)[:20],
         source_ref=_short(record.source_ref),
         import_batch_id=batch.id,
     )
+
+
+def _derived_field(record: CanonicalRefuel, figures: DerivedFigures):
+    """Native files carry their own ``derived_field``; others use the derived one."""
+    if hasattr(record, "derived_field"):
+        return DerivedField(record.derived_field) if record.derived_field else None
+    return figures.derived_field
 
 
 def _new_expense(
@@ -493,7 +521,7 @@ def _new_expense(
         coverage_start=record.coverage_start,
         coverage_end=record.coverage_end,
         notes=record.notes,
-        source=batch.format,
+        source=(getattr(record, "source", None) or batch.format)[:20],
         source_ref=_short(record.source_ref),
         import_batch_id=batch.id,
     )

@@ -29,7 +29,9 @@ def export_home(request: Request, session: SessionDep):
 @router.get("/native")
 def export_native(request: Request, session: SessionDep) -> Response:
     """Download the native full export (ZIP)."""
-    content = native.export_native(session, _vehicle_ids(request))
+    content = native.export_native(
+        session, request.app.state.settings, _vehicle_ids(request)
+    )
     filename = f"autotracker-export-{date.today().isoformat()}.zip"
     return Response(
         content,

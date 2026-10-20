@@ -4,7 +4,7 @@
 {% block content %}
 <h1>Import preview</h1>
 <p>File: <strong>{{ p.filename }}</strong> - detected format: <strong>{{ preview.format }}</strong></p>
-{{ messages(errors + preview.errors, preview.warnings) }}
+{{ messages(errors, preview.warnings) }}
 
 {% if preview.header_mismatch %}
 <div class="error">
@@ -52,7 +52,7 @@
     </label>
     {% endfor %}
   {% else %}
-    <label>The file has no vehicle names. Import into
+    <label>{% if preview.needs_vehicle_choice %}Which vehicle do these records belong to?{% else %}The file has no vehicle names. Import into{% endif %}
       <select name="default_vehicle">
         <option value="">Choose...</option>
         {% for v in vehicles %}<option value="{{ v.id }}" {{ 'selected' if p.default_vehicle == v.id | string }}>{{ v.name }}</option>{% endfor %}

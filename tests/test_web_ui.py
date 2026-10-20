@@ -567,7 +567,7 @@ def test_export_page_notes_expenses_omitted(client):
 def test_native_download(client, monkeypatch):
     seen = []
     monkeypatch.setattr(native_exporter, "export_native",
-                        lambda session, ids=None: seen.append(ids) or b"PK-zip")
+                        lambda session, settings, ids=None: seen.append(ids) or b"PK-zip")
     response = client.get("/export/native?vehicle=1")
     assert response.content == b"PK-zip" and seen == [[1]]
     assert response.headers["content-type"] == "application/zip"

@@ -10,6 +10,8 @@ import pytest
 from sqlalchemy import func, select
 
 from autotracker.db import make_engine, make_session_factory, run_migrations
+from autotracker.config import Settings
+from autotracker.exporters.fuelly import export_fuelly
 from autotracker.exporters.native import export_native
 from autotracker.importers.base import Ambiguity, ImportOptions
 from autotracker.importers.pipeline import (
@@ -107,8 +109,27 @@ class TestPreview:
         data = (fixtures_dir / "fuelly_import_metric.csv").read_bytes()
         preview = preview_import(session, data)
         assert preview.errors and preview.vehicle_names == []
+        assert preview.needs_vehicle_choice
         with pytest.raises(ValidationError):
             commit_import(session, data, "f.csv", VehicleMapping())
+
+    def test_mapping_to_none_creates_vehicle(self, session, fuelio) -> None:
+        mapping = VehicleMapping(by_name={"Test Golf": None})
+        commit_import(session, fuelio, "f.csv", mapping)
+        assert [v.name for v in session.scalars(select(Vehicle))] == ["Test Golf"]
+
+    def test_mapping_to_none_with_active_same_name_is_an_error(
+        self, session, fuelio
+    ) -> None:
+        _vehicle(session, "Test Golf")
+        mapping = VehicleMapping(by_name={"Test Golf": None})
+        assert "already exists" in preview_import(session, fuelio, mapping=mapping).errors[0]
+        with pytest.raises(ValidationError):
+            commit_import(session, fuelio, "f.csv", mapping)
+
+    def test_undo_unknown_batch_raises_not_found(self, session) -> None:
+        with pytest.raises(NotFoundError):
+            undo_batch(session, 999)
 
     def test_rows_with_too_few_price_figures_are_skipped(self, session) -> None:
         data = b"fuelup_date,odometer,litres\n2024-01-01,1000,40.0\n"
@@ -143,7 +164,7 @@ class TestCommit:
         first = session.scalars(select(Refuel).order_by(Refuel.date)).first()
         assert first.total_cents == 2991  # 20.5 L x 1.459
         assert first.derived_field.value == "total"
-        assert first.station_id is None  # tags are not treated as stations
+        assert first.station_id is not None  # the tags cell is the station
 
     def test_map_file_vehicle_to_existing_one(self, session, fuelio) -> None:
         golf = _vehicle(session, "Golf")
@@ -285,10 +306,40 @@ class TestUndo:
         assert [x.id for x in list_batches(session)] == [b.id, a.id]
 
 
+class TestFuellyRoundTrip:
+    def test_station_survives_own_fuelly_export(self, session) -> None:
+        _populate(session)
+        exported = export_fuelly(session)
+        files = _fuelly_files(exported)
+        other_engine = make_engine()
+        run_migrations(other_engine)
+        with make_session_factory(other_engine)() as other:
+            vehicle = _vehicle(other, "Target")
+            for content in files:
+                commit_import(
+                    other, content, "f.csv", VehicleMapping(default_vehicle_id=vehicle)
+                )
+            names = {s.name for s in other.scalars(select(Station))}
+            used = {
+                other.get(Station, r.station_id).name
+                for r in other.scalars(select(Refuel))
+                if r.station_id
+            }
+        other_engine.dispose()
+        assert {"Alpha", "Beta"} <= names and used == {"Alpha", "Beta"}
+
+
+def _fuelly_files(export) -> list[bytes]:
+    if export.media_type == "text/csv":
+        return [export.content]
+    with zipfile.ZipFile(io.BytesIO(export.content)) as archive:
+        return [archive.read(n) for n in archive.namelist()]
+
+
 class TestNativeRoundTrip:
     def test_round_trip_into_empty_database(self, session) -> None:
         _populate(session)
-        first = export_native(session)
+        first = export_native(session, Settings())
 
         other_engine = make_engine()
         run_migrations(other_engine)
@@ -297,14 +348,14 @@ class TestNativeRoundTrip:
             assert preview.format == "native"
             assert (preview.new_refuels, preview.new_expenses) == (3, 2)
             commit_import(other, first, "export.zip", VehicleMapping())
-            second = export_native(other)
+            second = export_native(other, Settings())
         other_engine.dispose()
 
         assert _tables(first) == _tables(second)
 
     def test_native_values_restored(self, session) -> None:
         _populate(session)
-        data = export_native(session)
+        data = export_native(session, Settings())
         other_engine = make_engine()
         run_migrations(other_engine)
         with make_session_factory(other_engine)() as other:
@@ -330,7 +381,7 @@ class TestNativeRoundTrip:
 
     def test_reimport_native_is_noop(self, session) -> None:
         _populate(session)
-        data = export_native(session)
+        data = export_native(session, Settings())
         preview = preview_import(session, data)
         assert (preview.new_refuels, preview.new_expenses) == (0, 0)
         assert (preview.duplicate_refuels, preview.duplicate_expenses) == (3, 2)

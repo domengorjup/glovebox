@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends git ca-certific
     && rm -rf /var/lib/apt/lists/*
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
-ARG SOURCE_REPO=https://github.com/CHANGE_ME/autotracker_app.git
+ARG SOURCE_REPO=https://github.com/domengorjup/autotracker_app.git
 ARG SOURCE_REF=main
 RUN git clone --depth 1 --branch "${SOURCE_REF}" "${SOURCE_REPO}" /app
 WORKDIR /app

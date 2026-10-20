@@ -28,12 +28,16 @@ Open `http://localhost:8080/`. The container runs as UID 1000, so the data folde
 | `AUTOTRACKER_PORT` | `8080` (`8099` in addon mode) | Listen port |
 | `DATA_DIR` | `/data` | Folder holding the SQLite database |
 | `AUTOTRACKER_PASSWORD` | unset | Enables the login (standalone) |
-| `AUTOTRACKER_API_TOKEN` | unset | Bearer token for `/api/v1` (standalone) |
+| `AUTOTRACKER_API_TOKEN` | unset | Bearer token for `/api/v1` (standalone only; ignored in add-on mode, where only Ingress can connect) |
 | `AUTOTRACKER_SECRET` | unset | Key for signing session cookies |
 | `CURRENCY` | `EUR` | Display currency code |
 | `BASE_PATH` | empty | URL prefix when served behind a reverse proxy |
 
 Without `AUTOTRACKER_PASSWORD` there is no login: put a reverse proxy in front if the port is reachable by others.
+
+## Import notes
+
+Import and export are on their own pages. Files without a vehicle name ask which vehicle to use. For Fuelly files the `tags` column is imported as the gas station name. Re-importing a file is a no-op and each import can be undone.
 
 ## Backup and restore
 

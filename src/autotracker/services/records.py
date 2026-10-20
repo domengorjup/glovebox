@@ -118,7 +118,10 @@ class RefuelPreview:
 
 @dataclass(frozen=True)
 class ExpenseInput:
-    """Fields of an expense. Coverage dates: both or neither, end >= start."""
+    """
+    Fields of an expense. ``title`` must not be blank (enforced on save).
+    Coverage dates: both or neither, end >= start.
+    """
 
     vehicle_id: int
     date: date
@@ -527,6 +530,8 @@ def _apply_expense(session: Session, expense: Expense, data: ExpenseInput) -> No
         allowed = ", ".join(c.value for c in ExpenseCategory)
         errors.append(f"Unknown category '{data.category}' (allowed: {allowed})")
         category = None
+    if not data.title.strip():
+        errors.append("Title is required")
     if data.amount_cents < 0:
         errors.append("Amount must not be negative")
     start, end = data.coverage_start, data.coverage_end

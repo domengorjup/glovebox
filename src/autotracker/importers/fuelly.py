@@ -3,6 +3,11 @@ Fuelly adapter (design D7): the fuelly.com import format and export format.
 
 Both formats are UNVERIFIED against real files. The format is told apart by
 its headers (``fuelup_date`` versus ``Fuelup Date``).
+
+Station rule: the whole ``tags`` cell (trimmed) is taken as the station name,
+because our own Fuelly export writes the station name there. Fuelly allows
+several tags per fill-up; they are not split, so a multi-tag cell becomes one
+station. The brand is never set (no brand detection).
 """
 
 from __future__ import annotations
@@ -71,6 +76,9 @@ class FuellyAdapter:
             result.ambiguities.append(Ambiguity.UNITS)
             return result
         body = rows[1:]
+        if not body:
+            result.warnings.append("The file has no data rows.")
+            return result
         order = resolve_date_order(
             [cell(r, columns["date"]) for r in body], options.date_order
         )
@@ -147,6 +155,7 @@ class _RowReader:
             is_full=not parse_flag(cell(row, columns.get("partial"))),
             missed_previous=parse_flag(cell(row, columns.get("missed"))),
             notes=cell(row, columns.get("notes")) or None,
+            station_name=cell(row, columns.get("tags")).strip() or None,
         )
 
     def _number(self, row: list[str], key: str) -> Decimal | None:
