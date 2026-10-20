@@ -12,8 +12,9 @@ A self-hosted Home Assistant add-on for tracking car running costs across multip
 - Never commit real user export files (they contain personal data); use anonymised fixtures in tests.
 
 ## Git
+- Release procedure: bump the version in `addon/glovebox/config.yaml`, `pyproject.toml` (then `uv lock`) and `SOURCE_REF=v<version>` in `addon/glovebox/Dockerfile`, add a CHANGELOG entry, commit, tag `v<version>`, push `master` and the tag.
 - Standing permission (granted 2026-10-20): commit locally at sensible checkpoints (after the foundation, after each completed task group, after final checks).
-- Standing permission (granted 2026-10-20): push `master` to `origin` (github.com/domengorjup/glovebox) after tests pass. Never force-push or rewrite published history without asking.
+- Standing permission (granted 2026-10-20): push `master` and release tags to `origin` (github.com/domengorjup/glovebox) after tests pass. Never force-push or rewrite published history without asking.
 
 ## Next steps
 - **Install and use v1** on Home Assistant OS (task 9.3); fix anything found. Then archive the OpenSpec change `add-autotracker-v1` via the `openspec-archive` skill.

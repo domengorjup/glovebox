@@ -7,7 +7,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends git ca-certific
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
 ARG SOURCE_REPO=https://github.com/domengorjup/glovebox.git
-ARG SOURCE_REF=master
+# Must match `version` in config.yaml; each release is a git tag v<version>.
+ARG SOURCE_REF=v0.1.1
 RUN git clone --depth 1 --branch "${SOURCE_REF}" "${SOURCE_REPO}" /app
 WORKDIR /app
 RUN uv sync --frozen --no-dev --no-editable \
