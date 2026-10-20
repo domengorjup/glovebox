@@ -151,6 +151,14 @@
 - [ ] 9.4 (BLOCKED on real sample) Import the user's real Drivvo export locally, without committing it. Compare the totals and the consumption against Drivvo's own reports, and record any differences.
 - [x] 9.5 Run `openspec validate add-autotracker-v1 --strict` and update the artifacts to match what was built.
 
+## 9a. Optional API listener in add-on mode (design D9a)
+
+- [x] 9a.1 Settings: `api_port` (`GLOVEBOX_API_PORT`), minimum token length of 16 in add-on mode, clear error at startup.
+- [x] 9a.2 `create_api_app` (only `/api/v1`, Bearer, 404 elsewhere) and `main()` running both uvicorn servers; no token means no listener plus a warning.
+- [x] 9a.3 `config.yaml` `ports: {8100/tcp: null}` and `ports_description`; entrypoint default `GLOVEBOX_API_PORT=8100` in add-on mode.
+- [x] 9a.4 DOCS.md and README: how to enable it and a `rest:` sensor example.
+- [x] 9a.5 Tests for each scenario in the web-access spec, then a docker smoke test of both ports.
+
 ## 10. Later (optional in this change)
 
 - [ ] 10.2 Future, only if a sample becomes available: Fuelly/aCar Android app export importer (column order in design D7 (c)). Not part of v1.

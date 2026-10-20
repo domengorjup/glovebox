@@ -42,6 +42,10 @@ class Settings:
         Display currency code.
     host, port : str, int
         Bind address used by the ``glovebox`` command.
+    api_port : int | None
+        Port of the add-on API listener (``/api/v1`` with Bearer token only).
+        ``None`` means no such listener. Only used in add-on mode, and only
+        started when ``api_token`` is set (design D9a).
     """
 
     mode: Mode = Mode.STANDALONE
@@ -53,6 +57,10 @@ class Settings:
     currency: str = "EUR"
     host: str = "0.0.0.0"
     port: int = 8080
+    api_port: int | None = None
+
+
+MIN_ADDON_TOKEN_LENGTH = 16
 
 
 # Environment variable -> (Settings field, add-on options.json key)
@@ -66,6 +74,7 @@ _ENV_NAMES = {
     "CURRENCY": "currency",
     "GLOVEBOX_HOST": "host",
     "GLOVEBOX_PORT": "port",
+    "GLOVEBOX_API_PORT": "api_port",
 }
 
 
@@ -102,7 +111,8 @@ def load_settings(
     Raises
     ------
     ValueError
-        If the mode or port is invalid, or ``options_file`` is not valid JSON.
+        If the mode or a port is invalid, ``options_file`` is not valid JSON,
+        or in add-on mode ``api_token`` is shorter than 16 characters.
     """
     env = os.environ if env is None else env
     raw: dict[str, str] = {}
@@ -117,14 +127,22 @@ def _build_settings(raw: dict[str, str]) -> Settings:
     """Convert string values to typed ``Settings``."""
     mode = Mode(raw.get("mode", Mode.STANDALONE))  # ValueError if invalid
     default_dir = "/data" if mode is Mode.ADDON else "./data"
+    api_token = raw.get("api_token")
+    if mode is Mode.ADDON and api_token and len(api_token) < MIN_ADDON_TOKEN_LENGTH:
+        raise ValueError(
+            f"api_token must be at least {MIN_ADDON_TOKEN_LENGTH} characters "
+            f"(got {len(api_token)}); set a longer token or clear it to disable "
+            "the API port"
+        )
     return Settings(
         mode=mode,
         base_path=_normalise_base_path(raw.get("base_path", "")),
         data_dir=Path(raw.get("data_dir", default_dir)),
         password=raw.get("password"),
-        api_token=raw.get("api_token"),
+        api_token=api_token,
         secret=raw.get("secret"),
         currency=raw.get("currency", "EUR"),
         host=raw.get("host", "0.0.0.0"),
         port=int(raw.get("port", 8080)),
+        api_port=int(raw["api_port"]) if "api_port" in raw else None,
     )

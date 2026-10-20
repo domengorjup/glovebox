@@ -50,3 +50,10 @@ In add-on mode, the API SHALL be reachable through Ingress under the same rules 
 #### Scenario: Missing token
 - **WHEN** standalone mode has a token configured and a request arrives without credentials
 - **THEN** the API returns 401
+
+### Requirement: API reachable outside Ingress in add-on mode
+In add-on mode, the `/api/v1` endpoints SHALL also be reachable on the optional API listener (see web-access) with `Authorization: Bearer <api_token>`, so that Home Assistant REST sensors and the companion integration can read them. Responses SHALL be identical to those on the Ingress listener.
+
+#### Scenario: REST sensor reads the summary
+- **WHEN** a client sends `GET /api/v1/vehicles/1/summary` to the API port with the valid Bearer token
+- **THEN** the response is the same summary JSON that Ingress returns

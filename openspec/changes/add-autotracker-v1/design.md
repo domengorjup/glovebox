@@ -161,7 +161,7 @@ Constraints:
   - All templates build URLs through a single `url_for`-style helper. No absolute paths are hard-coded; static assets and API calls use the same helper.
 - **Ingress mode** (`GLOVEBOX_MODE=addon`):
   - No app-level login; HA has already authenticated the user.
-  - The server listens on the ingress port and accepts requests only from the Supervisor ingress proxy address (`172.30.32.2`). **Unverified detail:** confirm against current HA developer docs during implementation.
+  - The server listens on the ingress port and accepts requests only from the Supervisor ingress proxy address (`172.30.32.2`). Verified against the HA docs (see `auth.py`).
 - **Standalone mode** (default):
   - If `GLOVEBOX_PASSWORD` is set, a single-password login with a signed session cookie (itsdangerous) protects HTML routes.
   - If unset, there is no login, and a startup log warning recommends a reverse proxy.
@@ -169,6 +169,16 @@ Constraints:
 - **Alternatives considered:**
   - Full user accounts: out of scope for single-household use.
   - Relying only on a reverse proxy: a password is cheap and safer by default.
+
+### D9a. Optional API listener in add-on mode
+- **Problem:** Ingress is the only way in, so HA REST sensors and the companion integration cannot read `/api/v1`.
+- **Listener:** a second port, container `8100/tcp`, serving only `/api/v1/*` with `Authorization: Bearer <api_token>`. Anything else returns 404 (even with a valid token, to reveal nothing). `ingress_port` stays 8099 and that listener is unchanged (proxy-only, no login).
+- **Enabling:** it starts only when `api_token` is non-empty. `config.yaml` maps `8100/tcp: null`, so the host port is off until the user sets it. The container cannot see whether the host port is mapped, so with no token it logs one warning at startup that tells how to enable it, and does not start the listener.
+- **Token rules:** compared with `hmac.compare_digest` (constant time, via `auth.has_valid_token`). Minimum 16 characters in add-on mode, checked in `load_settings`; a shorter token stops startup with an error (`glovebox: ...`, exit 1) instead of running with a weak secret on a LAN-reachable port. Standalone mode keeps accepting any token length, so it is unchanged.
+- **Two listeners:** `create_api_app(settings, engine)` builds a second small FastAPI app that mounts only `v1.router` and shares the engine, settings and session factory of the main app. `main()` runs two `uvicorn.Server` objects in one asyncio loop. Chosen over a path-based switch inside one app because a port-level separation cannot leak the UI or the 403/Ingress logic onto the open port, and over a second process because the SQLite engine and settings are shared for free. Only the main app runs migrations; the API app starts after it is created in the same process, and the secondary server does not install signal handlers so the main server's shutdown stops both.
+- **Docs facts** (checked 2026-10-20, https://contributors.home-assistant.io/apps/reference/configuration/): `ports` is a mapping `"container-port/protocol": host-port`, e.g. `8080/tcp: 8080`; a host port of `null` (or no value) means the port is off by default and the user can turn it on; `ports_description` is a mapping with the same keys giving a description per port.
+- **HA REST sensor** (https://www.home-assistant.io/integrations/rest/): top-level `rest:` list with `resource`, `scan_interval`, `headers` and `sensor` entries using `value_template` / `json_attributes`; the Bearer header is shown at https://www.home-assistant.io/integrations/sensor.rest/ (word `Bearer` kept in `secrets.yaml`).
+- **Trade-off:** the API port is plain HTTP on the LAN; the token is readable on the network. Documented; users who need more should keep the port off or use a reverse proxy.
 
 ### D10. Stats API contract (`/api/v1`)
 - **Endpoints:** read-only JSON.

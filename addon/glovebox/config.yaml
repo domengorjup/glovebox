@@ -11,6 +11,12 @@ ingress_port: 8099
 panel_icon: mdi:car-wrench
 panel_title: Glovebox
 panel_admin: true
+# Optional stats API (Bearer token, /api/v1 only). Host port null = off until the
+# user sets it in the add-on network settings; it also needs the api_token option.
+ports:
+  8100/tcp: null
+ports_description:
+  8100/tcp: "Stats API (/api/v1) with Bearer token; needs the api_token option"
 # The Dockerfile is a plain image (no s6 overlay); keep the Docker-provided init.
 init: true
 boot: auto

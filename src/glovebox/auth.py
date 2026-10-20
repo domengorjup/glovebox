@@ -120,6 +120,27 @@ def _check_addon(request: Request) -> Response | None:
     return JSONResponse({"detail": "Forbidden"}, status_code=403)
 
 
+def install_api_auth(app: FastAPI) -> None:
+    """
+    Install the middleware of the add-on API listener on ``app``.
+
+    Non-API paths get 404 before any token check, so nothing is revealed to
+    callers without the token. API paths need a valid Bearer token (401).
+    """
+
+    @app.middleware("http")
+    async def api_only(request: Request, call_next):  # noqa: ANN001, ANN202
+        if not _is_api(request.url.path):
+            return JSONResponse({"detail": "Not Found"}, status_code=404)
+        if not has_valid_token(request):
+            return JSONResponse(
+                {"detail": "Not authenticated"},
+                status_code=401,
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return await call_next(request)
+
+
 def install_auth(app: FastAPI) -> None:
     """
     Install the access-control middleware and login routes on ``app``.

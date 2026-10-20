@@ -28,7 +28,8 @@ Open `http://localhost:8080/`. The container runs as UID 1000, so the data folde
 | `GLOVEBOX_PORT` | `8080` (`8099` in addon mode) | Listen port |
 | `DATA_DIR` | `/data` | Folder holding the SQLite database |
 | `GLOVEBOX_PASSWORD` | unset | Enables the login (standalone) |
-| `GLOVEBOX_API_TOKEN` | unset | Bearer token for `/api/v1` (standalone only; ignored in add-on mode, where only Ingress can connect) |
+| `GLOVEBOX_API_TOKEN` | unset | Bearer token for `/api/v1` (standalone). In add-on mode it is the `api_token` option and enables the extra API port, see the add-on `DOCS.md` |
+| `GLOVEBOX_API_PORT` | `8100` in addon mode | Port of the add-on API listener (`/api/v1` only, Bearer token, started only when a token of 16+ characters is set) |
 | `GLOVEBOX_SECRET` | unset | Key for signing session cookies |
 | `CURRENCY` | `EUR` | Display currency code |
 | `BASE_PATH` | empty | URL prefix when served behind a reverse proxy |

@@ -28,3 +28,14 @@ The same container image SHALL run outside Home Assistant when started in standa
 - **WHEN** a user runs the image with `-p 8080:8080 -v ./data:/data`
 - **THEN** the app is reachable at `http://host:8080/`
 - **AND** the data persists in `./data`
+
+### Requirement: Optional API port
+The add-on `config.yaml` SHALL declare the API port `8100/tcp` under `ports` with the host port `null` (off by default) and describe it under `ports_description`. `ingress_port` SHALL stay `8099`. The `api_token` option SHALL be optional and a password-type field. DOCS.md SHALL explain how to enable the port and the token, and give a Home Assistant `rest:` example with the Bearer header.
+
+#### Scenario: Default install exposes nothing
+- **WHEN** the add-on is installed with default settings
+- **THEN** no host port is mapped for the API and only Ingress can reach the app
+
+#### Scenario: User enables the API
+- **WHEN** the user sets `api_token` (16 characters or more) and a host port for `8100/tcp` in the add-on network settings and restarts
+- **THEN** `GET http://<ha-host>:<host-port>/api/v1/vehicles` with the Bearer header returns 200

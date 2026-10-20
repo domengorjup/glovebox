@@ -1,11 +1,12 @@
 #!/bin/sh
 # Pick defaults from GLOVEBOX_MODE, then start the app.
-# standalone (default): port 8080. addon: HA ingress port 8099, data in /data.
+# standalone (default): port 8080. addon: HA ingress port 8099 (+ API port 8100 when api_token is set), data in /data.
 set -eu
 
 case "${GLOVEBOX_MODE:-standalone}" in
   addon)
     export GLOVEBOX_PORT="${GLOVEBOX_PORT:-8099}"
+    export GLOVEBOX_API_PORT="${GLOVEBOX_API_PORT:-8100}"
     export DATA_DIR="${DATA_DIR:-/data}"
     ;;
   standalone)
