@@ -1,7 +1,7 @@
 name: Glovebox
 version: "0.1.0"
 slug: glovebox
-description: Track car running costs: refuelling, maintenance and insurance, with statistics.
+description: "Track car running costs: refuelling, maintenance and insurance, with statistics."
 url: https://github.com/domengorjup/glovebox
 arch:
   - amd64
