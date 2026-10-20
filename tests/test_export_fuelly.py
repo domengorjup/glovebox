@@ -13,25 +13,6 @@ from glovebox.models import Expense, ExpenseCategory, Refuel, Station, Vehicle
 
 HEADER = "fuelup_date,odometer,litres,price,partial_fuelup,missed_fuelup,notes,tags"
 
-# Alias subset from LubeLogger (hargata/lubelog, MIT, Copyright (c) 2024 Hargata
-# Softworks); see THIRD_PARTY_NOTICES.md.
-# Import aliases recognised by LubeLogger, copied from
-# https://github.com/hargata/lubelog/blob/main/MapProfile/ImportMappers.cs
-# (ImportMapper); the export header must be a subset of their union.
-LUBELOGGER_ALIASES = {
-    "date": ["date", "fuelup_date"],
-    "odometer": ["odometer", "odo"],
-    "fuel_consumed": [
-        "gallons", "liters", "litres", "consumption", "quantity",
-        "fuelconsumed", "qty",
-    ],
-    "price": ["price"],
-    "notes": ["notes", "note"],
-    "partial": ["partial_fuelup", "partial tank", "partial_fill"],
-    "missed": ["missed_fuelup", "missedfuelup", "missed fill up", "missed_fill"],
-    "tags": ["tags"],
-}  # fmt: skip
-
 
 def _refuel(vehicle_id: int, station_id: int | None, **kw) -> Refuel:
     values = dict(
@@ -94,6 +75,15 @@ def test_multiple_vehicles_are_zipped(session: Session) -> None:
     assert single.media_type == "text/csv"
 
 
-def test_header_matches_lubelogger_aliases() -> None:
-    recognised = {a for aliases in LUBELOGGER_ALIASES.values() for a in aliases}
-    assert set(HEADER.split(",")) <= recognised
+def test_header_uses_spec_fuelly_columns(session: Session) -> None:
+    car = Vehicle(name="Car")
+    session.add(car)
+    session.flush()
+    session.add(_refuel(car.id, None))
+    session.flush()
+
+    header = export_fuelly(session).content.decode().splitlines()[0]
+    assert header.split(",") == [
+        "fuelup_date", "odometer", "litres", "price",
+        "partial_fuelup", "missed_fuelup", "notes", "tags",
+    ]  # fmt: skip

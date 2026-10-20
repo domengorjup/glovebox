@@ -138,16 +138,16 @@ Constraints:
     - `fuelup_date` (`YYYY-MM-DD`, `M/D/YY`, or `YYYY-MM-DD HH:MM:SS`);
     - `missed_fuelup` (0/1), `partial_fuelup` (0/1);
     - optional `city_percentage`, `tags`, `notes`.
-  - **(b) fuelly.com export format** (per the Fuelly FAQ summary and May's test fixture, **unverified against a real file**): `Name, Model, MPG, Odometer, Miles, Gallons, Price, Fuelup Date, Date Added, Tags, Notes`.
+  - **(b) fuelly.com export format** (per publicly available descriptions of the format, **unverified against a real file**): `Name, Model, MPG, Odometer, Miles, Gallons, Price, Fuelup Date, Date Added, Tags, Notes`.
     - **Units:** Gallons/Miles may hold the user's configured units. Whether the header changes is unknown, so the preview asks for units when the headers are ambiguous.
-  - **(c) Fuelly/aCar Android app export (future, not in v1),** as consumed by Hammond's importer (`server/service/importService.go`):
+  - **(c) Fuelly/aCar Android app export (future, not in v1),** per publicly available descriptions, **unverified against a real file**:
     - **Column order:** 0 type (`Gas`/`Service`), 1 MPG, 2 date, 3 time, 4 vehicle, 5 odometer, 6 fill (`Full`/partial), 7 price per unit, 8 quantity, 9 total cost, 10 octane, 11 gas brand, 12 location, 13 tags, 14 payment type, 15 tire pressure, 16 notes, 17 services.
     - **Support:** not in v1. Added in a later change only if a sample becomes available (see Non-Goals).
 - **Drivvo:** **real format unknown; English mapping provisional.** The user's Drivvo app is in English, so English is the first and default locale.
-  - **Known so far:** export is per vehicle from the app's History tab and follows the active filter; it needs a paid plan; headers are translated into the app language (a Danish export with translated headers was reported in Hammond issue #21).
+  - **Known so far:** export is per vehicle from the app's History tab and follows the active filter; it needs a paid plan; headers are translated into the app language (for example a Danish export with translated headers).
   - **Plan:** the adapter uses the shared machinery (D6) and ships an English alias table in `aliases/drivvo.toml`, marked provisional and based on a best guess of English header names, not on a real file. The preview reports unknown headers rather than guessing. Finalising the mapping, adding a fixture and other locales is blocked until the user gets the paid export (O1).
 - **Fuelly-compatible export (our output):** follows format (a) with metric headers: `fuelup_date,odometer,litres,price,partial_fuelup,missed_fuelup,notes,tags`.
-  - **Readable by LubeLogger, verified from its source** (`MapProfile/ImportMappers.cs`): it recognises `fuelup_date`, `odometer`, `litres`, `price`, `partial_fuelup`, `missed_fuelup`, `notes`, `tags`. It derives total cost as quantity × price when no `cost` column is present.
+  - **Header names:** the export uses exactly these Fuelly column names: `fuelup_date`, `odometer`, `litres`, `price`, `partial_fuelup`, `missed_fuelup`, `notes`, `tags`. Total cost is not exported; a reader derives it as quantity × price.
   - **Station:** goes into `tags` as well as into notes, so it survives in tools without a station field. The Fuelly importer reads the whole `tags` cell, trimmed, back as the station name (no splitting, no brand).
   - **Import preview:** files without vehicle names (Fuelly import format) ask for a target vehicle. A header-only Fuelly file produces the warning "The file has no data rows."
 

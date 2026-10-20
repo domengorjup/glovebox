@@ -1,6 +1,6 @@
 # Third-party notices
 
-Glovebox itself is released under the MIT licence (see `LICENSE`). This file lists third-party material that is bundled with it or was used as a reference.
+Glovebox itself is released under the MIT licence (see `LICENSE`). This file lists third-party material that is bundled with it.
 
 ## Vendored front-end assets
 
@@ -11,10 +11,6 @@ Located in `src/glovebox/web/static/`. Licence texts sit next to the files (see 
 | Pico.css (`pico.min.css`) | 2.1.1 | MIT (`LICENSE-pico.md`) | Copyright (c) 2019-2024 Pico |
 | Chart.js (`chart.umd.min.js`) | 4.5.1 | MIT (`LICENSE-chartjs.md`) | Copyright (c) 2014-2024 Chart.js Contributors |
 | @kurkle/color (bundled inside `chart.umd.min.js`) | 0.3.2 | MIT (`LICENSE-kurkle-color.md`) | Copyright (c) 2018-2021 Jukka Kurkela |
-
-## Test data
-
-`tests/test_export_fuelly.py` contains a subset of the import column aliases from LubeLogger (`MapProfile/ImportMappers.cs`, https://github.com/hargata/lubelog), used to check that the Fuelly-compatible export header is accepted by LubeLogger. LubeLogger is MIT licensed, Copyright (c) 2024 Hargata Softworks.
 
 ## Python dependencies
 

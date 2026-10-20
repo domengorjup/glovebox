@@ -105,7 +105,7 @@
   - one CSV per vehicle, zipped if there is more than one;
   - header `fuelup_date,odometer,litres,price,partial_fuelup,missed_fuelup,notes,tags`;
   - station name in `tags`.
-- [x] 5.3 Write tests: the export-contents scenario; the exact Fuelly row scenario; a header check against LubeLogger's alias list (taken from `MapProfile/ImportMappers.cs` and recorded in the test as a constant with its source URL).
+- [x] 5.3 Write tests: the export-contents scenario; the exact Fuelly row scenario; a header check that the export columns are exactly the Fuelly column names defined in the data-export spec.
 
 ## 6. Web UI (needs 1; uses 2's service signatures, can start against stubs)
 

@@ -1,6 +1,6 @@
 ## Why
 
-The user tracks car running costs in Drivvo, a proprietary freemium app whose data export is paywalled. No maintained open-source tool both runs inside Home Assistant and imports Drivvo data. The one HA add-on that does (`miczu71/fuel_tracker`) has no licence and logs in with Drivvo credentials. glovebox v1 is a small, self-hosted replacement. It covers only the features the user actually uses and can bring existing history in from the common apps.
+The user tracks car running costs in Drivvo, a proprietary freemium app whose data export is paywalled. No maintained open-source tool both runs inside Home Assistant and imports Drivvo data. The only HA add-on found for this needs the Drivvo account credentials and has no clear licence. glovebox v1 is a small, self-hosted replacement. It covers only the features the user actually uses and can bring existing history in from the common apps.
 
 ## What Changes
 

@@ -22,7 +22,6 @@ A self-hosted Home Assistant add-on for tracking car running costs across multip
   - `glovebox.log_refuel` HA action, backed by a new token-protected write endpoint; pre-select the nearest known station from the phone's location.
   - Phone-friendly "quick add refuelling" page (could come earlier).
   - Optional "next service due" sensor (reminders were deliberately left out of v1).
-  - Some ideas come from the AutoLog add-on (MIT): implement independently, copy no code or text.
 - **Later:** GitHub Actions multi-arch image build to GHCR (group 10), then point `config.yaml` `image:` at it, which removes the git clone in the add-on Dockerfile.
 
 ## Structure
