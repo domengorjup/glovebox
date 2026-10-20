@@ -95,10 +95,3 @@ def test_unsafe_ingress_header_ignored(client: TestClient) -> None:
     response = client.get("/", headers={"X-Ingress-Path": '/"><script>'})
     assert "<script>" not in response.text
     assert 'href="/"' in response.text
-
-
-def test_stubs_are_not_implemented(session: Session) -> None:
-    with pytest.raises(NotImplementedError):
-        records.list_vehicles(session)
-    with pytest.raises(NotImplementedError):
-        stats.segments([])

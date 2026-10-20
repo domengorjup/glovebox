@@ -1,0 +1,3 @@
+Date,Odometer,Fuel type,Volume,Price per unit,Total cost,Full tank,Missed refuelling,Gas station,Notes
+2024-02-01,5000,Petrol,40.00,1.500,60.00,Yes,No,Alpha Fuel,
+2024-02-15,5500,Petrol,20.00,1.550,31.00,No,No,Beta Oil,short stop

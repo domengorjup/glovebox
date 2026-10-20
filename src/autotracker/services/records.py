@@ -13,6 +13,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date, time
 
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from autotracker.models import (
@@ -23,7 +24,11 @@ from autotracker.models import (
     Station,
     Vehicle,
 )
-from autotracker.services.stats import StatsFilter
+from autotracker.services.stats import (
+    StatsFilter,
+    select_expenses,
+    select_refuels,
+)
 
 
 class RecordsError(Exception):
@@ -134,44 +139,127 @@ class RecordCounts:
     expenses: int
 
 
+# --- Helpers --------------------------------------------------------------
+
+INCONSISTENCY_TOLERANCE = 0.01
+
+
+def _clean(value: str | None) -> str | None:
+    """Strip whitespace; empty strings become ``None``."""
+    if value is None:
+        return None
+    return value.strip() or None
+
+
+def _round_div(numerator: int, denominator: int) -> int:
+    """Integer division rounding half up (positive operands)."""
+    return (2 * numerator + denominator) // (2 * denominator)
+
+
+def _get_or_raise(session: Session, model: type, record_id: int, label: str):
+    record = session.get(model, record_id)
+    if record is None:
+        raise NotFoundError(f"{label} {record_id} does not exist")
+    return record
+
+
 # --- Vehicles -------------------------------------------------------------
 
 
 def list_vehicles(session: Session, include_archived: bool = False) -> list[Vehicle]:
     """List vehicles ordered by name; archived ones only if requested."""
-    raise NotImplementedError
+    stmt = select(Vehicle).order_by(Vehicle.name, Vehicle.id)
+    if not include_archived:
+        stmt = stmt.where(Vehicle.archived.is_(False))
+    return list(session.scalars(stmt))
 
 
 def get_vehicle(session: Session, vehicle_id: int) -> Vehicle:
     """Return a vehicle or raise ``NotFoundError``."""
-    raise NotImplementedError
+    return _get_or_raise(session, Vehicle, vehicle_id, "Vehicle")
+
+
+def _check_vehicle_name(
+    session: Session, name: str, exclude_id: int | None = None
+) -> str:
+    name = name.strip()
+    if not name:
+        raise ValidationError(["Vehicle name is required"])
+    stmt = select(Vehicle.id).where(
+        Vehicle.name == name, Vehicle.archived.is_(False)
+    )
+    if exclude_id is not None:
+        stmt = stmt.where(Vehicle.id != exclude_id)
+    if session.scalars(stmt).first() is not None:
+        raise ValidationError([f"A vehicle named '{name}' already exists"])
+    return name
+
+
+def _apply_vehicle(vehicle: Vehicle, name: str, data: VehicleInput) -> None:
+    vehicle.name = name
+    vehicle.make = _clean(data.make)
+    vehicle.model = _clean(data.model)
+    vehicle.plate = _clean(data.plate)
+    vehicle.fuel_type = _clean(data.fuel_type)
+    vehicle.initial_odometer = data.initial_odometer
+    vehicle.notes = _clean(data.notes)
 
 
 def create_vehicle(session: Session, data: VehicleInput) -> Vehicle:
     """Create a vehicle; ``ValidationError`` if the name is empty or taken
     by a non-archived vehicle."""
-    raise NotImplementedError
+    vehicle = Vehicle(archived=False)
+    _apply_vehicle(vehicle, _check_vehicle_name(session, data.name), data)
+    session.add(vehicle)
+    session.flush()
+    return vehicle
 
 
 def update_vehicle(session: Session, vehicle_id: int, data: VehicleInput) -> Vehicle:
     """Update a vehicle with the same validation as ``create_vehicle``."""
-    raise NotImplementedError
+    vehicle = get_vehicle(session, vehicle_id)
+    exclude = None if vehicle.archived else vehicle.id
+    name = _check_vehicle_name(session, data.name, exclude_id=exclude)
+    _apply_vehicle(vehicle, name, data)
+    session.flush()
+    return vehicle
 
 
 def archive_vehicle(session: Session, vehicle_id: int, archived: bool = True) -> Vehicle:
     """Archive (or restore) a vehicle; restoring re-checks name uniqueness."""
-    raise NotImplementedError
+    vehicle = get_vehicle(session, vehicle_id)
+    if not archived:
+        _check_vehicle_name(session, vehicle.name, exclude_id=vehicle.id)
+    vehicle.archived = archived
+    session.flush()
+    return vehicle
 
 
 def count_vehicle_records(session: Session, vehicle_id: int) -> RecordCounts:
     """Count a vehicle's refuels and expenses (for the delete confirmation)."""
-    raise NotImplementedError
+    refuels = session.scalar(
+        select(func.count()).select_from(Refuel).where(Refuel.vehicle_id == vehicle_id)
+    )
+    expenses = session.scalar(
+        select(func.count())
+        .select_from(Expense)
+        .where(Expense.vehicle_id == vehicle_id)
+    )
+    return RecordCounts(refuels=refuels or 0, expenses=expenses or 0)
 
 
 def delete_vehicle(session: Session, vehicle_id: int, *, confirm: bool = False) -> None:
     """Delete a vehicle and its records; raises ``ConfirmationRequired`` if it
     has records and ``confirm`` is false."""
-    raise NotImplementedError
+    vehicle = get_vehicle(session, vehicle_id)
+    counts = count_vehicle_records(session, vehicle_id)
+    if (counts.refuels or counts.expenses) and not confirm:
+        raise ConfirmationRequired(counts.refuels, counts.expenses)
+    # Explicit deletes: do not depend on SQLite foreign-key enforcement.
+    session.execute(delete(Refuel).where(Refuel.vehicle_id == vehicle_id))
+    session.execute(delete(Expense).where(Expense.vehicle_id == vehicle_id))
+    session.delete(vehicle)
+    session.flush()
 
 
 # --- Stations -------------------------------------------------------------
@@ -179,23 +267,52 @@ def delete_vehicle(session: Session, vehicle_id: int, *, confirm: bool = False) 
 
 def list_stations(session: Session) -> list[Station]:
     """List stations ordered by name."""
-    raise NotImplementedError
+    return list(session.scalars(select(Station).order_by(Station.name, Station.id)))
 
 
 def get_station(session: Session, station_id: int) -> Station:
     """Return a station or raise ``NotFoundError``."""
-    raise NotImplementedError
+    return _get_or_raise(session, Station, station_id, "Station")
+
+
+def _check_station(
+    session: Session, data: StationInput, exclude_id: int | None = None
+) -> tuple[str, str | None]:
+    name = data.name.strip()
+    if not name:
+        raise ValidationError(["Station name is required"])
+    location = _clean(data.location)
+    # SQL "= NULL" never matches, so compare NULL locations explicitly.
+    location_match = (
+        Station.location.is_(None) if location is None else Station.location == location
+    )
+    stmt = select(Station.id).where(Station.name == name, location_match)
+    if exclude_id is not None:
+        stmt = stmt.where(Station.id != exclude_id)
+    if session.scalars(stmt).first() is not None:
+        raise ValidationError([f"Station '{name}' already exists at this location"])
+    return name, location
 
 
 def create_station(session: Session, data: StationInput) -> Station:
     """Create a station; ``ValidationError`` on empty name or duplicate
     (name, location), including when location is NULL."""
-    raise NotImplementedError
+    name, location = _check_station(session, data)
+    station = Station(name=name, brand=_clean(data.brand), location=location)
+    session.add(station)
+    session.flush()
+    return station
 
 
 def update_station(session: Session, station_id: int, data: StationInput) -> Station:
     """Rename / relocate / set brand of one station."""
-    raise NotImplementedError
+    station = get_station(session, station_id)
+    station.name, station.location = _check_station(
+        session, data, exclude_id=station_id
+    )
+    station.brand = _clean(data.brand)
+    session.flush()
+    return station
 
 
 def set_brand_bulk(
@@ -203,17 +320,35 @@ def set_brand_bulk(
 ) -> list[Station]:
     """Set (or clear, with ``None``) the brand of several stations at once.
     Manual only: never infers a brand."""
-    raise NotImplementedError
+    stations = [get_station(session, station_id) for station_id in station_ids]
+    for station in stations:
+        station.brand = _clean(brand)
+    session.flush()
+    return stations
 
 
 def merge_stations(session: Session, source_id: int, target_id: int) -> Station:
     """Point all refuels of ``source_id`` at ``target_id`` and delete the source."""
-    raise NotImplementedError
+    if source_id == target_id:
+        raise ValidationError(["Cannot merge a station into itself"])
+    source = get_station(session, source_id)
+    target = get_station(session, target_id)
+    session.execute(
+        update(Refuel).where(Refuel.station_id == source_id).values(station_id=target_id)
+    )
+    session.delete(source)
+    session.flush()
+    return target
 
 
 def delete_station(session: Session, station_id: int) -> None:
     """Delete a station; its refuels keep existing with ``station_id`` NULL."""
-    raise NotImplementedError
+    station = get_station(session, station_id)
+    session.execute(
+        update(Refuel).where(Refuel.station_id == station_id).values(station_id=None)
+    )
+    session.delete(station)
+    session.flush()
 
 
 # --- Refuels --------------------------------------------------------------
@@ -229,12 +364,76 @@ def derive_price_figures(
 
     Also used by the import pipeline on commit.
 
+    Units: litres in thousandths, price per litre in milli-units of currency,
+    total in cents, so ``total_cents = litres_milli * price_milli / 10000``.
+    When all three are given they are returned unchanged with
+    ``derived_field=None``.
+
     Raises
     ------
     ValidationError
         If fewer than two figures are given or a litres/price is not positive.
     """
-    raise NotImplementedError
+    given = [v for v in (litres_milli, price_per_litre_milli, total_cents) if v is not None]
+    if len(given) < 2:
+        raise ValidationError(
+            ["Enter at least two of litres, price per litre and total price"]
+        )
+    errors = []
+    if litres_milli is not None and litres_milli <= 0:
+        errors.append("Litres must be positive")
+    if price_per_litre_milli is not None and price_per_litre_milli <= 0:
+        errors.append("Price per litre must be positive")
+    if total_cents is not None and total_cents < 0:
+        errors.append("Total price must not be negative")
+    if errors:
+        raise ValidationError(errors)
+
+    if len(given) == 3:
+        return DerivedFigures(litres_milli, price_per_litre_milli, total_cents, None)
+    if total_cents is None:
+        total = _round_div(litres_milli * price_per_litre_milli, 10_000)
+        return DerivedFigures(
+            litres_milli, price_per_litre_milli, total, DerivedField.TOTAL
+        )
+    if price_per_litre_milli is None:
+        price = _round_div(total_cents * 10_000, litres_milli)
+        return DerivedFigures(
+            litres_milli, price, total_cents, DerivedField.PRICE_PER_LITRE
+        )
+    litres = _round_div(total_cents * 10_000, price_per_litre_milli)
+    return DerivedFigures(litres, price_per_litre_milli, total_cents, DerivedField.LITRES)
+
+
+def _inconsistency_warning(data: RefuelInput) -> list[str]:
+    """Warn if all three figures were entered and disagree by more than 1 %."""
+    if None in (data.litres_milli, data.price_per_litre_milli, data.total_cents):
+        return []
+    expected = data.litres_milli * data.price_per_litre_milli / 10_000
+    if abs(data.total_cents - expected) > INCONSISTENCY_TOLERANCE * expected:
+        return [
+            f"Total {data.total_cents / 100:.2f} differs from litres x price "
+            f"({expected / 100:.2f}) by more than 1 %"
+        ]
+    return []
+
+
+def _odometer_warnings(
+    session: Session, data: RefuelInput, exclude_id: int | None
+) -> list[str]:
+    stmt = select(Refuel).where(Refuel.vehicle_id == data.vehicle_id)
+    if exclude_id is not None:
+        stmt = stmt.where(Refuel.id != exclude_id)
+    warnings = []
+    for other in session.scalars(stmt):
+        too_low = other.date < data.date and other.odometer_km > data.odometer_km
+        too_high = other.date > data.date and other.odometer_km < data.odometer_km
+        if too_low or too_high:
+            warnings.append(
+                f"Odometer {data.odometer_km:g} is out of order compared with the "
+                f"refuel on {other.date.isoformat()} at {other.odometer_km:g} km"
+            )
+    return warnings
 
 
 def preview_refuel(
@@ -242,32 +441,68 @@ def preview_refuel(
 ) -> RefuelPreview:
     """Derive figures and collect warnings (>1 % inconsistency, odometer
     order) without saving. ``exclude_id`` skips the record being edited."""
-    raise NotImplementedError
+    figures = derive_price_figures(
+        data.litres_milli, data.price_per_litre_milli, data.total_cents
+    )
+    warnings = _inconsistency_warning(data)
+    warnings += _odometer_warnings(session, data, exclude_id)
+    return RefuelPreview(figures=figures, warnings=warnings)
 
 
 def list_refuels(session: Session, flt: StatsFilter) -> list[Refuel]:
     """Refuels matching the filter, newest first."""
-    raise NotImplementedError
+    return list(session.scalars(select_refuels(flt)))
 
 
 def get_refuel(session: Session, refuel_id: int) -> Refuel:
     """Return a refuel or raise ``NotFoundError``."""
-    raise NotImplementedError
+    return _get_or_raise(session, Refuel, refuel_id, "Refuel")
+
+
+def _apply_refuel(session: Session, refuel: Refuel, data: RefuelInput) -> None:
+    get_vehicle(session, data.vehicle_id)
+    if data.station_id is not None:
+        get_station(session, data.station_id)
+    if data.odometer_km < 0:
+        raise ValidationError(["Odometer must not be negative"])
+    figures = derive_price_figures(
+        data.litres_milli, data.price_per_litre_milli, data.total_cents
+    )
+    refuel.vehicle_id = data.vehicle_id
+    refuel.date = data.date
+    refuel.time = data.time
+    refuel.odometer_km = data.odometer_km
+    refuel.litres_milli = figures.litres_milli
+    refuel.price_per_litre_milli = figures.price_per_litre_milli
+    refuel.total_cents = figures.total_cents
+    refuel.derived_field = figures.derived_field
+    refuel.station_id = data.station_id
+    refuel.is_full = data.is_full
+    refuel.missed_previous = data.missed_previous
+    refuel.notes = _clean(data.notes)
 
 
 def create_refuel(session: Session, data: RefuelInput) -> Refuel:
     """Save a refuel (warnings never block); records ``derived_field``."""
-    raise NotImplementedError
+    refuel = Refuel(source="manual")
+    _apply_refuel(session, refuel, data)
+    session.add(refuel)
+    session.flush()
+    return refuel
 
 
 def update_refuel(session: Session, refuel_id: int, data: RefuelInput) -> Refuel:
     """Update a refuel, re-deriving the price figures."""
-    raise NotImplementedError
+    refuel = get_refuel(session, refuel_id)
+    _apply_refuel(session, refuel, data)
+    session.flush()
+    return refuel
 
 
 def delete_refuel(session: Session, refuel_id: int) -> None:
     """Delete a refuel."""
-    raise NotImplementedError
+    session.delete(get_refuel(session, refuel_id))
+    session.flush()
 
 
 # --- Expenses -------------------------------------------------------------
@@ -275,24 +510,61 @@ def delete_refuel(session: Session, refuel_id: int) -> None:
 
 def list_expenses(session: Session, flt: StatsFilter) -> list[Expense]:
     """Expenses matching the filter (vehicle, dates, category), newest first."""
-    raise NotImplementedError
+    return list(session.scalars(select_expenses(flt)))
 
 
 def get_expense(session: Session, expense_id: int) -> Expense:
     """Return an expense or raise ``NotFoundError``."""
-    raise NotImplementedError
+    return _get_or_raise(session, Expense, expense_id, "Expense")
+
+
+def _apply_expense(session: Session, expense: Expense, data: ExpenseInput) -> None:
+    get_vehicle(session, data.vehicle_id)
+    errors = []
+    try:
+        category = ExpenseCategory(data.category)
+    except ValueError:
+        allowed = ", ".join(c.value for c in ExpenseCategory)
+        errors.append(f"Unknown category '{data.category}' (allowed: {allowed})")
+        category = None
+    if data.amount_cents < 0:
+        errors.append("Amount must not be negative")
+    start, end = data.coverage_start, data.coverage_end
+    if (start is None) != (end is None):
+        errors.append("Coverage start and end must be set together")
+    elif start is not None and end < start:
+        errors.append("Coverage end must not be before coverage start")
+    if errors:
+        raise ValidationError(errors)
+    expense.vehicle_id = data.vehicle_id
+    expense.date = data.date
+    expense.category = category
+    expense.title = data.title.strip()
+    expense.amount_cents = data.amount_cents
+    expense.odometer_km = data.odometer_km
+    expense.coverage_start = start
+    expense.coverage_end = end
+    expense.notes = _clean(data.notes)
 
 
 def create_expense(session: Session, data: ExpenseInput) -> Expense:
     """Create an expense; ``ValidationError`` on a bad coverage range."""
-    raise NotImplementedError
+    expense = Expense(source="manual")
+    _apply_expense(session, expense, data)
+    session.add(expense)
+    session.flush()
+    return expense
 
 
 def update_expense(session: Session, expense_id: int, data: ExpenseInput) -> Expense:
     """Update an expense with the same validation as ``create_expense``."""
-    raise NotImplementedError
+    expense = get_expense(session, expense_id)
+    _apply_expense(session, expense, data)
+    session.flush()
+    return expense
 
 
 def delete_expense(session: Session, expense_id: int) -> None:
     """Delete an expense."""
-    raise NotImplementedError
+    session.delete(get_expense(session, expense_id))
+    session.flush()

@@ -1,0 +1,26 @@
+# Fuelly CSV headers (design D7). Both formats are UNVERIFIED against a real
+# file: the import format comes from a search summary of the help page, the
+# export format from the FAQ summary and a third-party test fixture.
+
+# fuelly.com import format (also what our Fuelly-compatible export writes).
+[import]
+date = ["fuelup_date"]
+odometer = ["odometer", "km", "miles"]
+litres = ["litres", "liters"]
+gallons = ["gallons"]
+price = ["price"]
+partial = ["partial_fuelup"]
+missed = ["missed_fuelup"]
+notes = ["notes"]
+tags = ["tags"]
+
+# fuelly.com export format. "Miles" is the trip distance, not the odometer.
+[export]
+vehicle = ["Name"]
+date = ["Fuelup Date"]
+odometer = ["Odometer"]
+litres = ["Litres", "Liters"]
+gallons = ["Gallons"]
+price = ["Price"]
+notes = ["Notes"]
+tags = ["Tags"]

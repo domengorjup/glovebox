@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% from "_macros.html" import messages %}
+{% block title %}{{ 'Edit' if expense_id else 'New' }} expense - Autotracker{% endblock %}
+{% block content %}
+<h1>{{ 'Edit expense' if expense_id else 'New expense' }}</h1>
+{{ messages(errors) }}
+<form method="post" action="{{ url(request, ('/expenses/%d/edit' % expense_id) if expense_id else '/expenses/new') }}">
+  <label>Vehicle
+    <select name="vehicle_id" required>
+      <option value="">Choose...</option>
+      {% for v in vehicles %}
+      <option value="{{ v.id }}" {{ 'selected' if f.vehicle_id == v.id | string }}>{{ v.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Date (paid) <input type="date" name="date" value="{{ f.date }}" required></label>
+  <label>Category
+    <select name="category">
+      {% for c in categories %}
+      <option value="{{ c.value }}" {{ 'selected' if f.category == c.value }}>{{ c.value }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Title <input name="title" value="{{ f.title }}" placeholder="e.g. Oil change, Annual policy" required></label>
+  <label>Amount (full price paid) <input name="amount" inputmode="decimal" value="{{ f.amount }}" required></label>
+  <label>Odometer (km, optional) <input name="odometer_km" inputmode="decimal" value="{{ f.odometer_km }}"></label>
+  <fieldset>
+    <legend>Coverage period (optional, both dates or none)</legend>
+    <div class="grid">
+      <label>From <input type="date" name="coverage_start" value="{{ f.coverage_start }}"></label>
+      <label>To (inclusive) <input type="date" name="coverage_end" value="{{ f.coverage_end }}"></label>
+    </div>
+    <p class="muted">Used to spread the cost over the covered days in statistics. The stored amount stays the full price.</p>
+  </fieldset>
+  <label>Notes <textarea name="notes">{{ f.notes }}</textarea></label>
+  <button type="submit">Save</button>
+  <a href="{{ url(request, '/expenses') }}">Cancel</a>
+</form>
+{% endblock %}

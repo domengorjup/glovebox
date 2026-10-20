@@ -1,0 +1,15 @@
+/* Small additions to Pico.css; keep the UI usable on a phone. */
+.main-nav { flex-wrap: wrap; }
+.nav-links { flex-wrap: wrap; }
+.table-scroll { overflow-x: auto; }
+.filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0 1rem; }
+.warning { border-left: 4px solid var(--pico-color-amber-450, #f5a623); padding: .5rem 1rem; margin-bottom: 1rem; }
+.error { border-left: 4px solid var(--pico-del-color, #c0392b); padding: .5rem 1rem; margin-bottom: 1rem; }
+.chart-box { position: relative; height: 18rem; margin-bottom: 1.5rem; }
+.num { text-align: right; white-space: nowrap; }
+.row-actions { white-space: nowrap; }
+.row-actions form { display: inline; }
+.inline-form { display: inline; }
+.inline-form button, .row-actions button { width: auto; padding: .15rem .6rem; margin: 0; }
+.toggle a[aria-current="true"] { font-weight: bold; text-decoration: underline; }
+.muted { color: var(--pico-muted-color); }

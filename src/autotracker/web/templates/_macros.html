@@ -1,0 +1,68 @@
+{# Shared template macros. Every URL goes through url(request, ...). #}
+
+{% macro messages(errors=None, warnings=None) %}
+  {% for message in errors or [] %}<p class="error" role="alert">{{ message }}</p>{% endfor %}
+  {% for message in warnings or [] %}<p class="warning">{{ message }}</p>{% endfor %}
+{% endmacro %}
+
+{% macro post_button(request, path, label, confirm_text=None, fields=None) %}
+  <form method="post" action="{{ url(request, path) }}" class="inline-form"
+        {% if confirm_text %}onsubmit="return confirm('{{ confirm_text }}')"{% endif %}>
+    {% for name, value in (fields or {}).items() %}
+      <input type="hidden" name="{{ name }}" value="{{ value }}">
+    {% endfor %}
+    <button type="submit" class="secondary outline">{{ label }}</button>
+  </form>
+{% endmacro %}
+
+{# GET filter form. `show` lists the fields to offer. #}
+{% macro filter_form(request, path, f, choices, show, allocation=None) %}
+  <form method="get" action="{{ url(request, path) }}">
+    <div class="filters">
+      {% if 'vehicle' in show %}
+      <label>Vehicle
+        <select name="vehicle">
+          <option value="">All</option>
+          {% for v in choices.all_vehicles %}
+          <option value="{{ v.id }}" {{ 'selected' if v.id in f.vehicles }}>{{ v.name }}{{ ' (archived)' if v.archived }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {% endif %}
+      {% if 'dates' in show %}
+      <label>From <input type="date" name="date_from" value="{{ f.date_from or '' }}"></label>
+      <label>To <input type="date" name="date_to" value="{{ f.date_to or '' }}"></label>
+      {% endif %}
+      {% if 'category' in show %}
+      <label>Category
+        <select name="category">
+          <option value="">All</option>
+          {% for c in choices.all_categories %}
+          <option value="{{ c.value }}" {{ 'selected' if c in f.categories }}>{{ c.value }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {% endif %}
+      {% if 'station' in show %}
+      <label>Station
+        <select name="station">
+          <option value="">All</option>
+          {% for s in choices.all_stations %}
+          <option value="{{ s.id }}" {{ 'selected' if s.id in f.stations }}>{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Brand
+        <select name="brand">
+          <option value="">All</option>
+          {% for b in choices.all_brands %}
+          <option value="{{ b }}" {{ 'selected' if b in f.brands }}>{{ b }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {% endif %}
+    </div>
+    {% if allocation %}<input type="hidden" name="allocation" value="{{ allocation }}">{% endif %}
+    <button type="submit">Apply filters</button>
+  </form>
+{% endmacro %}

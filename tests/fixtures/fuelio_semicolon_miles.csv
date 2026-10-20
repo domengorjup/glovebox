@@ -1,0 +1,13 @@
+## Vehicle
+Name;Description;DistUnit;FuelUnit
+Miles Car;Hand-made sample;1;1
+## Log
+Data;Odo (mi);Fuel (gal);Full;Price (optional);City (optional);Notes (optional);Missed;VolumePrice
+2024-06-01 09:00;1000;10,000;1;35,00;Gamma;;0;3,500
+2024-06-15 09:00;1300;8,500;1;29,75;Gamma;;0;3,500
+## CostCategories
+CostTypeID;Name
+1;Service
+## Costs
+CostTitle;Date;Odo;CostTypeID;Notes;Cost;isTemplate;isIncome
+Brake pads;2024-06-20 10:00;1200;1;;1.234,50;0;0

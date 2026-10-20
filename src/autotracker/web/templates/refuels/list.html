@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% from "_macros.html" import filter_form, post_button %}
+{% block title %}Refuels - Autotracker{% endblock %}
+{% block content %}
+<h1>Refuels</h1>
+<p><a role="button" href="{{ url(request, '/refuels/new') }}">Add refuel</a></p>
+<details {{ 'open' if f.vehicles or f.date_from or f.date_to or f.stations or f.brands }}>
+  <summary>Filters</summary>
+  {{ filter_form(request, '/refuels', f, choices, ['vehicle', 'dates', 'station']) }}
+</details>
+<p class="muted">{{ rows | length }} refuels</p>
+<div class="table-scroll">
+<table>
+  <thead><tr>
+    <th>Date</th><th>Vehicle</th><th class="num">Odometer</th><th class="num">Litres</th>
+    <th class="num">Price/L</th><th class="num">Total</th><th>Station</th>
+    <th class="num">L/100 km</th><th></th>
+  </tr></thead>
+  <tbody>
+  {% for r in rows %}
+  {% set seg = segments.get(r.id) %}
+  <tr>
+    <td>{{ r.date }}</td>
+    <td>{{ vehicle_names.get(r.vehicle_id, '') }}</td>
+    <td class="num">{{ r.odometer_km | km }}</td>
+    <td class="num">{{ r.litres_milli | litres }}{{ '' if r.is_full else ' (part)' }}</td>
+    <td class="num">{{ r.price_per_litre_milli | price }}</td>
+    <td class="num">{{ r.total_cents | money }}</td>
+    <td>{{ station_names.get(r.station_id, '') }}</td>
+    <td class="num">{% if seg %}{{ seg.consumption | consumption }}{% else %}-{% endif %}</td>
+    <td class="row-actions">
+      <a href="{{ url(request, '/refuels/%d/edit' % r.id) }}">Edit</a>
+      {{ post_button(request, '/refuels/%d/delete' % r.id, 'Delete', 'Delete this refuel?') }}
+    </td>
+  </tr>
+  {% else %}
+  <tr><td colspan="9">No refuels match.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="muted">L/100 km is shown on the full fill that closes a segment; "n/a" means the
+segment is invalid (missed fill-up, no earlier full fill, bad odometer).</p>
+{% endblock %}

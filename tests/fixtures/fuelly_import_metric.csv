@@ -1,0 +1,4 @@
+fuelup_date,odometer,litres,price,partial_fuelup,missed_fuelup,notes,tags
+2024-05-02,98000,20.500,1.459,1,0,,OMV Celje
+2024-05-20,98500,40.000,1.500,0,0,highway trip,
+2024-06-10 14:30:00,99000,38.000,1.480,0,1,,

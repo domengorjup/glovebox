@@ -1,16 +1,19 @@
-"""HTML routes. Group 6 adds pages to ``router`` (or submodules it includes)."""
+"""HTML routes: dashboard, vehicles, refuels, expenses, stations, import, export."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter
 
-from autotracker.web.templating import templates
+from autotracker.web import (
+    dashboard,
+    exports,
+    expenses,
+    imports,
+    refuels,
+    stations,
+    vehicles,
+)
 
 router = APIRouter()
-
-
-@router.get("/", response_class=HTMLResponse)
-def index(request: Request) -> HTMLResponse:
-    """Placeholder home page; replaced by the dashboard in group 6."""
-    return templates.TemplateResponse(request, "index.html")
+for module in (dashboard, vehicles, refuels, expenses, stations, imports, exports):
+    router.include_router(module.router)

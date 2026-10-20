@@ -12,6 +12,7 @@ from sqlalchemy import Engine
 
 from autotracker import __version__
 from autotracker.api import v1
+from autotracker.auth import install_auth
 from autotracker.config import Settings, load_settings
 from autotracker.db import make_engine, make_session_factory, run_migrations
 from autotracker.web import router as web_router
@@ -48,6 +49,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     app.state.settings = settings
     app.state.engine = engine
     app.state.session_factory = make_session_factory(engine)
+    install_auth(app)
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     app.include_router(web_router)
     app.include_router(v1.router)

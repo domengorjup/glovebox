@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% from "_macros.html" import filter_form %}
+{% block title %}Statistics - Autotracker{% endblock %}
+{% block content %}
+<h1>Statistics</h1>
+<details {{ 'open' if f.vehicles or f.date_from or f.date_to or f.stations or f.brands }}>
+  <summary>Filters</summary>
+  {{ filter_form(request, '/', f, choices, ['vehicle', 'dates', 'station'], allocation) }}
+</details>
+
+<p class="toggle">Expense allocation:
+  <a href="{{ query_url(request, allocation='spread') }}" {% if allocation == 'spread' %}aria-current="true"{% endif %}>Spread over coverage</a> |
+  <a href="{{ query_url(request, allocation='paid') }}" {% if allocation == 'paid' %}aria-current="true"{% endif %}>As paid</a>
+  <span class="muted">(view only, nothing is changed in your data)</span>
+</p>
+
+<section>
+  <div class="grid">
+    <article>
+      <header>Total cost</header>
+      <strong>{{ breakdown.total_cents | money }}</strong>
+    </article>
+    <article>
+      <header>Cost per km</header>
+      <strong>{% if cost_per_km.per_km is none %}n/a{% else %}{{ '%.3f' % cost_per_km.per_km }} {{ request.app.state.settings.currency }}/km{% endif %}</strong>
+      {% if cost_per_km.distance_km %}<br><small class="muted">over {{ cost_per_km.distance_km | km }} km</small>{% endif %}
+    </article>
+    <article>
+      <header>Average consumption</header>
+      <strong>{% if avg_consumption is none %}n/a{% else %}{{ avg_consumption | consumption }} L/100 km{% endif %}</strong>
+      <br><small class="muted">{{ segment_count }} valid segments, distance-weighted</small>
+    </article>
+  </div>
+</section>
+
+<h2>Cost by category</h2>
+<div class="table-scroll">
+<table>
+  <thead><tr><th>Category</th><th class="num">Amount</th></tr></thead>
+  <tbody>
+    <tr><td>fuel</td><td class="num">{{ breakdown.fuel_cents | money }}</td></tr>
+    {% for c in categories %}
+    <tr><td>{{ c }}</td><td class="num">{{ breakdown.by_category.get(c, 0) | money }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<h2>Consumption over time</h2>
+<div class="chart-box"><canvas id="chart-consumption"></canvas></div>
+<h2>Monthly cost</h2>
+<div class="chart-box"><canvas id="chart-monthly"></canvas></div>
+<h2>Yearly cost</h2>
+<div class="chart-box"><canvas id="chart-yearly"></canvas></div>
+
+<h2>Stations and brands</h2>
+<p class="toggle">Group by:
+  <a href="{{ query_url(request, group='station') }}" {% if group == 'station' %}aria-current="true"{% endif %}>Station</a> |
+  <a href="{{ query_url(request, group='brand') }}" {% if group == 'brand' %}aria-current="true"{% endif %}>Brand</a>
+</p>
+<div class="table-scroll">
+<table>
+  <thead><tr>
+    <th>{{ 'Brand' if group == 'brand' else 'Station' }}</th><th class="num">Fills</th>
+    <th class="num">Litres</th><th class="num">Avg price/L</th>
+    <th class="num">Min</th><th class="num">Max</th><th class="num">L/100 km (segments)</th>
+  </tr></thead>
+  <tbody>
+  {% for s in station_rows %}
+  <tr>
+    <td>{{ s.label }}</td><td class="num">{{ s.fills }}</td>
+    <td class="num">{{ s.litres_milli | litres }}</td>
+    <td class="num">{{ s.avg_price_per_litre_milli | price }}</td>
+    <td class="num">{{ s.min_price_per_litre_milli | price }}</td>
+    <td class="num">{{ s.max_price_per_litre_milli | price }}</td>
+    <td class="num">{{ s.consumption | consumption }} ({{ s.consumption_segments }})</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="7">No refuels match.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="muted">Prices use all fills. Consumption uses only segments whose fuel came
+entirely from that {{ group }}, so mixed-station tanks are left out; it shows n/a
+below 2 segments, and the number in brackets is the segment count.</p>
+
+<script type="application/json" id="chart-data">{{ chart_data | tojson }}</script>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url(request, '/static/chart.umd.min.js') }}"></script>
+<script src="{{ url(request, '/static/app.js') }}"></script>
+{% endblock %}

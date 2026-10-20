@@ -3,13 +3,59 @@
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import urlencode
 
+from fastapi import Request
 from fastapi.templating import Jinja2Templates
+from jinja2 import pass_context
 
 from autotracker.urls import url
+from autotracker.web import formatting
 
 WEB_DIR = Path(__file__).parent
 STATIC_DIR = WEB_DIR / "static"
 
 templates = Jinja2Templates(directory=WEB_DIR / "templates")
+
+
+@pass_context
+def _money(context: dict, cents: int | None) -> str:
+    """Format cents with the configured currency code."""
+    if cents is None:
+        return "n/a"
+    currency = context["request"].app.state.settings.currency
+    return f"{formatting.format_cents(cents)} {currency}"
+
+
+def _price(milli: int | None) -> str:
+    """Format a price per litre (3 decimals)."""
+    return "n/a" if milli is None else formatting.format_milli(milli, 3)
+
+
+def query_url(request: Request, **changes: str | None) -> str:
+    """
+    URL of the current page with query parameters replaced.
+
+    A value of ``None`` or ``""`` removes that parameter; other parameters
+    (including repeated ones) are kept, so toggles keep the active filters.
+    """
+    items = [(k, v) for k, v in request.query_params.multi_items() if k not in changes]
+    items += [(k, v) for k, v in changes.items() if v not in (None, "")]
+    query = urlencode(items)
+    base = url(request, request.url.path)
+    return f"{base}?{query}" if query else base
+
+
 templates.env.globals["url"] = url
+templates.env.globals["query_url"] = query_url
+templates.env.filters["money"] = _money
+templates.env.filters["litres"] = lambda milli: formatting.format_milli(milli, 2)
+templates.env.filters["price"] = _price
+templates.env.filters["km"] = formatting.format_km
+templates.env.filters["consumption"] = formatting.format_consumption
+templates.env.filters["milli_input"] = lambda milli: (
+    "" if milli is None else formatting.format_milli(milli, 3).rstrip("0").rstrip(".")
+)
+templates.env.filters["cents_input"] = lambda cents: (
+    "" if cents is None else formatting.format_cents(cents)
+)
