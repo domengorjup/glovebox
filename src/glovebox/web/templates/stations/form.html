@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% from "_macros.html" import messages %}
+{% set v = entered if entered is defined else station %}
+{% block title %}Edit station - Glovebox{% endblock %}
+{% block content %}
+<h1>Edit station</h1>
+{{ messages(errors) }}
+<form method="post" action="{{ url(request, '/stations/%d/edit' % station.id) }}">
+  <label>Name <input name="name" value="{{ v.name }}" required></label>
+  <label>Location <input name="location" value="{{ v.location or '' }}"></label>
+  <label>Brand <input name="brand" value="{{ v.brand or '' }}"></label>
+  <button type="submit">Save</button>
+  <a href="{{ url(request, '/stations') }}">Cancel</a>
+</form>
+{% endblock %}

@@ -1,6 +1,6 @@
 ## Why
 
-The user tracks car running costs in Drivvo, a proprietary freemium app whose data export is paywalled. No maintained open-source tool both runs inside Home Assistant and imports Drivvo data. The one HA add-on that does (`miczu71/fuel_tracker`) has no licence and logs in with Drivvo credentials. autotracker v1 is a small, self-hosted replacement. It covers only the features the user actually uses and can bring existing history in from the common apps.
+The user tracks car running costs in Drivvo, a proprietary freemium app whose data export is paywalled. No maintained open-source tool both runs inside Home Assistant and imports Drivvo data. The one HA add-on that does (`miczu71/fuel_tracker`) has no licence and logs in with Drivvo credentials. glovebox v1 is a small, self-hosted replacement. It covers only the features the user actually uses and can bring existing history in from the common apps.
 
 ## What Changes
 
@@ -46,7 +46,7 @@ The user tracks car running costs in Drivvo, a proprietary freemium app whose da
 
 ## Impact
 
-- New codebase: Python package `autotracker` (FastAPI app, SQLAlchemy models, Alembic migrations, importers/exporters, Jinja2 templates, vendored static assets), plus `Dockerfile`, add-on folder and `repository.yaml`.
+- New codebase: Python package `glovebox` (FastAPI app, SQLAlchemy models, Alembic migrations, importers/exporters, Jinja2 templates, vendored static assets), plus `Dockerfile`, add-on folder and `repository.yaml`.
 - New dependencies (via `uv add`): fastapi, uvicorn, sqlalchemy, alembic, jinja2, python-multipart, itsdangerous. Dev dependencies: pytest, httpx.
 - Vendored front-end assets (no CDN, because Ingress and offline use must work): Chart.js and a small classless CSS framework.
 - No external services. User data stays in the SQLite file. Real user export files are never committed; tests use anonymised fixtures.

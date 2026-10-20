@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% from "_macros.html" import messages %}
+{% block title %}{{ 'Edit' if refuel_id else 'New' }} refuel - Glovebox{% endblock %}
+{% block content %}
+<h1>{{ 'Edit refuel' if refuel_id else 'New refuel' }}</h1>
+{{ messages(errors, warnings) }}
+{% if figures is defined %}
+<p class="muted">Calculated: {{ figures.litres_milli | litres }} L at
+{{ figures.price_per_litre_milli | price }} per litre, total {{ figures.total_cents | money }}.</p>
+{% endif %}
+<form method="post" action="{{ url(request, ('/refuels/%d/edit' % refuel_id) if refuel_id else '/refuels/new') }}">
+  <label>Vehicle
+    <select name="vehicle_id" required>
+      <option value="">Choose...</option>
+      {% for v in vehicles %}
+      <option value="{{ v.id }}" {{ 'selected' if f.vehicle_id == v.id | string }}>{{ v.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <div class="grid">
+    <label>Date <input type="date" name="date" value="{{ f.date }}" required></label>
+    <label>Time (optional) <input type="time" name="time" value="{{ f.time }}"></label>
+  </div>
+  <label>Odometer (km) <input name="odometer_km" inputmode="decimal" value="{{ f.odometer_km }}" required></label>
+  <fieldset>
+    <legend>Fuel: enter any two of the three, the third is calculated</legend>
+    <div class="grid">
+      <label>Litres <input name="litres" inputmode="decimal" value="{{ f.litres }}"></label>
+      <label>Price per litre <input name="price_per_litre" inputmode="decimal" value="{{ f.price_per_litre }}"></label>
+      <label>Total <input name="total" inputmode="decimal" value="{{ f.total }}"></label>
+    </div>
+  </fieldset>
+  <label>Station
+    <select name="station_id">
+      <option value="">None</option>
+      {% for s in stations %}
+      <option value="{{ s.id }}" {{ 'selected' if f.station_id == s.id | string }}>{{ s.name }}{{ ' - ' ~ s.location if s.location }}{{ ' (' ~ s.brand ~ ')' if s.brand }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <details>
+    <summary>New station</summary>
+    <div class="grid">
+      <label>Name <input name="new_station_name" value="{{ f.new_station_name }}"></label>
+      <label>Location (optional) <input name="new_station_location" value="{{ f.new_station_location }}"></label>
+    </div>
+    <p class="muted">A new station overrides the selection above. Set its brand on the Stations page.</p>
+  </details>
+  <label><input type="checkbox" name="is_full" value="1" {{ 'checked' if f.is_full }}> Full tank</label>
+  <label><input type="checkbox" name="missed_previous" value="1" {{ 'checked' if f.missed_previous }}> Missed the previous fill-up</label>
+  <label>Notes <textarea name="notes">{{ f.notes }}</textarea></label>
+  {% if needs_confirm is defined %}
+    <input type="hidden" name="confirm_warnings" value="1">
+    <button type="submit">Save anyway</button>
+  {% else %}
+    <button type="submit">Save</button>
+  {% endif %}
+  <a href="{{ url(request, '/refuels') }}">Cancel</a>
+</form>
+{% endblock %}

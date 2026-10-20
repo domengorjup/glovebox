@@ -8,11 +8,13 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
-from autotracker.exporters.fuelly import export_fuelly
-from autotracker.models import Expense, ExpenseCategory, Refuel, Station, Vehicle
+from glovebox.exporters.fuelly import export_fuelly
+from glovebox.models import Expense, ExpenseCategory, Refuel, Station, Vehicle
 
 HEADER = "fuelup_date,odometer,litres,price,partial_fuelup,missed_fuelup,notes,tags"
 
+# Alias subset from LubeLogger (hargata/lubelog, MIT, Copyright (c) 2024 Hargata
+# Softworks); see THIRD_PARTY_NOTICES.md.
 # Import aliases recognised by LubeLogger, copied from
 # https://github.com/hargata/lubelog/blob/main/MapProfile/ImportMappers.cs
 # (ImportMapper); the export header must be a subset of their union.

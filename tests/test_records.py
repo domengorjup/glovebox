@@ -6,8 +6,8 @@ from datetime import date
 
 import pytest
 
-from autotracker.models import DerivedField, ExpenseCategory, Expense, Refuel
-from autotracker.services.records import (
+from glovebox.models import DerivedField, ExpenseCategory, Expense, Refuel
+from glovebox.services.records import (
     ConfirmationRequired,
     ExpenseInput,
     NotFoundError,
@@ -36,7 +36,7 @@ from autotracker.services.records import (
     update_station,
     update_vehicle,
 )
-from autotracker.services.stats import StatsFilter
+from glovebox.services.stats import StatsFilter
 
 
 @pytest.fixture

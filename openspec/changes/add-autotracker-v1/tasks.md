@@ -14,10 +14,10 @@
 
 ## 1. Foundation (sequential, blocks everything else)
 
-- [x] 1.1 Create `pyproject.toml` with a `src/autotracker` package. Add dependencies with `uv add fastapi uvicorn sqlalchemy alembic jinja2 python-multipart itsdangerous` and dev dependencies `pytest httpx`.
+- [x] 1.1 Create `pyproject.toml` with a `src/glovebox` package. Add dependencies with `uv add fastapi uvicorn sqlalchemy alembic jinja2 python-multipart itsdangerous` and dev dependencies `pytest httpx`.
 - [x] 1.2 Implement `config.py`. Read settings from env vars, plus `/data/options.json` in add-on mode:
-  - `AUTOTRACKER_MODE` (`standalone`|`addon`), `BASE_PATH`, `DATA_DIR`
-  - `AUTOTRACKER_PASSWORD`, `AUTOTRACKER_API_TOKEN`, `AUTOTRACKER_SECRET`
+  - `GLOVEBOX_MODE` (`standalone`|`addon`), `BASE_PATH`, `DATA_DIR`
+  - `GLOVEBOX_PASSWORD`, `GLOVEBOX_API_TOKEN`, `GLOVEBOX_SECRET`
   - `CURRENCY` (default `EUR`)
 - [x] 1.3 Implement `db.py`: SQLite engine under `DATA_DIR`, WAL mode, session factory.
 - [x] 1.4 Implement `models.py` per design D3: vehicle, station, refuel, expense (with nullable `coverage_start` and `coverage_end`), import_batch. Money is stored as integer cents and price per litre as integer milli-units; category is an enum. Add the indexes that the duplicate-detection keys need.
@@ -130,15 +130,15 @@
 
 - [x] 7.1 Implement `api/v1.py`: `/vehicles`, `/vehicles/{id}/summary` (with `allocation=spread|paid`, default spread, 422 otherwise, echoed in the response), `/vehicles/{id}/consumption`, `/stations/stats`, with JSON 404 errors. Add response-shape snapshot tests that pin the v1 fields.
 - [x] 7.2 Implement `auth.py` for standalone mode: optional single-password login with an itsdangerous-signed session cookie, plus a login page and logout. Log a startup warning when no password is set.
-- [x] 7.3 Add Bearer-token checking for `/api/v1` in standalone mode when `AUTOTRACKER_API_TOKEN` is set, returning 401 otherwise.
+- [x] 7.3 Add Bearer-token checking for `/api/v1` in standalone mode when `GLOVEBOX_API_TOKEN` is set, returning 401 otherwise.
 - [x] 7.4 Add the add-on mode source-address check (the ingress proxy only, otherwise 403). Verify the current proxy address and header behaviour against the HA developer docs, and record the source in a code comment.
 - [x] 7.5 Write tests for every scenario in the web-access and stats-api specs, including the UI/API consistency check.
 
 ## 8. Add-on packaging and container (needs 1; can run in parallel with 2–7)
 
 - [x] 8.1 Write the `Dockerfile`: Python 3.12 base, install with `uv` from the lockfile, non-root user where HA allows it. It serves on the ingress port in add-on mode and on 8080 in standalone mode, with an entrypoint that reads the mode.
-- [x] 8.2 Create `repository.yaml` at the repo root and `addon/autotracker/`:
-  - `config.yaml`: ingress, panel title "Autotracker", `mdi:car`, arch `amd64` and `aarch64`, options schema;
+- [x] 8.2 Create `repository.yaml` at the repo root and `addon/glovebox/`:
+  - `config.yaml`: ingress, panel title "Glovebox", `mdi:car-wrench`, arch `amd64` and `aarch64`, options schema;
   - `DOCS.md`, `CHANGELOG.md`, `icon.png`, `logo.png`.
 - [x] 8.3 Verify the `config.yaml` keys, base image and any `build.yaml` requirement against the current HA add-on developer docs. Note the doc URLs in the repo README.
 - [x] 8.4 Write the README: install as an HA add-on (repository URL), run standalone (`docker run -p 8080:8080 -v ./data:/data …`), environment variables, backup and restore via the native export.
@@ -149,7 +149,7 @@
 - [x] 9.2 Build the image locally. Run it standalone, then smoke-test: create a vehicle, add refuels and an expense, view stats, export natively, import the export into a fresh volume.
 - [ ] 9.3 Install as a local add-on on the user's HA OS. The user does this step, or it is done with their permission. Smoke-test the Ingress panel, then a backup and restore.
 - [ ] 9.4 (BLOCKED on real sample) Import the user's real Drivvo export locally, without committing it. Compare the totals and the consumption against Drivvo's own reports, and record any differences.
-- [ ] 9.5 Run `openspec validate add-autotracker-v1 --strict` and update the artifacts to match what was built.
+- [x] 9.5 Run `openspec validate add-autotracker-v1 --strict` and update the artifacts to match what was built.
 
 ## 10. Later (optional in this change)
 

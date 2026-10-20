@@ -48,43 +48,6 @@ wheels = [
 ]
 
 [[package]]
-name = "autotracker"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "alembic" },
-    { name = "fastapi" },
-    { name = "itsdangerous" },
-    { name = "jinja2" },
-    { name = "python-multipart" },
-    { name = "sqlalchemy" },
-    { name = "uvicorn" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "httpx" },
-    { name = "pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "alembic", specifier = ">=1.20.0" },
-    { name = "fastapi", specifier = ">=0.152.0" },
-    { name = "itsdangerous", specifier = ">=2.2.0" },
-    { name = "jinja2", specifier = ">=3.1.6" },
-    { name = "python-multipart", specifier = ">=0.0.32" },
-    { name = "sqlalchemy", specifier = ">=2.1.5" },
-    { name = "uvicorn", specifier = ">=0.54.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "httpx", specifier = ">=0.28.1" },
-    { name = "pytest", specifier = ">=9.1.1" },
-]
-
-[[package]]
 name = "certifi"
 version = "2026.10.19"
 source = { registry = "https://pypi.org/simple" }
@@ -126,6 +89,43 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/d6/7c/5d06e9e29b8576f4a02df605873a44b9a9bc76d170197ac2f9a3c09c44ac/fastapi-0.152.0.tar.gz", hash = "sha256:8356eab05470647405cf280fa51b34f7693527b9d2e43288d6425970e43db768", size = 485311, upload-time = "2026-10-20T12:13:01.291Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b1/94/67981dee51cf0ba40ec9974f58162b90abbf8b210441d339e3a4415fc7dc/fastapi-0.152.0-py3-none-any.whl", hash = "sha256:ecea8d7b0d00a7a4f4ababc1848593441e6c344cbf40615f5390ce1572f43d78", size = 145466, upload-time = "2026-10-20T12:12:59.681Z" },
+]
+
+[[package]]
+name = "glovebox"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "alembic" },
+    { name = "fastapi" },
+    { name = "itsdangerous" },
+    { name = "jinja2" },
+    { name = "python-multipart" },
+    { name = "sqlalchemy" },
+    { name = "uvicorn" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "httpx" },
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "alembic", specifier = ">=1.20.0" },
+    { name = "fastapi", specifier = ">=0.152.0" },
+    { name = "itsdangerous", specifier = ">=2.2.0" },
+    { name = "jinja2", specifier = ">=3.1.6" },
+    { name = "python-multipart", specifier = ">=0.0.32" },
+    { name = "sqlalchemy", specifier = ">=2.1.5" },
+    { name = "uvicorn", specifier = ">=0.54.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "pytest", specifier = ">=9.1.1" },
 ]
 
 [[package]]

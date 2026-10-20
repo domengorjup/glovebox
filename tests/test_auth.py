@@ -8,9 +8,9 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from autotracker.app import create_app
-from autotracker.auth import INGRESS_PROXY_ADDRESS, SESSION_COOKIE, session_secret
-from autotracker.config import Mode, Settings
+from glovebox.app import create_app
+from glovebox.auth import INGRESS_PROXY_ADDRESS, SESSION_COOKIE, session_secret
+from glovebox.config import Mode, Settings
 
 
 def make_client(engine, tmp_path: Path, *, host: str = "testclient", **kw) -> TestClient:
@@ -44,9 +44,9 @@ def test_addon_ignores_password_and_has_no_login(engine, tmp_path):
 # --- standalone login --------------------------------------------------------
 
 def test_no_password_open_and_warns(engine, tmp_path, caplog):
-    with caplog.at_level(logging.WARNING, logger="autotracker.auth"):
+    with caplog.at_level(logging.WARNING, logger="glovebox.auth"):
         c = make_client(engine, tmp_path)
-    assert "AUTOTRACKER_PASSWORD" in caplog.text
+    assert "GLOVEBOX_PASSWORD" in caplog.text
     assert c.get("/").status_code == 200
     assert c.get("/api/v1/vehicles").status_code == 200
 

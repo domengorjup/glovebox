@@ -6,8 +6,8 @@ from datetime import date, time
 
 import pytest
 
-from autotracker.importers.base import Ambiguity, ImportOptions
-from autotracker.importers.fuelly import FuellyAdapter
+from glovebox.importers.base import Ambiguity, ImportOptions
+from glovebox.importers.fuelly import FuellyAdapter
 
 ADAPTER = FuellyAdapter()
 

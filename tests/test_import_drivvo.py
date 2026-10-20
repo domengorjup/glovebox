@@ -7,15 +7,15 @@ from datetime import date
 import pytest
 from sqlalchemy import select
 
-from autotracker.importers.base import ALIASES_DIR, ImportOptions, load_aliases
-from autotracker.importers.drivvo import DrivvoAdapter
-from autotracker.importers.pipeline import (
+from glovebox.importers.base import ALIASES_DIR, ImportOptions, load_aliases
+from glovebox.importers.drivvo import DrivvoAdapter
+from glovebox.importers.pipeline import (
     VehicleMapping,
     commit_import,
     detect_format,
     preview_import,
 )
-from autotracker.models import Expense, ExpenseCategory, Refuel, Vehicle
+from glovebox.models import Expense, ExpenseCategory, Refuel, Vehicle
 
 ADAPTER = DrivvoAdapter()
 

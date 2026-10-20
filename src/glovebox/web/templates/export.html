@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Export - Glovebox{% endblock %}
+{% block content %}
+<h1>Export</h1>
+{% macro vehicle_select() %}
+  <label>Vehicle
+    <select name="vehicle">
+      <option value="">All vehicles</option>
+      {% for v in vehicles %}<option value="{{ v.id }}">{{ v.name }}{{ ' (archived)' if v.archived }}</option>{% endfor %}
+    </select>
+  </label>
+{% endmacro %}
+<article>
+  <header>Full backup (native format)</header>
+  <p>ZIP with vehicles, stations, refuels and expenses. It can be imported back into Glovebox.</p>
+  <form method="get" action="{{ url(request, '/export/native') }}">
+    {{ vehicle_select() }}
+    <button type="submit">Download native export</button>
+  </form>
+</article>
+<article>
+  <header>Fuelly-compatible CSV</header>
+  <p>Refuels only, one CSV per vehicle (zipped if more than one). <strong>Expenses are not included</strong>
+  because the Fuelly format has no place for them.</p>
+  <form method="get" action="{{ url(request, '/export/fuelly') }}">
+    {{ vehicle_select() }}
+    <button type="submit">Download Fuelly export</button>
+  </form>
+</article>
+{% endblock %}

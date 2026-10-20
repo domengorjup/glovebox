@@ -6,9 +6,9 @@ from datetime import date
 
 import pytest
 
-from autotracker.models import Expense, ExpenseCategory, Refuel, Station, Vehicle
-from autotracker.services.records import NotFoundError
-from autotracker.services.stats import (
+from glovebox.models import Expense, ExpenseCategory, Refuel, Station, Vehicle
+from glovebox.services.records import NotFoundError
+from glovebox.services.stats import (
     Allocation,
     GroupBy,
     StatsFilter,

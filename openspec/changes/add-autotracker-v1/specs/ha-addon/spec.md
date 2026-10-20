@@ -5,14 +5,14 @@ The project repository SHALL be installable as a Home Assistant add-on repositor
 
 #### Scenario: Add repository in HA
 - **WHEN** the user adds the repository URL in the HA add-on store
-- **THEN** the autotracker add-on is listed and can be installed
+- **THEN** the glovebox add-on is listed and can be installed
 
 ### Requirement: Ingress panel
-The add-on SHALL enable Ingress, add a sidebar panel titled "Autotracker" with a car icon, and support at least the `amd64` and `aarch64` architectures.
+The add-on SHALL enable Ingress, add a sidebar panel titled "Glovebox" with a car icon, and support at least the `amd64` and `aarch64` architectures.
 
 #### Scenario: Open from sidebar
 - **WHEN** the installed add-on is started and the user clicks the sidebar panel
-- **THEN** the autotracker dashboard opens inside Home Assistant
+- **THEN** the glovebox dashboard opens inside Home Assistant
 
 ### Requirement: Persistent data and backups
 The add-on SHALL store its SQLite database and settings under `/data`, so that they survive restarts and upgrades and are included in Home Assistant backups. On startup it SHALL apply pending schema migrations automatically.

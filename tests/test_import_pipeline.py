@@ -9,12 +9,12 @@ from datetime import date
 import pytest
 from sqlalchemy import func, select
 
-from autotracker.db import make_engine, make_session_factory, run_migrations
-from autotracker.config import Settings
-from autotracker.exporters.fuelly import export_fuelly
-from autotracker.exporters.native import export_native
-from autotracker.importers.base import Ambiguity, ImportOptions
-from autotracker.importers.pipeline import (
+from glovebox.db import make_engine, make_session_factory, run_migrations
+from glovebox.config import Settings
+from glovebox.exporters.fuelly import export_fuelly
+from glovebox.exporters.native import export_native
+from glovebox.importers.base import Ambiguity, ImportOptions
+from glovebox.importers.pipeline import (
     VehicleMapping,
     available_formats,
     commit_import,
@@ -23,7 +23,7 @@ from autotracker.importers.pipeline import (
     preview_import,
     undo_batch,
 )
-from autotracker.models import (
+from glovebox.models import (
     Expense,
     ExpenseCategory,
     ImportBatch,
@@ -31,7 +31,7 @@ from autotracker.models import (
     Station,
     Vehicle,
 )
-from autotracker.services.records import NotFoundError, ValidationError
+from glovebox.services.records import NotFoundError, ValidationError
 
 
 def count(session, model) -> int:
@@ -194,7 +194,7 @@ class TestCommit:
     def test_failed_commit_leaves_no_trace(
         self, session, fuelio, monkeypatch
     ) -> None:
-        from autotracker.importers import pipeline
+        from glovebox.importers import pipeline
 
         def boom(*args, **kwargs):
             raise RuntimeError("disk full")

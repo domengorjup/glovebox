@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% from "_macros.html" import messages %}
+{% block title %}Stations - Glovebox{% endblock %}
+{% block content %}
+<h1>Stations</h1>
+{{ messages(errors) }}
+<p class="muted">Brands are set by hand here; the app never guesses a brand from a name.
+Stations are created from the refuel form or by imports.</p>
+<form method="post" action="{{ url(request, '/stations/brand') }}">
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th></th><th>Name</th><th>Location</th><th>Brand</th><th></th></tr></thead>
+    <tbody>
+    {% for s in stations %}
+    <tr>
+      <td><input type="checkbox" name="station_ids" value="{{ s.id }}" aria-label="Select {{ s.name }}"></td>
+      <td>{{ s.name }}</td><td>{{ s.location or '' }}</td><td>{{ s.brand or '' }}</td>
+      <td><a href="{{ url(request, '/stations/%d/edit' % s.id) }}">Rename / edit</a></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5">No stations yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <fieldset role="group">
+    <input name="brand" placeholder="Brand for selected stations">
+    <button type="submit">Set brand</button>
+    <button type="submit" name="clear" value="1" class="secondary">Clear brand</button>
+  </fieldset>
+</form>
+
+<h2>Merge duplicates</h2>
+<form method="post" action="{{ url(request, '/stations/merge') }}">
+  <div class="grid">
+    <label>Merge this station...
+      <select name="source_id" required>
+        {% for s in stations %}<option value="{{ s.id }}">{{ s.name }}{{ ' - ' ~ s.location if s.location }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>...into this one
+      <select name="target_id" required>
+        {% for s in stations %}<option value="{{ s.id }}">{{ s.name }}{{ ' - ' ~ s.location if s.location }}</option>{% endfor %}
+      </select>
+    </label>
+  </div>
+  <p class="muted">All refuels of the first station move to the second; the first is removed.</p>
+  <button type="submit" class="secondary">Merge</button>
+</form>
+{% endblock %}

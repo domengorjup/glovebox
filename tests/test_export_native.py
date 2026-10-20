@@ -10,10 +10,10 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
-from autotracker import __version__
-from autotracker.config import Settings
-from autotracker.exporters.native import export_native
-from autotracker.models import (
+from glovebox import __version__
+from glovebox.config import Settings
+from glovebox.exporters.native import export_native
+from glovebox.models import (
     DerivedField,
     Expense,
     ExpenseCategory,

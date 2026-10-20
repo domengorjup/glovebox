@@ -8,9 +8,9 @@ from datetime import date, time
 
 import pytest
 
-from autotracker.importers.base import Ambiguity, ImportOptions
-from autotracker.importers.fuelio import FuelioAdapter
-from autotracker.models import ExpenseCategory
+from glovebox.importers.base import Ambiguity, ImportOptions
+from glovebox.importers.fuelio import FuelioAdapter
+from glovebox.models import ExpenseCategory
 
 ADAPTER = FuelioAdapter()
 

@@ -45,7 +45,7 @@ API values SHALL be computed by the same statistics functions as the web pages.
 - **THEN** the average consumption and the cost totals are equal
 
 ### Requirement: API authentication
-In add-on mode, the API SHALL be reachable through Ingress under the same rules as the UI. In standalone mode, when `AUTOTRACKER_API_TOKEN` is set, the API SHALL require `Authorization: Bearer <token>` or a valid login session, and SHALL return HTTP 401 otherwise.
+In add-on mode, the API SHALL be reachable through Ingress under the same rules as the UI. In standalone mode, when `GLOVEBOX_API_TOKEN` is set, the API SHALL require `Authorization: Bearer <token>` or a valid login session, and SHALL return HTTP 401 otherwise.
 
 #### Scenario: Missing token
 - **WHEN** standalone mode has a token configured and a request arrives without credentials

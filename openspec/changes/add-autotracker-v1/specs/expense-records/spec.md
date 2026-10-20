@@ -15,6 +15,10 @@ The system SHALL store expense records with the following fields.
 - **THEN** the system rejects it
 - **AND** the user may instead choose `other` with title "Parking"
 
+#### Scenario: Reject expense without title
+- **WHEN** an expense is submitted with an empty or blank title
+- **THEN** the system rejects it and stores nothing
+
 ### Requirement: Coverage period for fixed costs
 An expense of any category MAY have a coverage start date and a coverage end date, intended for insurance, registration and similar fixed costs. Both dates SHALL be set together or both left empty, and the end date SHALL NOT be before the start date (both inclusive). The stored amount SHALL always be the full price paid; coverage dates only affect how statistics allocate it.
 

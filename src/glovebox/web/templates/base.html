@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Glovebox{% endblock %}</title>
+  {# Vendored assets only (no CDN); see static/VENDORED.md. #}
+  <link rel="stylesheet" href="{{ url(request, '/static/pico.min.css') }}">
+  <link rel="stylesheet" href="{{ url(request, '/static/app.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header class="container">
+    <nav class="main-nav">
+      <ul><li><strong><a href="{{ url(request, '/') }}">Glovebox</a></strong></li></ul>
+      <ul class="nav-links">
+        <li><a href="{{ url(request, '/refuels') }}">Refuels</a></li>
+        <li><a href="{{ url(request, '/expenses') }}">Expenses</a></li>
+        <li><a href="{{ url(request, '/stations') }}">Stations</a></li>
+        <li><a href="{{ url(request, '/vehicles') }}">Vehicles</a></li>
+        <li><a href="{{ url(request, '/import') }}">Import</a></li>
+        <li><a href="{{ url(request, '/export') }}">Export</a></li>
+      </ul>
+    </nav>
+  </header>
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

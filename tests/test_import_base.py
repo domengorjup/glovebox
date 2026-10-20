@@ -9,7 +9,7 @@ from decimal import Decimal
 
 import pytest
 
-from autotracker.importers import base
+from glovebox.importers import base
 
 
 class TestEncoding:

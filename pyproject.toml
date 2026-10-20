@@ -1,7 +1,9 @@
 [project]
-name = "autotracker"
+name = "glovebox"
 version = "0.1.0"
 description = "Self-hosted car running-cost tracker"
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     { name = "Domen Gorjup", email = "domen_gorjup@hotmail.com" }
 ]
@@ -17,7 +19,7 @@ dependencies = [
 ]
 
 [project.scripts]
-autotracker = "autotracker.app:main"
+glovebox = "glovebox.app:main"
 
 [build-system]
 requires = ["uv_build>=0.12.17,<0.13.0"]

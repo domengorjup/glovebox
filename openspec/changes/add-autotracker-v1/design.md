@@ -149,23 +149,24 @@ Constraints:
   - **Plan:** the adapter uses the shared machinery (D6) and ships an English alias table in `aliases/drivvo.toml`, marked provisional and based on a best guess of English header names, not on a real file. The preview reports unknown headers rather than guessing. Finalising the mapping, adding a fixture and other locales is blocked until the user gets the paid export (O1).
 - **Fuelly-compatible export (our output):** follows format (a) with metric headers: `fuelup_date,odometer,litres,price,partial_fuelup,missed_fuelup,notes,tags`.
   - **Readable by LubeLogger, verified from its source** (`MapProfile/ImportMappers.cs`): it recognises `fuelup_date`, `odometer`, `litres`, `price`, `partial_fuelup`, `missed_fuelup`, `notes`, `tags`. It derives total cost as quantity × price when no `cost` column is present.
-  - **Station:** goes into `tags` as well as into notes, so it survives in tools without a station field.
+  - **Station:** goes into `tags` as well as into notes, so it survives in tools without a station field. The Fuelly importer reads the whole `tags` cell, trimmed, back as the station name (no splitting, no brand).
+  - **Import preview:** files without vehicle names (Fuelly import format) ask for a target vehicle. A header-only Fuelly file produces the warning "The file has no data rows."
 
 ### D8. Exports
 - **Native export:** a ZIP containing `vehicles.csv`, `stations.csv`, `refuels.csv`, `expenses.csv`, plus `manifest.json` (app version, schema version, export date, currency).
-  - **Format:** UTF-8, comma delimiter, ISO dates, `.` decimals. It round-trips exactly through the native importer.
+  - **Format:** UTF-8, comma delimiter, ISO dates, `.` decimals. It round-trips exactly through the native importer, including each record's `derived_field` and `source`.
 - **Fuelly-compatible export:** one CSV per vehicle, zipped if there is more than one vehicle. Expenses are not part of that format and are omitted; the UI says so.
 
 ### D9. Web access: Ingress prefix, root, and optional login
 - **Path prefix:** the app reads the `X-Ingress-Path` request header (set by the HA Supervisor) or a `BASE_PATH` env var, and uses it as the root path.
   - All templates build URLs through a single `url_for`-style helper. No absolute paths are hard-coded; static assets and API calls use the same helper.
-- **Ingress mode** (`AUTOTRACKER_MODE=addon`):
+- **Ingress mode** (`GLOVEBOX_MODE=addon`):
   - No app-level login; HA has already authenticated the user.
   - The server listens on the ingress port and accepts requests only from the Supervisor ingress proxy address (`172.30.32.2`). **Unverified detail:** confirm against current HA developer docs during implementation.
 - **Standalone mode** (default):
-  - If `AUTOTRACKER_PASSWORD` is set, a single-password login with a signed session cookie (itsdangerous) protects HTML routes.
+  - If `GLOVEBOX_PASSWORD` is set, a single-password login with a signed session cookie (itsdangerous) protects HTML routes.
   - If unset, there is no login, and a startup log warning recommends a reverse proxy.
-  - The stats API also accepts `Authorization: Bearer <AUTOTRACKER_API_TOKEN>` when that variable is set. This is what the future integration will use.
+  - The stats API also accepts `Authorization: Bearer <GLOVEBOX_API_TOKEN>` when that variable is set. This is what the future integration will use.
 - **Alternatives considered:**
   - Full user accounts: out of scope for single-household use.
   - Relying only on a reverse proxy: a password is cheap and safer by default.
@@ -182,19 +183,19 @@ Constraints:
 - **Shared code:** HTML pages and the API call the same stats service functions, so numbers cannot diverge.
 
 ### D11. HA add-on packaging
-- **Repository layout:** `repository.yaml` at the repo root and an add-on folder `autotracker/` containing:
-  - `config.yaml` (name, slug, version, arch `[amd64, aarch64]`, `ingress: true`, `ingress_port`, `panel_icon: mdi:car`, `panel_title`, `init: false`);
+- **Repository layout:** `repository.yaml` at the repo root and an add-on folder `glovebox/` containing:
+  - `config.yaml` (name, slug, version, arch `[amd64, aarch64]`, `ingress: true`, `ingress_port`, `panel_icon: mdi:car-wrench`, `panel_title`, `init: false`);
   - `Dockerfile` (FROM the add-on base Python image, or `python:3.12-slim`);
   - `DOCS.md`, `CHANGELOG.md`, icon and logo.
-- **Data:** the database lives at `/data/autotracker.db`, which HA includes in its add-on backups.
+- **Data:** the database lives at `/data/glovebox.db`, which HA includes in its add-on backups.
 - **Build:** v1 builds locally on the HA host from the Dockerfile; no registry is needed. A GitHub Actions workflow that builds multi-arch images and publishes them to GHCR is a separate, later task group.
 - **Unverified details to check against current HA developer docs:** the exact `config.yaml` keys, the base-image names, and whether `build.yaml` is still needed.
-- **Standalone image:** the same Dockerfile, run with `AUTOTRACKER_MODE=standalone`, `DATA_DIR=/data` and port 8080.
+- **Standalone image:** the same Dockerfile, run with `GLOVEBOX_MODE=standalone`, `DATA_DIR=/data` and port 8080.
 
 ### D12. Code layout and parallel-work interfaces
 
 ```
-src/autotracker/
+src/glovebox/
   config.py            # settings from env/options (mode, base path, data dir, password, token, currency)
   db.py, models.py     # SQLAlchemy models (D3); Alembic in migrations/
   services/
@@ -209,7 +210,7 @@ src/autotracker/
   web/                 # HTML routes, templates/, static/ (vendored)
   api/v1.py            # stats API
   auth.py              # D9
-addon/autotracker/     # HA add-on folder; repository.yaml at repo root
+addon/glovebox/     # HA add-on folder; repository.yaml at repo root
 tests/fixtures/        # anonymised samples only
 ```
 

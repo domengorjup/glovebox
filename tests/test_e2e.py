@@ -20,10 +20,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
-from autotracker.app import create_app
-from autotracker.config import Settings
-from autotracker.db import make_engine, run_migrations
-from autotracker.models import Expense, ImportBatch, Refuel, Station, Vehicle
+from glovebox.app import create_app
+from glovebox.config import Settings
+from glovebox.db import make_engine, run_migrations
+from glovebox.models import Expense, ImportBatch, Refuel, Station, Vehicle
 
 PREFIX = "/api/hassio_ingress/e2etoken"
 

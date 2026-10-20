@@ -8,9 +8,9 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from autotracker.models import Vehicle
-from autotracker.services import records, stats
-from autotracker.services.stats import (
+from glovebox.models import Vehicle
+from glovebox.services import records, stats
+from glovebox.services.stats import (
     Allocation,
     LastRefuel,
     Segment,
@@ -21,7 +21,7 @@ from autotracker.services.stats import (
 
 @pytest.fixture
 def vehicle_id(engine, client: TestClient) -> int:
-    from autotracker.db import make_session_factory
+    from glovebox.db import make_session_factory
 
     with make_session_factory(engine)() as s:
         v = Vehicle(name="Clio", make="Renault")
@@ -123,7 +123,7 @@ def test_unknown_vehicle_404_json(client):
     def raise_nf(*_a):
         raise records.NotFoundError("Vehicle 999 not found")
 
-    import autotracker.services.stats as st
+    import glovebox.services.stats as st
 
     st.vehicle_summary, original = raise_nf, st.vehicle_summary
     try:
@@ -197,7 +197,7 @@ def test_station_stats_bad_group_by_422(client):
 
 def test_ui_api_consistency(engine, client, vehicle_id):
     """API summary equals the service output for the same vehicle (UI uses it too)."""
-    from autotracker.db import make_session_factory
+    from glovebox.db import make_session_factory
 
     with make_session_factory(engine)() as s:
         try:

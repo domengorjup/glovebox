@@ -12,10 +12,10 @@ from sqlalchemy import inspect, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from autotracker.config import Mode, load_settings
-from autotracker.db import make_engine, run_migrations
-from autotracker.models import Base, Expense, ExpenseCategory, Vehicle
-from autotracker.services import records, stats
+from glovebox.config import Mode, load_settings
+from glovebox.db import make_engine, run_migrations
+from glovebox.models import Base, Expense, ExpenseCategory, Vehicle
+from glovebox.services import records, stats
 
 
 def test_settings_defaults(tmp_path: Path) -> None:
@@ -29,7 +29,7 @@ def test_settings_defaults(tmp_path: Path) -> None:
 def test_settings_env_overrides_options(tmp_path: Path) -> None:
     options = tmp_path / "options.json"
     options.write_text(json.dumps({"currency": "CHF", "password": "x"}))
-    env = {"AUTOTRACKER_MODE": "addon", "CURRENCY": "USD", "BASE_PATH": "foo/"}
+    env = {"GLOVEBOX_MODE": "addon", "CURRENCY": "USD", "BASE_PATH": "foo/"}
     s = load_settings(env, options)
     assert (s.mode, s.currency, s.password) == (Mode.ADDON, "USD", "x")
     assert s.base_path == "/foo"
@@ -38,7 +38,7 @@ def test_settings_env_overrides_options(tmp_path: Path) -> None:
 
 def test_settings_invalid_mode_raises() -> None:
     with pytest.raises(ValueError):
-        load_settings({"AUTOTRACKER_MODE": "bogus"})
+        load_settings({"GLOVEBOX_MODE": "bogus"})
 
 
 def test_migrations_match_models(engine) -> None:

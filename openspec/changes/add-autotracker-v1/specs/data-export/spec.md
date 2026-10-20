@@ -12,7 +12,7 @@ The system SHALL export all data, or a selected vehicle, as a ZIP containing `ve
 The system SHALL export refuellings in the Fuelly import format, one CSV per vehicle (zipped if more than one), with header `fuelup_date,odometer,litres,price,partial_fuelup,missed_fuelup,notes,tags`. In it:
 - `price` SHALL be the price per litre;
 - the fill flags SHALL be `0` or `1`;
-- the station name SHALL be included in `tags`.
+- the station name SHALL be included in `tags` (the Fuelly importer reads it back as the station, see data-import).
 
 Expenses SHALL NOT be included, and the UI SHALL say so.
 

@@ -19,7 +19,7 @@ In add-on mode, the system SHALL NOT show a login. It SHALL accept HTTP requests
 - **THEN** the response is 403
 
 ### Requirement: Optional standalone login
-In standalone mode, when `AUTOTRACKER_PASSWORD` is set, the system SHALL require a login with that password before serving any HTML page, and SHALL keep the session in a signed cookie. When no password is set, the system SHALL serve without login and SHALL log a warning at startup.
+In standalone mode, when `GLOVEBOX_PASSWORD` is set, the system SHALL require a login with that password before serving any HTML page, and SHALL keep the session in a signed cookie. When no password is set, the system SHALL serve without login and SHALL log a warning at startup.
 
 #### Scenario: Login required
 - **WHEN** a password is configured and an unauthenticated user opens the dashboard

@@ -1,4 +1,4 @@
-# Project: autotracker
+# Project: glovebox
 
 ## Purpose
 A self-hosted Home Assistant add-on for tracking car running costs across multiple vehicles: refuelling (fuel quantity, price per litre, total price, gas station), maintenance, and insurance/registration. It shows stats and filters (e.g. consumption over time, comparison across gas stations) and replaces Drivvo.
@@ -15,8 +15,8 @@ A self-hosted Home Assistant add-on for tracking car running costs across multip
 - Standing permission (granted 2026-10-20): commit locally at sensible checkpoints (after the foundation, after each completed task group, after final checks). Never push without asking.
 
 ## Structure
-- `src/autotracker/`: `app.py` (factory `create_app`, `main`), `config.py`, `db.py`, `models.py`, `auth.py` (add-on source check, standalone login/token), `urls.py` (`url(request, path)` base-path helper), `migrations/` (Alembic, run at startup), `services/{records,stats}.py`, `importers/{base,pipeline,drivvo,fuelio,fuelly,native}.py` (+ `aliases/*.toml`), `exporters/{native,fuelly}.py`, `api/v1.py`, `web/` (routes, `templating.py`, `templates/`, `static/`).
+- `src/glovebox/`: `app.py` (factory `create_app`, `main`), `config.py`, `db.py`, `models.py`, `auth.py` (add-on source check, standalone login/token), `urls.py` (`url(request, path)` base-path helper), `migrations/` (Alembic, run at startup), `services/{records,stats}.py`, `importers/{base,pipeline,drivvo,fuelio,fuelly,native}.py` (+ `aliases/*.toml`), `exporters/{native,fuelly}.py`, `api/v1.py`, `web/` (routes, `templating.py`, `templates/`, `static/`).
 - Task groups 1-9 are implemented; the change artifacts are in `openspec/changes/add-autotracker-v1/`.
-- `addon/autotracker/` (HA add-on files), `Dockerfile`, `docker/entrypoint.sh`, `repository.yaml`.
+- `addon/glovebox/` (HA add-on files), `Dockerfile`, `docker/entrypoint.sh`, `repository.yaml`.
 - `tests/`: `test_e2e.py` (no monkeypatching, drives the real web forms), `conftest.py` (migrated in-memory `engine`, `session`, `client` fixtures), `fixtures/` (anonymised samples only).
-- Run: `uv run autotracker` (env: `DATA_DIR`, `AUTOTRACKER_PORT`, ...). Test: `uv run pytest`.
+- Run: `uv run glovebox` (env: `DATA_DIR`, `GLOVEBOX_PORT`, ...). Test: `uv run pytest`.

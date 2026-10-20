@@ -10,9 +10,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
-from autotracker.app import create_app
-from autotracker.config import Settings
-from autotracker.db import make_engine, make_session_factory, run_migrations
+from glovebox.app import create_app
+from glovebox.config import Settings
+from glovebox.db import make_engine, make_session_factory, run_migrations
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 

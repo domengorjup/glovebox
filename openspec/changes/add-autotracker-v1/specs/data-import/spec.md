@@ -30,6 +30,11 @@ The preview SHALL list each vehicle name found in the file and let the user map 
 - **WHEN** a file contains vehicle "My Golf" and the user maps it to existing vehicle "Golf"
 - **THEN** the committed records reference "Golf"
 
+#### Scenario: File without vehicle names
+- **WHEN** a file with no vehicle names, such as a Fuelly import-format file, is uploaded
+- **THEN** the preview asks for a target vehicle (an existing one or a new one)
+- **AND** nothing is imported until a target is chosen
+
 ### Requirement: Locale-tolerant parsing
 Importers SHALL handle the following:
 - **Encoding:** UTF-8 with or without BOM, falling back to cp1252.
@@ -86,11 +91,24 @@ The `## Costs` section SHALL be imported as expenses. Each category SHALL be res
 ### Requirement: Fuelly import
 The system SHALL import Fuelly CSV files in the fuelly.com import format and in the fuelly.com export format. The format SHALL be detected by its headers. Miles and gallons SHALL be converted to km and litres. When a file's units cannot be determined from its headers, the preview SHALL ask the user.
 - **Import format:** `fuelup_date`, `odometer`, `litres`/`gallons`, `price`, `partial_fuelup`, `missed_fuelup`, `notes`, `tags`.
+- **Station:** the whole `tags` cell, trimmed, SHALL be taken as the station name (our own Fuelly export writes the station there). Several tags are not split, so a multi-tag cell becomes one station. No brand is set. An empty cell means no station.
 - **Export format:** `Name`, `Model`, `MPG`, `Odometer`, `Miles`, `Gallons`, `Price`, `Fuelup Date`, `Date Added`, `Tags`, `Notes`.
 
 #### Scenario: Fuelly partial and missed flags
 - **WHEN** a Fuelly import-format row has `partial_fuelup` 1 and `missed_fuelup` 0
 - **THEN** the refuel is stored with is_full false and missed_previous false
+
+#### Scenario: Fuelly tags become station
+- **WHEN** a Fuelly row has `tags` "OMV Celje"
+- **THEN** the refuel is linked to the station "OMV Celje"
+
+#### Scenario: Multi-tag cell
+- **WHEN** a Fuelly row has `tags` "work, highway"
+- **THEN** the station name is the whole text "work, highway"
+
+#### Scenario: Header-only Fuelly file
+- **WHEN** a Fuelly file has valid headers but no data rows
+- **THEN** the preview shows the warning "The file has no data rows." and imports nothing
 
 #### Scenario: Gallons converted
 - **WHEN** a Fuelly row has `gallons` 10.000 and `price` 3.500 (per gallon)
@@ -108,8 +126,12 @@ The system SHALL import Drivvo CSV exports of refuelling, service and expense re
 - **THEN** every refuel row is imported with date, odometer, litres, price per litre, total and station matching the fixture's expected values
 
 ### Requirement: Native import
-The system SHALL import the native export ZIP (see data-export) and restore its vehicles, stations, refuels and expenses with identical values.
+The system SHALL import the native export ZIP (see data-export) and restore its vehicles, stations, refuels and expenses with identical values, including `derived_field` and `source` of each record, so that a backup restores exactly what was stored.
 
 #### Scenario: Round trip
 - **WHEN** data is exported natively and imported into an empty database
 - **THEN** a second native export is identical to the first, apart from the export timestamp
+
+#### Scenario: Derived field and source preserved
+- **WHEN** a refuel with `derived_field` "price_per_litre" and `source` "drivvo" is exported natively and imported into an empty database
+- **THEN** the restored refuel has the same `derived_field` and `source`

@@ -13,13 +13,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from autotracker.exporters import fuelly as fuelly_exporter
-from autotracker.exporters import native as native_exporter
-from autotracker.exporters.fuelly import ExportFile
-from autotracker.importers import pipeline
-from autotracker.importers.base import Ambiguity, HeaderMismatch
-from autotracker.importers.pipeline import ImportPreview
-from autotracker.models import (
+from glovebox.exporters import fuelly as fuelly_exporter
+from glovebox.exporters import native as native_exporter
+from glovebox.exporters.fuelly import ExportFile
+from glovebox.importers import pipeline
+from glovebox.importers.base import Ambiguity, HeaderMismatch
+from glovebox.importers.pipeline import ImportPreview
+from glovebox.models import (
     DerivedField,
     Expense,
     ExpenseCategory,
@@ -28,15 +28,15 @@ from autotracker.models import (
     Station,
     Vehicle,
 )
-from autotracker.services import records, stats
-from autotracker.services.records import (
+from glovebox.services import records, stats
+from glovebox.services.records import (
     ConfirmationRequired,
     DerivedFigures,
     RecordCounts,
     RefuelPreview,
     ValidationError,
 )
-from autotracker.services.stats import (
+from glovebox.services.stats import (
     Allocation,
     CostBreakdown,
     CostPerKm,
