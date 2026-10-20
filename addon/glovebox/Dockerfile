@@ -10,7 +10,8 @@ ARG SOURCE_REPO=https://github.com/domengorjup/glovebox.git
 ARG SOURCE_REF=master
 RUN git clone --depth 1 --branch "${SOURCE_REF}" "${SOURCE_REPO}" /app
 WORKDIR /app
-RUN uv sync --frozen --no-dev --no-editable
+RUN uv sync --frozen --no-dev --no-editable \
+    && chmod 755 docker/entrypoint.sh
 
 FROM python:3.12-slim
 ENV PATH="/app/.venv/bin:$PATH" \

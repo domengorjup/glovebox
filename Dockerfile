@@ -18,7 +18,8 @@ ENV PATH="/app/.venv/bin:$PATH" \
 COPY --from=build /app/.venv /app/.venv
 COPY LICENSE THIRD_PARTY_NOTICES.md /usr/share/doc/glovebox/
 COPY docker/entrypoint.sh /usr/local/bin/glovebox-entrypoint
-RUN useradd --uid 1000 --no-create-home glovebox \
+RUN chmod 755 /usr/local/bin/glovebox-entrypoint \
+    && useradd --uid 1000 --no-create-home glovebox \
     && mkdir /data && chown glovebox /data
 # Non-root for standalone. The HA add-on image (addon/glovebox/Dockerfile) runs as root
 # because Supervisor mounts /data as root-owned.
