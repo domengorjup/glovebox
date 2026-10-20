@@ -14,6 +14,17 @@ A self-hosted Home Assistant add-on for tracking car running costs across multip
 ## Git
 - Standing permission (granted 2026-10-20): commit locally at sensible checkpoints (after the foundation, after each completed task group, after final checks). Never push without asking.
 
+## Next steps
+- **Install and use v1** on Home Assistant OS (task 9.3); fix anything found. Then archive the OpenSpec change `add-autotracker-v1` via the `openspec-archive` skill.
+- **Drivvo import** (tasks 4.3–4.5, 9.4) is blocked on a real Drivvo CSV export (English app, needs the paid plan). The current English alias mapping is provisional.
+- **v2 (new OpenSpec change, after v1 has been used for a while):**
+  - HACS companion integration that reads the stats API (token-protected add-on port 8100): one HA device per vehicle, sensors with long-term statistics. No MQTT (the user runs ZHA, no Mosquitto).
+  - `glovebox.log_refuel` HA action, backed by a new token-protected write endpoint; pre-select the nearest known station from the phone's location.
+  - Phone-friendly "quick add refuelling" page (could come earlier).
+  - Optional "next service due" sensor (reminders were deliberately left out of v1).
+  - Some ideas come from the AutoLog add-on (MIT): implement independently, copy no code or text.
+- **Later:** GitHub Actions multi-arch image build to GHCR (group 10), then point `config.yaml` `image:` at it, which removes the git clone in the add-on Dockerfile.
+
 ## Structure
 - `src/glovebox/`: `app.py` (factory `create_app`, `main`), `config.py`, `db.py`, `models.py`, `auth.py` (add-on source check, standalone login/token), `urls.py` (`url(request, path)` base-path helper), `migrations/` (Alembic, run at startup), `services/{records,stats}.py`, `importers/{base,pipeline,drivvo,fuelio,fuelly,native}.py` (+ `aliases/*.toml`), `exporters/{native,fuelly}.py`, `api/v1.py`, `web/` (routes, `templating.py`, `templates/`, `static/`).
 - Task groups 1-9 are implemented; the change artifacts are in `openspec/changes/add-autotracker-v1/`.
