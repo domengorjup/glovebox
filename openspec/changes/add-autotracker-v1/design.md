@@ -130,7 +130,6 @@ Constraints:
   - **`## Costs` columns:** `CostTitle`, `Date` (`yyyy-MM-dd HH:mm`), `Odo`, `CostTypeID` (resolved through `## CostCategories` `CostTypeID`→`Name`), `Notes`, `Cost`, `isTemplate`, `isIncome`.
     - **Skipped:** template rows, income rows, and rows with Cost ≤ 0.
     - **Category mapping:** CostTypeID names are matched to our categories by an alias table (e.g. Service/Maintenance→maintenance, Insurance→insurance, Registration→registration, anything else→other, with the Fuelio category name kept as `title`).
-  - **Sources:** github.com/Programistyk/FuelioImport (`fueliobackupbuilder.class.php`); github.com/songsit2017/Fuel-log (`native-kotlin/FUELIO-IMPORT-FORMAT.md`).
 - **Fuelly:** v1 supports **two different formats**, (a) and (b); (c) is noted for the future. The importer detects which one it has by its headers.
   - **(a) fuelly.com import format,** per the Fuelly CSV-import help page, read only through a search summary because the page returned 403 (**unverified verbatim**):
     - `odometer` or `miles`/`km`;

@@ -16,11 +16,6 @@ Located in `src/glovebox/web/static/`. Licence texts sit next to the files (see 
 
 `tests/test_export_fuelly.py` contains a subset of the import column aliases from LubeLogger (`MapProfile/ImportMappers.cs`, https://github.com/hargata/lubelog), used to check that the Fuelly-compatible export header is accepted by LubeLogger. LubeLogger is MIT licensed, Copyright (c) 2024 Hargata Softworks.
 
-## Format research
-
-- Fuelio CSV format: https://github.com/Programistyk/FuelioImport (MIT, Copyright (c) 2022 Programistyk Kamil Kamiński).
-- Fuelio CSV format: https://github.com/songsit2017/Fuel-log. Only facts about the file format were used. The repository carries no licence and no code was copied.
-
 ## Python dependencies
 
 Python dependencies (FastAPI, Uvicorn, SQLAlchemy, Alembic, Jinja2, python-multipart, itsdangerous and their dependencies) are not vendored. They are installed from PyPI at image build time, and each package ships its own licence file in its `*.dist-info` directory inside the image.
