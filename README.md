@@ -44,19 +44,6 @@ Import and export are on their own pages. Files without a vehicle name ask which
 
 Use the native full export in the app (a ZIP of CSV files plus a manifest) as a backup. To restore, start the app on a fresh `/data` volume and import that ZIP. In the add-on, `/data` is also included in Home Assistant backups.
 
-## Add-on developer documentation used
-
-The packaging follows the Home Assistant add-on ("app") developer docs, checked 2026-10-20 (the old `developers.home-assistant.io/docs/add-ons/` pages now redirect):
-
-- https://contributors.home-assistant.io/apps/reference/configuration/ (`config.yaml` keys)
-- https://contributors.home-assistant.io/apps/guides/options/ (options, schema, `/data/options.json`)
-- https://contributors.home-assistant.io/apps/guides/ingress/ (Ingress)
-- https://contributors.home-assistant.io/apps/guides/dockerfile/ (base images, `build.yaml` deprecated)
-- https://contributors.home-assistant.io/apps/guides/repository/ (`repository.yaml`)
-- https://contributors.home-assistant.io/apps/guides/presentation/ (README, DOCS, icon, logo)
-- https://contributors.home-assistant.io/apps/guides/testing/ (local builds)
-- https://contributors.home-assistant.io/apps/reference/environment/ (`/data`, ingress address)
-
 ## Licence
 
 Released under the MIT licence, see [LICENSE](LICENSE). Bundled and referenced third-party material is listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
