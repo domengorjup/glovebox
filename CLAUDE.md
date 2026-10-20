@@ -16,6 +16,10 @@ A self-hosted Home Assistant add-on for tracking car running costs across multip
 - Standing permission (granted 2026-10-20): commit locally at sensible checkpoints (after the foundation, after each completed task group, after final checks).
 - Standing permission (granted 2026-10-20): push `master` and release tags to `origin` (github.com/domengorjup/glovebox) after tests pass. Never force-push or rewrite published history without asking.
 
+## Workflow
+- OpenSpec (`openspec/`) is for behaviour, API and data-model changes (e.g. v2). UI/layout work is done as design iterations without OpenSpec: clickable mockup or the running app, screenshots via headless browser, user feedback, repeat. Mockups live in `.mockups/` (locally excluded from git).
+- Test HA instance: HAOS VM `haos-test` in the user's restricted Incus project on `linux-turbo` (reach via SSH tunnel; HA UI is on VM port 80). Credentials for it live outside the repo in `~/.config/glovebox-test/ha.env`; never print or commit them.
+
 ## Next steps
 - **Install and use v1** on Home Assistant OS (task 9.3); fix anything found. Then archive the OpenSpec change `add-autotracker-v1` via the `openspec-archive` skill.
 - **Drivvo import** (tasks 4.3–4.5, 9.4) is blocked on a real Drivvo CSV export (English app, needs the paid plan). The current English alias mapping is provisional.
