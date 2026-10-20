@@ -1,0 +1,30 @@
+[project]
+name = "autotracker"
+version = "0.1.0"
+description = "Self-hosted car running-cost tracker"
+authors = [
+    { name = "Domen Gorjup", email = "domen_gorjup@hotmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.20.0",
+    "fastapi>=0.152.0",
+    "itsdangerous>=2.2.0",
+    "jinja2>=3.1.6",
+    "python-multipart>=0.0.32",
+    "sqlalchemy>=2.1.5",
+    "uvicorn>=0.54.0",
+]
+
+[project.scripts]
+autotracker = "autotracker.app:main"
+
+[build-system]
+requires = ["uv_build>=0.12.17,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+]

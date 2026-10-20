@@ -14,30 +14,30 @@
 
 ## 1. Foundation (sequential, blocks everything else)
 
-- [ ] 1.1 Create `pyproject.toml` with a `src/autotracker` package. Add dependencies with `uv add fastapi uvicorn sqlalchemy alembic jinja2 python-multipart itsdangerous` and dev dependencies `pytest httpx`.
-- [ ] 1.2 Implement `config.py`. Read settings from env vars, plus `/data/options.json` in add-on mode:
+- [x] 1.1 Create `pyproject.toml` with a `src/autotracker` package. Add dependencies with `uv add fastapi uvicorn sqlalchemy alembic jinja2 python-multipart itsdangerous` and dev dependencies `pytest httpx`.
+- [x] 1.2 Implement `config.py`. Read settings from env vars, plus `/data/options.json` in add-on mode:
   - `AUTOTRACKER_MODE` (`standalone`|`addon`), `BASE_PATH`, `DATA_DIR`
   - `AUTOTRACKER_PASSWORD`, `AUTOTRACKER_API_TOKEN`, `AUTOTRACKER_SECRET`
   - `CURRENCY` (default `EUR`)
-- [ ] 1.3 Implement `db.py`: SQLite engine under `DATA_DIR`, WAL mode, session factory.
-- [ ] 1.4 Implement `models.py` per design D3: vehicle, station, refuel, expense (with nullable `coverage_start` and `coverage_end`), import_batch. Money is stored as integer cents and price per litre as integer milli-units; category is an enum. Add the indexes that the duplicate-detection keys need.
-- [ ] 1.5 Set up Alembic and an initial migration. Run `upgrade head` automatically at app startup.
-- [ ] 1.6 Write `importers/base.py` (interface only, with docstrings):
+- [x] 1.3 Implement `db.py`: SQLite engine under `DATA_DIR`, WAL mode, session factory.
+- [x] 1.4 Implement `models.py` per design D3: vehicle, station, refuel, expense (with nullable `coverage_start` and `coverage_end`), import_batch. Money is stored as integer cents and price per litre as integer milli-units; category is an enum. Add the indexes that the duplicate-detection keys need.
+- [x] 1.5 Set up Alembic and an initial migration. Run `upgrade head` automatically at app startup.
+- [x] 1.6 Write `importers/base.py` (interface only, with docstrings):
   - `CanonicalVehicleRef`, `CanonicalRefuel`, `CanonicalExpense`, `ImportResult`
   - the `ImporterAdapter` protocol: `detect(head: bytes) -> float`, `parse(data: bytes, options) -> ImportResult`
-- [ ] 1.7 Write the stub signatures for `services/stats.py`:
+- [x] 1.7 Write the stub signatures for `services/stats.py`:
   - `segments(refuels) -> list[Segment]`
   - `avg_consumption(segments)`
   - `cost_breakdown(filter, allocation)` and `cost_per_km(filter, allocation)`, with `allocation` as `spread` (default) or `paid`
   - `station_stats(filter, group_by)`
   - `vehicle_summary(vehicle_id, today, allocation)`
   - a `StatsFilter` dataclass (vehicles, date_from, date_to, categories, stations, brands)
-- [ ] 1.8 Write the stub signatures for `services/records.py`: CRUD for vehicles, stations (including merge and bulk brand), refuels and expenses.
-- [ ] 1.9 Create the FastAPI app skeleton (`app.py`):
+- [x] 1.8 Write the stub signatures for `services/records.py`: CRUD for vehicles, stations (including merge and bulk brand), refuels and expenses.
+- [x] 1.9 Create the FastAPI app skeleton (`app.py`):
   - router mounting for `web/` and `api/`;
   - a base-path helper `url(request, path)` honouring `X-Ingress-Path`, then `BASE_PATH`, then `/`;
   - a base Jinja2 layout that uses the helper.
-- [ ] 1.10 Set up the pytest scaffold: in-memory SQLite fixture, app test client, and the `tests/fixtures/` README stating the anonymisation rule.
+- [x] 1.10 Set up the pytest scaffold: in-memory SQLite fixture, app test client, and the `tests/fixtures/` README stating the anonymisation rule.
 
 ## 2. Records and statistics services (needs 1)
 
