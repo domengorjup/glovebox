@@ -1,0 +1,321 @@
+{
+  "name": "glovebox-standard-format",
+  "title": "Glovebox standard format",
+  "profile": "tabular-data-package",
+  "resources": [
+    {
+      "name": "records",
+      "path": "records.csv",
+      "profile": "tabular-data-resource",
+      "format": "csv",
+      "mediatype": "text/csv",
+      "encoding": "utf-8",
+      "title": "Records (refuels and expenses)",
+      "schema": {
+        "fields": [
+          {
+            "name": "type",
+            "type": "string",
+            "description": "Kind of record.",
+            "example": "refuel",
+            "constraints": {
+              "required": true,
+              "enum": [
+                "refuel",
+                "expense"
+              ]
+            }
+          },
+          {
+            "name": "vehicle",
+            "type": "string",
+            "description": "Vehicle name.",
+            "example": "Golf",
+            "constraints": {
+              "required": true
+            }
+          },
+          {
+            "name": "date",
+            "type": "date",
+            "description": "Date of the record, YYYY-MM-DD.",
+            "example": "2026-05-02",
+            "constraints": {
+              "required": true
+            }
+          },
+          {
+            "name": "time",
+            "type": "time",
+            "description": "Time of day, HH:MM (HH:MM:SS is also accepted). Applies to refuel rows only.",
+            "example": "14:30",
+            "format": "%H:%M"
+          },
+          {
+            "name": "odometer_km",
+            "type": "number",
+            "description": "Odometer reading. Unit: km. Required on refuel rows.",
+            "example": "98000",
+            "decimalChar": ".",
+            "groupChar": "",
+            "unit": "km"
+          },
+          {
+            "name": "fuel_l",
+            "type": "number",
+            "description": "Fuel quantity. Unit: l. Give two of fuel_l, price_per_l and total; the third is derived. Applies to refuel rows only.",
+            "example": "45.200",
+            "decimalChar": ".",
+            "groupChar": "",
+            "unit": "l"
+          },
+          {
+            "name": "price_per_l",
+            "type": "number",
+            "description": "Price per litre. Unit: currency/l. Give two of fuel_l, price_per_l and total; the third is derived. Applies to refuel rows only.",
+            "example": "1.459",
+            "decimalChar": ".",
+            "groupChar": "",
+            "unit": "currency/l"
+          },
+          {
+            "name": "total",
+            "type": "number",
+            "description": "Refuel total, or expense amount (greater than 0). Unit: currency. Refuel: give two of fuel_l, price_per_l and total. Expense: required.",
+            "example": "65.95",
+            "decimalChar": ".",
+            "groupChar": "",
+            "unit": "currency"
+          },
+          {
+            "name": "currency",
+            "type": "string",
+            "description": "ISO 4217 currency code; must equal the app currency when given.",
+            "example": "EUR"
+          },
+          {
+            "name": "full",
+            "type": "boolean",
+            "description": "The tank was filled completely. Applies to refuel rows only.",
+            "example": "true",
+            "trueValues": [
+              "true"
+            ],
+            "falseValues": [
+              "false"
+            ]
+          },
+          {
+            "name": "missed_previous",
+            "type": "boolean",
+            "description": "A fill-up before this one was not recorded. Applies to refuel rows only.",
+            "example": "false",
+            "trueValues": [
+              "true"
+            ],
+            "falseValues": [
+              "false"
+            ]
+          },
+          {
+            "name": "station",
+            "type": "string",
+            "description": "Station name. Applies to refuel rows only.",
+            "example": "OMV Celje"
+          },
+          {
+            "name": "station_location",
+            "type": "string",
+            "description": "Station location; with the name it identifies the station. Applies to refuel rows only.",
+            "example": "Celje"
+          },
+          {
+            "name": "station_brand",
+            "type": "string",
+            "description": "Station brand; used only when the station is created. Applies to refuel rows only.",
+            "example": "OMV"
+          },
+          {
+            "name": "category",
+            "type": "string",
+            "description": "Expense category. Applies to expense rows only.",
+            "example": "maintenance",
+            "constraints": {
+              "enum": [
+                "maintenance",
+                "insurance",
+                "registration",
+                "other"
+              ]
+            }
+          },
+          {
+            "name": "title",
+            "type": "string",
+            "description": "Short label of the expense. Applies to expense rows only. Required on expense rows.",
+            "example": "Oil change"
+          },
+          {
+            "name": "coverage_start",
+            "type": "date",
+            "description": "First day the expense covers (insurance, registration), YYYY-MM-DD. Set both coverage_start and coverage_end, or neither. Applies to expense rows only.",
+            "example": "2026-01-01"
+          },
+          {
+            "name": "coverage_end",
+            "type": "date",
+            "description": "Last day the expense covers, YYYY-MM-DD. Set both coverage_start and coverage_end, or neither. Applies to expense rows only.",
+            "example": "2026-12-31"
+          },
+          {
+            "name": "notes",
+            "type": "string",
+            "description": "Free text.",
+            "example": "Winter tyres"
+          },
+          {
+            "name": "derived",
+            "type": "string",
+            "description": "Written by Glovebox: which refuel figure was derived. Leave empty. Applies to refuel rows only.",
+            "example": "total",
+            "constraints": {
+              "enum": [
+                "fuel_l",
+                "price_per_l",
+                "total"
+              ]
+            }
+          },
+          {
+            "name": "source",
+            "type": "string",
+            "description": "Written by Glovebox: where the record came from. Leave empty.",
+            "example": "manual"
+          },
+          {
+            "name": "source_ref",
+            "type": "string",
+            "description": "Written by Glovebox: the record's id in its source. Leave empty.",
+            "example": "1042"
+          }
+        ],
+        "missingValues": [
+          ""
+        ]
+      }
+    },
+    {
+      "name": "vehicles",
+      "path": "vehicles.csv",
+      "profile": "tabular-data-resource",
+      "format": "csv",
+      "mediatype": "text/csv",
+      "encoding": "utf-8",
+      "title": "Vehicles (backup only)",
+      "schema": {
+        "fields": [
+          {
+            "name": "name",
+            "type": "string",
+            "description": "Vehicle name, as used in records.csv.",
+            "example": "Golf",
+            "constraints": {
+              "required": true
+            }
+          },
+          {
+            "name": "make",
+            "type": "string",
+            "description": "Manufacturer.",
+            "example": "Volkswagen"
+          },
+          {
+            "name": "model",
+            "type": "string",
+            "description": "Model.",
+            "example": "Golf VII"
+          },
+          {
+            "name": "plate",
+            "type": "string",
+            "description": "Registration plate.",
+            "example": "LJ AB-123"
+          },
+          {
+            "name": "fuel_type",
+            "type": "string",
+            "description": "Fuel type.",
+            "example": "Diesel"
+          },
+          {
+            "name": "initial_odometer_km",
+            "type": "number",
+            "description": "Odometer when tracking started. Unit: km.",
+            "example": "85000",
+            "decimalChar": ".",
+            "groupChar": "",
+            "unit": "km"
+          },
+          {
+            "name": "archived",
+            "type": "boolean",
+            "description": "The vehicle is archived.",
+            "example": "false",
+            "trueValues": [
+              "true"
+            ],
+            "falseValues": [
+              "false"
+            ]
+          },
+          {
+            "name": "notes",
+            "type": "string",
+            "description": "Free text.",
+            "example": "Company car"
+          }
+        ],
+        "missingValues": [
+          ""
+        ]
+      }
+    },
+    {
+      "name": "stations",
+      "path": "stations.csv",
+      "profile": "tabular-data-resource",
+      "format": "csv",
+      "mediatype": "text/csv",
+      "encoding": "utf-8",
+      "title": "Stations (backup only)",
+      "schema": {
+        "fields": [
+          {
+            "name": "name",
+            "type": "string",
+            "description": "Station name.",
+            "example": "OMV Celje",
+            "constraints": {
+              "required": true
+            }
+          },
+          {
+            "name": "location",
+            "type": "string",
+            "description": "Station location.",
+            "example": "Celje"
+          },
+          {
+            "name": "brand",
+            "type": "string",
+            "description": "Station brand.",
+            "example": "OMV"
+          }
+        ],
+        "missingValues": [
+          ""
+        ]
+      }
+    }
+  ]
+}

@@ -3,22 +3,23 @@
 {% block title %}Import - Glovebox{% endblock %}
 {% block content %}
 {{ page_head(request, 'Import') }}
+{% if more_sections %}
+{{ messages(None, ['The file has more sections: ' ~ (more_sections | join(', ')) ~ '. Upload it again and pick the preset for each one. Records that are already imported are skipped.']) }}
+{% endif %}
 {{ messages(errors) }}
 <form class="card card-pad stack" method="post" action="{{ url(request, '/import/upload') }}" enctype="multipart/form-data">
   <div class="field">
     <label for="i-file">File (CSV or ZIP)</label>
     <input id="i-file" type="file" name="file" required>
   </div>
-  <div class="field">
-    <label for="i-format">Format</label>
-    <select id="i-format" name="format">
-      <option value="">Detect automatically</option>
-      {% for name in formats %}<option value="{{ name }}">{{ name }}</option>{% endfor %}
-    </select>
+  <p class="help">Next you check how the columns map to the standard format. Nothing is imported until you confirm in the preview.</p>
+  <div class="actions">
+    <button type="submit" class="btn primary with-icon">{{ icon('upload', 18) }}Upload and map</button>
   </div>
-  <p class="help">Nothing is imported until you confirm on the next page.</p>
-  <div><button type="submit" class="btn primary">Upload and preview</button></div>
 </form>
+<div class="page-actions gap-top">
+  <a class="btn outline with-icon" href="{{ url(request, '/presets') }}">{{ icon('tune-variant', 18) }}Presets</a>
+</div>
 
 <h2>Past imports</h2>
 <div class="card list-card">
@@ -27,7 +28,7 @@
     <span class="badge">{{ icon('upload', 22) }}</span>
     <span class="body">
       <span class="title">{{ b.filename }}</span>
-      <span class="detail">{{ b.created_at.strftime('%Y-%m-%d %H:%M') }} · {{ b.format }}</span>
+      <span class="detail">{{ b.created_at.strftime('%Y-%m-%d %H:%M') }} · {{ preset_names.get(b.format, b.format) }}</span>
       <span class="detail">{{ b.refuels_imported }} refuels · {{ b.expenses_imported }} expenses · {{ b.duplicates_skipped }} duplicates skipped</span>
     </span>
     {{ post_button(request, '/import/%d/undo' % b.id, 'Undo', 'Remove all records of this import?') }}

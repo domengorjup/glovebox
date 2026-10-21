@@ -1,0 +1,26 @@
+# Drivvo CSV, service rows.
+# Source: converted from the earlier built-in mapping [service] and [categories].
+# BEST EFFORT, UNTESTED: the English header names are a guess and were not
+# taken from a real Drivvo export. The service type is kept as the title; the
+# category defaults to maintenance.
+
+name = "Drivvo (services)"
+note = "Best effort, untested: not checked against a real export."
+verified = false
+export = false
+
+[format]
+date_format = "auto"
+decimal_char = "auto"
+group_char = ""
+distance_unit = "km"
+volume_unit = "l"
+
+[fields]
+type = { value = "expense" }
+date = { column = "Date" }
+odometer_km = { column = ["Odometer", "Odo"], missing_values = ["0"] }
+title = { column = ["Service", "Service type"] }
+category = { column = ["Service", "Service type"], default = "maintenance", map = { maintenance = ["Oil change", "Service", "Maintenance", "Repair", "Brakes", "Tyres", "Tires", "Battery"], insurance = ["Insurance"], registration = ["Registration", "Vehicle tax", "Road tax", "Inspection"] } }
+total = { column = ["Total cost", "Total price", "Total", "Cost"] }
+notes = { column = ["Notes", "Note"] }

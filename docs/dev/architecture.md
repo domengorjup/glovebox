@@ -10,8 +10,8 @@ Glovebox is one Python app (FastAPI) that serves server-rendered HTML pages and 
 | `api/v1.py` | Read-only stats API. |
 | `services/records.py` | Create, read, update, delete and validation. Derives the third price figure. |
 | `services/stats.py` | Consumption, cost, allocation and station statistics. Used by both the HTML pages and the API, so their numbers cannot differ. |
-| `importers/` | One pipeline, one adapter per format, header alias tables. |
-| `exporters/` | Native ZIP and Fuelly-compatible CSV. |
+| `importers/` | One pipeline and one preset-driven engine; presets are TOML files in `presets/`. |
+| `exporters/` | Preset-driven CSV export and the full backup ZIP. |
 | `auth.py` | Add-on source check (Ingress proxy only), standalone login, Bearer token. |
 | `db.py`, `models.py`, `migrations/` | SQLAlchemy models, Alembic migrations run at startup. |
 
@@ -21,7 +21,7 @@ Glovebox is one Python app (FastAPI) that serves server-rendered HTML pages and 
 browser -> web routes -> services/records -> SQLite
                       \-> services/stats  -> SQLite (read)
 HA REST sensor -> api/v1 -> services/stats
-CSV file -> importers/pipeline (detect, parse, dedupe, preview, commit) -> services/records
+CSV file -> importers/pipeline (detect preset, engine, dedupe, preview, commit) -> services/records
 ```
 
 ## Modes

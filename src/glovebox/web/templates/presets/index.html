@@ -1,0 +1,42 @@
+{% extends layout %}
+{% from "_macros.html" import messages, post_button, page_head with context %}
+{% block title %}Presets - Glovebox{% endblock %}
+{% macro preset_rows(items, deletable) %}
+  {% for p in items %}
+  <div class="row">
+    <span class="badge">{{ icon('file-document-outline', 22) }}</span>
+    <span class="body">
+      <span class="title">{{ p.name }}</span>
+      <span class="detail">{{ 'Verified' if p.verified else 'Unverified' }}{{ ' · Import and export' if p.export else ' · Import only' }}</span>
+      {% if p.note %}<span class="detail">{{ p.note }}</span>{% endif %}
+    </span>
+    <a class="icon-btn" href="{{ url(request, '/presets/' ~ p.id ~ '/download') }}" aria-label="Download {{ p.name }}" download>{{ icon('download', 24) }}</a>
+    {% if deletable %}{{ post_button(request, '/presets/' ~ p.id ~ '/delete', 'Delete', 'Delete the preset ' ~ p.name ~ '?') }}{% endif %}
+  </div>
+  {% endfor %}
+{% endmacro %}
+{% block content %}
+{{ page_head(request, 'Presets') }}
+{{ messages(errors) }}
+<p class="help flush">A preset says which column of a CSV file feeds which field. Shipped presets cannot be changed: download one, edit it and upload it again, or save your own from the import mapping.</p>
+
+<h2>Your presets</h2>
+<div class="card list-card">
+  {{ preset_rows(own, true) }}
+  {% if not own %}<div class="empty">No own presets yet.</div>{% endif %}
+</div>
+
+<h2>Shipped presets</h2>
+<div class="card list-card">
+  {{ preset_rows(shipped, false) }}
+</div>
+
+<h2>Upload a preset</h2>
+<form class="card card-pad stack" method="post" action="{{ url(request, '/presets/upload') }}" enctype="multipart/form-data">
+  <div class="field">
+    <label for="i-file">Preset file (TOML)</label>
+    <input id="i-file" type="file" name="file" accept=".toml,text/plain" required>
+  </div>
+  <div><button type="submit" class="btn primary">{{ icon('upload', 18) }}Upload preset</button></div>
+</form>
+{% endblock %}

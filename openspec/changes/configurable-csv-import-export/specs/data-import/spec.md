@@ -4,7 +4,7 @@
 The system SHALL import a file in four steps:
 1. **Upload:** the file is read and the best-matching preset is selected.
 2. **Mapping:** the user can review and adjust the mapping and value formats.
-3. **Preview:** shows the preset used, record counts per type, vehicles found in the file, duplicates, skipped rows, per-row errors, warnings and the preset's note. It changes no data.
+3. **Preview:** shows the preset used, record counts per type, vehicles found in the file, the vehicles and stations that will be created or filled, duplicates, skipped rows, per-row errors, warnings and the preset's note. It changes no data.
 4. **Commit:** writes the records only after the user confirms.
 
 All records of one commit SHALL be written in a single transaction and tagged with an import batch, so that the batch can later be undone. The batch SHALL record the id of the preset used.
@@ -128,7 +128,7 @@ The system SHALL ship these presets:
 On upload the system SHALL:
 - **Encoding:** read UTF-8 with or without BOM, falling back to cp1252.
 - **Delimiter:** sniff it among `,`, `;` and tab.
-- **ZIP:** accept a ZIP of CSV files, applying the chosen preset to each CSV.
+- **ZIP:** accept a ZIP of CSV files, applying the chosen preset to each CSV except `vehicles.csv` and `stations.csv` (see "Vehicles and stations tables in an import").
 - **Sections:** read only the named section when the preset names one; a section starts at a line `## <name>`, quoted or not.
 - **Header row:** detect it within the first 20 non-blank rows.
 - **Preset:** score every preset (user presets and shipped presets) by the share of its mapped columns found in the headers, and pre-select the best one if at least half of its columns are found. When no preset qualifies, the mapping SHALL start from the standard preset, with only the columns whose headers equal standard field names assigned.
@@ -142,6 +142,11 @@ The user SHALL be able to override the preset, the encoding, the delimiter and t
 #### Scenario: Detect Fuelio backup
 - **WHEN** the uploaded file contains a `## Log` section whose headers include `Data`, `Odo (km)` and `Fuel (litres)`
 - **THEN** "Fuelio fill-ups" is pre-selected
+
+#### Scenario: Fuelio file with both sections
+- **WHEN** a Fuelio file has a `## Log` and a `## Costs` section and both Fuelio presets match every column
+- **THEN** "Fuelio fill-ups" is pre-selected
+- **AND** a tied user preset is preferred over a shipped one
 
 #### Scenario: Unknown headers open the mapping
 - **WHEN** a file's headers match no preset
@@ -215,8 +220,40 @@ The system SHALL store user presets in the database as TOML text. A presets page
 - **WHEN** the user changes the "Fuelly (metric)" mapping and saves it
 - **THEN** a new user preset is created and "Fuelly (metric)" is unchanged
 
+### Requirement: Vehicles and stations tables in an import
+A normal import SHALL accept `vehicles.csv` and/or `stations.csv` next to the records, in a ZIP (with or without `datapackage.json`) or in a ZIP of several CSV files. These two tables have the fixed layout of the standard format and are read without the preset. A ZIP member is taken as one of them when its name is `vehicles` or `stations`, it has a `name` column and it has no `date` column. The preset is applied to the other CSV files.
+- A vehicle in `vehicles.csv` that does not exist SHALL be created with all its details.
+- A station in `stations.csv` that does not exist SHALL be created with its location and brand, also when it has no refuels.
+- A vehicle that exists (matched by name, after the vehicle mapping) and a station that exists (matched by name and location) SHALL only be completed: empty details are filled, and no existing value is overwritten.
+- The preview SHALL list each vehicle and station that will be created, or filled with which details. Nothing is written before the user confirms.
+- Stations created by the import belong to its batch and are removed by undo when no other record uses them. Details filled into existing vehicles and stations are not reverted by undo.
+- `vehicles.csv` or `stations.csv` alone (without records) SHALL be accepted.
+
+#### Scenario: Vehicle and station created with details
+- **WHEN** a ZIP holds `records.csv`, `vehicles.csv` with "Golf" (make "VW", plate "LJ AB-123") and `stations.csv` with "Alpha" in Celje (brand "OMV"), none of which exist, and no `datapackage.json`
+- **THEN** the preview lists vehicle "Golf" and station "Alpha" as created
+- **AND** after the commit the vehicle has its make and plate and the station its location and brand
+
+#### Scenario: Existing vehicle is only completed
+- **WHEN** vehicle "Golf" exists with make "Seat" and no plate, and `vehicles.csv` gives "Golf" with make "VW" and plate "LJ AB-123"
+- **THEN** the preview lists vehicle "Golf" as filled with the plate
+- **AND** after the commit the make is still "Seat" and the plate is "LJ AB-123"
+
+#### Scenario: Existing station keeps its brand
+- **WHEN** station "A" in X has brand "Old" and `stations.csv` gives it brand "New"
+- **THEN** the brand stays "Old"
+- **AND** the station is not listed in the preview
+
+#### Scenario: Station without refuels
+- **WHEN** `stations.csv` lists a station that no record uses
+- **THEN** the station is created
+
+#### Scenario: A table with dates is not a companion table
+- **WHEN** a ZIP member is named `stations.csv` but has a `date` column
+- **THEN** it is read as a records table with the preset
+
 ### Requirement: Backup restore
-The system SHALL import a full backup ZIP (see data-export), recognised by its `datapackage.json`. It SHALL create vehicles from `vehicles.csv` with their details and create or reuse the stations in `stations.csv`, including stations without refuels. It SHALL import `records.csv` with the standard preset, restoring `derived` and `source` as written. The vehicle mapping and duplicate detection SHALL apply as for any import.
+A full backup ZIP (see data-export) SHALL be imported as the case above plus `datapackage.json`, through the same code path and with the same preview. Its presence makes the system read `records.csv` with the standard preset whatever preset was chosen, so the upload goes straight to the preview without a mapping step. It SHALL restore `derived` and `source` as written, and vehicles marked archived stay archived. A backup without `records.csv` SHALL be rejected with a message. The vehicle mapping and duplicate detection SHALL apply as for any import.
 
 #### Scenario: Backup round trip
 - **WHEN** a full backup is restored into an empty database and a second full backup is made
@@ -225,3 +262,7 @@ The system SHALL import a full backup ZIP (see data-export), recognised by its `
 #### Scenario: Derived field and source preserved
 - **WHEN** a refuel with derived `price_per_l` and source "drivvo-refuelling" is backed up and restored into an empty database
 - **THEN** the restored refuel has the same derived field and source
+
+#### Scenario: Same result without the descriptor
+- **WHEN** the same ZIP is uploaded once with and once without `datapackage.json`
+- **THEN** both previews list the same records, vehicles and station and vehicle changes

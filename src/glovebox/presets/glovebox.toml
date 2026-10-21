@@ -1,0 +1,40 @@
+# Glovebox standard format (design D1/D5): identity mapping, fixed formats.
+# Every column of the standard records table maps to the column of the same
+# name. This is the format of the export and of the full backup's records.csv.
+# Verified by the round-trip tests.
+
+name = "Glovebox"
+note = "The Glovebox standard CSV format (see the format description)."
+verified = true
+export = true
+
+[format]
+date_format = "%Y-%m-%d"
+decimal_char = "."
+group_char = ""
+distance_unit = "km"
+volume_unit = "l"
+
+[fields]
+type = { column = "type" }
+vehicle = { column = "vehicle" }
+date = { column = "date" }
+time = { column = "time" }
+odometer_km = { column = "odometer_km" }
+fuel_l = { column = "fuel_l" }
+price_per_l = { column = "price_per_l" }
+total = { column = "total" }
+currency = { column = "currency" }
+full = { column = "full" }
+missed_previous = { column = "missed_previous" }
+station = { column = "station" }
+station_location = { column = "station_location" }
+station_brand = { column = "station_brand" }
+category = { column = "category" }
+title = { column = "title" }
+coverage_start = { column = "coverage_start" }
+coverage_end = { column = "coverage_end" }
+notes = { column = "notes" }
+derived = { column = "derived" }
+source = { column = "source" }
+source_ref = { column = "source_ref" }

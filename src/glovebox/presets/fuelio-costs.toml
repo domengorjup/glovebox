@@ -1,0 +1,44 @@
+# Fuelio backup, "## Costs" section (expenses).
+# Source: converted from the earlier built-in mapping [costs] and its rules.
+# Reverse-engineered, not checked against a real export. Template and income
+# rows and rows with cost 0 are skipped. The category is mapped from
+# "CostTitle" (design D9: "## CostCategories" is no longer looked up); other
+# titles become "other". The header carries no distance unit, so the preview
+# asks when the odometer column is present.
+
+name = "Fuelio (costs)"
+note = "Fuelio backup, ## Costs section. Category is taken from the cost title; unknown titles become 'other'. Based on open-source parsers."
+verified = false
+export = false
+
+[file]
+section = "Costs"
+
+[format]
+date_format = "auto"
+decimal_char = "auto"
+group_char = ""
+distance_unit = "auto"
+volume_unit = "l"
+
+[fields]
+type = { value = "expense" }
+date = { column = "Date" }
+odometer_km = { column = "Odo", missing_values = ["0"] }
+total = { column = "Cost" }
+title = { column = "CostTitle" }
+category = { column = "CostTitle", default = "other", map = { maintenance = ["Service", "Maintenance", "Repair", "Service/Maintenance", "Oil change"], insurance = ["Insurance"], registration = ["Registration", "Road tax", "Vehicle tax"] } }
+notes = { column = "Notes" }
+source_ref = { column = "UniqueId" }
+
+[[skip_rows]]
+column = "isTemplate"
+values = ["1"]
+
+[[skip_rows]]
+column = "isIncome"
+values = ["1"]
+
+[[skip_rows]]
+column = "Cost"
+values = ["0", "0.0", "0.00", "0,0", "0,00"]

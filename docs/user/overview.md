@@ -8,7 +8,7 @@ Glovebox is a small web app for the running costs of your cars. It looks like pa
 
 - Records **refuellings**, **services** and other **expenses** (insurance, registration, parking and so on) for any number of vehicles.
 - Works out **fuel consumption** between full tanks, **cost per km**, monthly costs and **price comparisons** between gas stations and brands.
-- **Imports** history from Drivvo, Fuelio and Fuelly CSV files, and **exports** everything as CSV.
+- **Imports** history from CSV files with presets (Fuelly, Fuelio, Drivvo or your own mapping), and **exports** the standard CSV, a Fuelly-compatible CSV, a custom CSV or a full backup.
 - Offers a read-only **stats API** for Home Assistant sensors.
 
 ## What it does not do

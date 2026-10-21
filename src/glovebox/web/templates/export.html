@@ -1,28 +1,87 @@
 {% extends layout %}
-{% from "_macros.html" import page_head with context %}
+{% from "_macros.html" import messages, page_head, field, select with context %}
 {% block title %}Export - Glovebox{% endblock %}
-{% macro vehicle_select(caller_id) %}
-  <div class="field">
-    <label for="i-vehicle-{{ caller_id }}">Vehicle</label>
-    <select id="i-vehicle-{{ caller_id }}" name="vehicle">
-      <option value="">All vehicles</option>
-      {% for v in vehicles %}<option value="{{ v.id }}">{{ v.name }}{{ ' (archived)' if v.archived }}</option>{% endfor %}
-    </select>
-  </div>
-{% endmacro %}
 {% block content %}
 {{ page_head(request, 'Export') }}
-<form class="card card-pad stack" method="get" action="{{ url(request, '/export/native') }}">
-  <div><div class="card-title">Full backup (native format)</div>
-  <p class="card-sub">ZIP with vehicles, stations, refuels and expenses. It can be imported back into Glovebox.</p></div>
-  {{ vehicle_select('native') }}
-  <div><button type="submit" class="btn primary">{{ icon('download', 18) }}Download native export</button></div>
+{{ messages(errors, warnings) }}
+{% for note in notes %}<p class="help flush">{{ note }}</p>{% endfor %}
+
+<form class="stack" method="post" action="{{ url(request, '/export') }}">
+  <input type="hidden" name="base_preset" value="{{ base.id }}">
+
+  <h2>Vehicles</h2>
+  <div class="card list-card">
+    {% for v in vehicles %}
+    <div class="row">
+      <label class="pick"><input id="i-vehicle-{{ v.id }}" type="checkbox" name="vehicle" value="{{ v.id }}" {{ 'checked' if v.id | string in ticked }} aria-label="Export {{ v.name }}"></label>
+      <label class="body" for="i-vehicle-{{ v.id }}"><span class="title">{{ v.name }}</span><br>
+        <span class="detail">{{ 'Archived' if v.archived else (([v.make, v.model] | select | join(' ')) or 'Active') }}</span></label>
+    </div>
+    {% else %}
+    <div class="empty">No vehicles yet.</div>
+    {% endfor %}
+  </div>
+  <p class="help flush">Nothing ticked exports all vehicles.</p>
+
+  <h2>CSV file</h2>
+  <div class="card card-pad stack">
+    <div class="field">
+      <label for="i-preset">Format</label>
+      <select id="i-preset" name="preset" data-autosubmit>
+        {% for p in presets %}<option value="{{ p.id }}" {{ 'selected' if p.id == base.id }}>{{ p.name }}</option>{% endfor %}
+      </select>
+    </div>
+    {% if base.note %}<p class="help flush">{{ base.note }}</p>{% endif %}
+    {% if refuels_only %}
+    <p class="alert warning"><strong>Expenses are not included</strong> in this format: it has no place for them.</p>
+    {% endif %}
+    {% if base.split_by_vehicle %}<p class="help flush">One CSV per vehicle (zipped if more than one).</p>{% endif %}
+    <div><button type="submit" class="btn primary with-icon" formaction="{{ url(request, '/export/csv') }}">{{ icon('download', 18) }}Download CSV</button></div>
+
+    <details class="archived">
+      <summary>Customise columns and format</summary>
+      <div class="stack">
+        {% for c in columns %}
+        <div class="grid2">
+          <label class="switch-row">
+            <span><span>{{ c.name }}</span><span class="s">{{ c.description }}</span></span>
+            <span class="switch">
+              <input type="checkbox" name="include.{{ c.name }}" value="1" {{ 'checked' if c.included }} aria-label="Include {{ c.name }}">
+              <span class="track"></span>
+            </span>
+          </label>
+          {{ field('Header', 'header.' ~ c.name, c.header) }}
+        </div>
+        {% endfor %}
+        <div class="grid3">
+          {{ select('Delimiter', 'delimiter', delimiters, delimiter) }}
+          {{ select('Decimal separator', 'decimal_char', decimals, decimal) }}
+          {{ field('Date pattern', 'date_format', date_pattern, placeholder='ISO 8601, or e.g. %d.%m.%Y') }}
+        </div>
+        <div class="grid2">
+          {{ select('Distance unit', 'distance_unit', distances, distance) }}
+          {{ select('Volume unit', 'volume_unit', volumes, volume) }}
+        </div>
+        <div class="grid2">
+          {{ field('Save as preset', 'preset_name', '', placeholder='Name of the new preset') }}
+          <div><button type="submit" class="btn outline" formaction="{{ url(request, '/export/preset') }}">Save preset</button></div>
+        </div>
+        <p class="help flush">A saved preset appears in the format list above and can also be used for import.</p>
+      </div>
+    </details>
+  </div>
+
+  <h2>Full backup</h2>
+  <div class="card card-pad stack">
+    <div><div class="card-title">Standard CSV files in a ZIP</div>
+    <p class="card-sub">Vehicles, stations, refuels and expenses, with a description of the format. Importing the ZIP restores everything.</p></div>
+    <div><button type="submit" class="btn primary with-icon" formaction="{{ url(request, '/export/backup') }}">{{ icon('download', 18) }}Download full backup</button></div>
+  </div>
 </form>
-<form class="card card-pad stack gap-top" method="get" action="{{ url(request, '/export/fuelly') }}">
-  <div><div class="card-title">Fuelly-compatible CSV</div>
-  <p class="card-sub">Refuels only, one CSV per vehicle (zipped if more than one). <strong>Expenses are not included</strong>
-  because the Fuelly format has no place for them.</p></div>
-  {{ vehicle_select('fuelly') }}
-  <div><button type="submit" class="btn primary">{{ icon('download', 18) }}Download Fuelly export</button></div>
-</form>
+
+<h2>Format description</h2>
+<div class="card card-pad stack">
+  <p class="card-sub">Column names, types and units of the standard CSV format, as a Data Package descriptor (JSON).</p>
+  <div><a class="btn outline with-icon" href="{{ url(request, '/export/format.json') }}" download>{{ icon('download', 18) }}Download format description</a></div>
+</div>
 {% endblock %}

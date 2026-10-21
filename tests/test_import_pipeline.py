@@ -1,29 +1,28 @@
-"""End-to-end pipeline tests (3.2, 3.8) and the native round trip (3.7)."""
+"""Import pipeline: detection, preview, commit, duplicates, undo and backup restore."""
 
 from __future__ import annotations
 
 import io
 import zipfile
+from dataclasses import replace
 from datetime import date
 
 import pytest
 from sqlalchemy import func, select
 
-from glovebox.db import make_engine, make_session_factory, run_migrations
-from glovebox.config import Settings
-from glovebox.exporters.fuelly import export_fuelly
-from glovebox.exporters.native import export_native
-from glovebox.importers.base import Ambiguity, ImportOptions
+from glovebox.importers import engine
+from glovebox.importers.base import Answers, QuestionKind
 from glovebox.importers.pipeline import (
     VehicleMapping,
-    available_formats,
     commit_import,
-    detect_format,
+    detect_preset,
     list_batches,
     preview_import,
     undo_batch,
 )
+from glovebox.importers.presets import list_presets, load_preset, save_user_preset
 from glovebox.models import (
+    DerivedField,
     Expense,
     ExpenseCategory,
     ImportBatch,
@@ -33,167 +32,301 @@ from glovebox.models import (
 )
 from glovebox.services.records import NotFoundError, ValidationError
 
+STANDARD = engine.standard_preset()
+
+REFUELS = load_preset(
+    """
+name = "Sample refuels"
+note = "Sample note."
+[format]
+distance_unit = "km"
+volume_unit = "l"
+[fields]
+type = { value = "refuel" }
+date = { column = "fuelup_date" }
+odometer_km = { column = "odometer" }
+fuel_l = { column = "litres" }
+price_per_l = { column = "price" }
+total = { column = "total" }
+full = { column = "partial", true_values = ["0"], false_values = ["1"], default = "true" }
+station = { column = "tags" }
+""",
+    id="sample-refuels",
+)
+
+FUELLY = (
+    b"fuelup_date,odometer,litres,price,total,partial,tags\n"
+    b"2024-01-10,1000,40.000,1.500,,0,Alpha Fuel\n"
+    b"2024-01-20,1600,20.000,,31.00,1,Beta Oil\n"
+    b"2024-02-01,2200,30.000,1.400,,0,Alpha Fuel\n"
+)
+
 
 def count(session, model) -> int:
     return session.scalar(select(func.count()).select_from(model))
 
 
+def _vehicle(session, name: str = "Target") -> int:
+    vehicle = Vehicle(name=name)
+    session.add(vehicle)
+    session.commit()
+    return vehicle.id
+
+
+def _mapping(session) -> VehicleMapping:
+    return VehicleMapping(default_vehicle_id=_vehicle(session))
+
+
 @pytest.fixture
-def fuelio(fixtures_dir) -> bytes:
-    return (fixtures_dir / "fuelio_comma_km.csv").read_bytes()
+def standard_file(fixtures_dir) -> bytes:
+    return (fixtures_dir / "standard_records.csv").read_bytes()
 
 
-class TestFormats:
-    def test_registered_adapters(self) -> None:
-        assert {a.name for a in available_formats()} == {
-            "drivvo", "fuelio", "fuelly", "native",
-        }  # fmt: skip
+class TestDetection:
+    def test_standard_file_selects_the_standard_preset(self, session, standard_file) -> None:
+        assert detect_preset(session, standard_file).id == "glovebox"
 
-    def test_detect_fuelio_backup(self, fuelio) -> None:
-        assert detect_format(fuelio) == "fuelio"
+    def test_unknown_headers_select_nothing(self, session) -> None:
+        assert detect_preset(session, b"Datum,Km\n1.1.2024,5\n") is None
+        assert detect_preset(session, b"") is None
 
-    def test_unknown_content(self) -> None:
-        assert detect_format(b"hello world") is None
+    def test_user_preset_is_detected(self, session) -> None:
+        saved = save_user_preset(session, replace(REFUELS, id="", name="My app"))
+        assert detect_preset(session, FUELLY).id == saved.id
 
-    def test_user_can_override_detection(self, session, fuelio) -> None:
-        preview = preview_import(session, fuelio, format="drivvo")
-        assert preview.format == "drivvo"
-        assert preview.header_mismatch is not None
+    def test_user_preset_wins_a_tie(self, session) -> None:
+        saved = save_user_preset(session, replace(REFUELS, id="", name="My app"))
+        twin = save_user_preset(session, replace(REFUELS, id="", name="Another"))
+        assert detect_preset(session, FUELLY).id in {saved.id, twin.id}
 
-    def test_unrecognised_file_has_error(self, session) -> None:
-        preview = preview_import(session, b"hello world")
-        assert preview.errors and preview.new_refuels == 0
+    def test_backup_selects_the_standard_preset(self, session) -> None:
+        assert detect_preset(session, _backup()).id == "glovebox"
+
+
+class TestFuelioTie:
+    """A Fuelio file with both sections scores 1.0 for both Fuelio presets."""
+
+    def test_fillups_wins_deterministically(self, session, fixtures_dir) -> None:
+        data = (fixtures_dir / "fuelio_comma_km.csv").read_bytes()
+        shipped = {p.id: p for p in list_presets(session)}
+        scores = {i: engine.score(shipped[i], engine.read_file(data, shipped[i]))
+                  for i in ("fuelio-fillups", "fuelio-costs")}
+        assert scores["fuelio-fillups"] == scores["fuelio-costs"] == 1.0
+        assert detect_preset(session, data).id == "fuelio-fillups"
+
+    def test_user_preset_still_wins_the_tie(self, session, fixtures_dir) -> None:
+        data = (fixtures_dir / "fuelio_comma_km.csv").read_bytes()
+        fillups = next(p for p in list_presets(session) if p.id == "fuelio-fillups")
+        save_user_preset(session, replace(fillups, name="My Fuelio", id="", shipped=False))
+        assert detect_preset(session, data).name == "My Fuelio"
 
 
 class TestPreview:
-    def test_preview_does_not_write(self, session, fuelio) -> None:
-        preview = preview_import(session, fuelio)
-        assert preview.format == "fuelio"
-        assert preview.vehicle_names == ["Test Golf"]
-        assert (preview.new_refuels, preview.new_expenses) == (4, 3)
+    def test_preview_does_not_write(self, session, standard_file) -> None:
+        preview = preview_import(session, standard_file, STANDARD)
+        assert preview.format == "glovebox"
+        assert preview.vehicle_names == ["Golf", "Polo"]
+        assert (preview.new_refuels, preview.new_expenses) == (3, 2)
         assert (preview.duplicate_refuels, preview.duplicate_expenses) == (0, 0)
+        assert preview.errors == [] and preview.row_errors == []
         for model in (Refuel, Expense, Vehicle, Station, ImportBatch):
             assert count(session, model) == 0
 
-    def test_unknown_headers_report_found_and_expected(
-        self, session, fixtures_dir
-    ) -> None:
-        data = (fixtures_dir / "drivvo_unknown_headers.csv").read_bytes()
-        preview = preview_import(session, data, format="drivvo")
-        assert preview.errors
-        assert preview.header_mismatch.found[0] == "Datum"
-        assert preview.header_mismatch.expected
+    def test_preview_carries_the_preset_note(self, session) -> None:
+        preview = preview_import(session, FUELLY, REFUELS, mapping=_mapping(session))
+        assert preview.preset_note == "Sample note."
+
+    def test_unmapped_required_fields_block(self, session) -> None:
+        preview = preview_import(session, b"Datum,Km\n2024-01-01,5\n", STANDARD)
+        assert any("'date'" in e for e in preview.errors)
+        assert any("'type'" in e for e in preview.errors)
         with pytest.raises(ValidationError):
-            commit_import(session, data, "x.csv", VehicleMapping(), format="drivvo")
+            commit_import(session, b"Datum,Km\n2024-01-01,5\n", "x.csv", VehicleMapping(), STANDARD)
         assert count(session, Refuel) == 0
 
-    def test_ambiguous_dates_are_surfaced_then_answered(
-        self, session, fixtures_dir
-    ) -> None:
-        data = (fixtures_dir / "fuelly_import_ambiguous_dates.csv").read_bytes()
-        mapping = VehicleMapping(default_vehicle_id=_vehicle(session))
-        asked = preview_import(session, data, mapping=mapping)
-        assert asked.ambiguities == [Ambiguity.DATE_ORDER]
+    def test_questions_are_surfaced_then_answered(self, session) -> None:
+        data = b"fuelup_date,odometer,litres,price,total,partial,tags\n01/02/2024,1000,40,1.5,,0,\n03/04/2024,1500,40,1.5,,0,\n"
+        mapping = _mapping(session)
+        asked = preview_import(session, data, REFUELS, mapping=mapping)
+        assert [q.kind for q in asked.questions] == [QuestionKind.DATE_ORDER]
+        assert asked.new_refuels == 0
+        with pytest.raises(ValidationError):
+            commit_import(session, data, "f.csv", mapping, REFUELS)
         answered = preview_import(
-            session, data, mapping=mapping, options=ImportOptions(date_order="dmy")
+            session, data, REFUELS, mapping=mapping, answers=Answers(date_order="dmy")
         )
-        assert not answered.ambiguities and answered.new_refuels == 2
+        assert answered.questions == [] and answered.new_refuels == 2
 
-    def test_units_question_for_fuelly_export(self, session, fixtures_dir) -> None:
-        data = (fixtures_dir / "fuelly_export.csv").read_bytes()
-        assert preview_import(session, data).ambiguities == [Ambiguity.UNITS]
-
-    def test_file_without_vehicle_names_requires_target(
-        self, session, fixtures_dir
-    ) -> None:
-        data = (fixtures_dir / "fuelly_import_metric.csv").read_bytes()
-        preview = preview_import(session, data)
+    def test_file_without_vehicle_names_requires_target(self, session) -> None:
+        preview = preview_import(session, FUELLY, REFUELS)
         assert preview.errors and preview.vehicle_names == []
         assert preview.needs_vehicle_choice
         with pytest.raises(ValidationError):
-            commit_import(session, data, "f.csv", VehicleMapping())
+            commit_import(session, FUELLY, "f.csv", VehicleMapping(), REFUELS)
+        assert count(session, Refuel) == 0
 
-    def test_mapping_to_none_creates_vehicle(self, session, fuelio) -> None:
-        mapping = VehicleMapping(by_name={"Test Golf": None})
-        commit_import(session, fuelio, "f.csv", mapping)
-        assert [v.name for v in session.scalars(select(Vehicle))] == ["Test Golf"]
+    def test_zip_member_names_are_the_vehicles(self, session) -> None:
+        data = _zip({"Golf.csv": FUELLY.decode(), "Polo.csv": FUELLY.decode()})
+        preview = preview_import(session, data, REFUELS)
+        assert preview.vehicle_names == ["Golf", "Polo"]
+        assert preview.new_refuels == 6
+
+    def test_mapping_to_none_creates_vehicle(self, session, standard_file) -> None:
+        mapping = VehicleMapping(by_name={"Golf": None, "Polo": None})
+        commit_import(session, standard_file, "f.csv", mapping, STANDARD)
+        assert {v.name for v in session.scalars(select(Vehicle))} == {"Golf", "Polo"}
 
     def test_mapping_to_none_with_active_same_name_is_an_error(
-        self, session, fuelio
+        self, session, standard_file
     ) -> None:
-        _vehicle(session, "Test Golf")
-        mapping = VehicleMapping(by_name={"Test Golf": None})
-        assert "already exists" in preview_import(session, fuelio, mapping=mapping).errors[0]
+        _vehicle(session, "Golf")
+        mapping = VehicleMapping(by_name={"Golf": None})
+        preview = preview_import(session, standard_file, STANDARD, mapping=mapping)
+        assert "already exists" in preview.errors[0]
         with pytest.raises(ValidationError):
-            commit_import(session, fuelio, "f.csv", mapping)
+            commit_import(session, standard_file, "f.csv", mapping, STANDARD)
 
     def test_undo_unknown_batch_raises_not_found(self, session) -> None:
         with pytest.raises(NotFoundError):
             undo_batch(session, 999)
 
-    def test_rows_with_too_few_price_figures_are_skipped(self, session) -> None:
-        data = b"fuelup_date,odometer,litres\n2024-01-01,1000,40.0\n"
-        mapping = VehicleMapping(default_vehicle_id=_vehicle(session))
-        preview = preview_import(session, data, mapping=mapping)
-        assert preview.new_refuels == 0 and preview.warnings
+    def test_row_errors_and_skips_are_reported_and_not_blocking(
+        self, session, fixtures_dir
+    ) -> None:
+        data = (fixtures_dir / "standard_bad_rows.csv").read_bytes()
+        preview = preview_import(session, data, STANDARD, mapping=_mapping(session))
+        assert preview.errors == []
+        assert (preview.new_refuels, preview.new_expenses) == (2, 1)
+        assert [e.line for e in preview.row_errors] == [3, 4, 5, 6, 8, 12]
+        # One price figure only: the pipeline skips the refuel and says why.
+        assert any("2026-05-06" in w for w in preview.warnings)
+
+    def test_a_preset_is_required_unless_the_file_is_a_backup(self, session) -> None:
+        assert preview_import(session, FUELLY).errors == ["Choose a preset for this file."]
+        assert preview_import(session, _backup()).errors == []
+
+    def test_skip_rule_count(self, session) -> None:
+        text = """
+name = "Skip"
+[format]
+distance_unit = "km"
+volume_unit = "l"
+[fields]
+type = { value = "refuel" }
+date = { column = "d" }
+odometer_km = { column = "o" }
+fuel_l = { column = "l" }
+total = { column = "t" }
+[[skip_rows]]
+column = "flag"
+values = ["1"]
+"""
+        data = b"d,o,l,t,flag\n2024-01-01,1,40,60,0\n2024-01-02,2,40,60,1\n"
+        preview = preview_import(session, data, load_preset(text), mapping=_mapping(session))
+        assert (preview.new_refuels, preview.skipped) == (1, 1)
 
 
 class TestCommit:
-    def test_commit_writes_everything_in_one_batch(self, session, fuelio) -> None:
-        batch = commit_import(session, fuelio, "fuelio.csv", VehicleMapping())
-        assert (batch.format, batch.filename) == ("fuelio", "fuelio.csv")
-        assert (batch.refuels_imported, batch.expenses_imported) == (4, 3)
-        vehicle = session.scalar(select(Vehicle))
-        assert vehicle.name == "Test Golf"
+    def test_commit_writes_everything_in_one_batch(self, session, standard_file) -> None:
+        batch = commit_import(session, standard_file, "std.csv", VehicleMapping(), STANDARD)
+        assert (batch.format, batch.filename) == ("glovebox", "std.csv")
+        assert (batch.refuels_imported, batch.expenses_imported) == (3, 2)
+        assert {v.name for v in session.scalars(select(Vehicle))} == {"Golf", "Polo"}
         refuels = session.scalars(select(Refuel).order_by(Refuel.date)).all()
         assert {r.import_batch_id for r in refuels} == {batch.id}
-        assert refuels[0].source == "fuelio"
-        assert refuels[0].vehicle_id == vehicle.id
-        assert (refuels[0].litres_milli, refuels[0].total_cents) == (40000, 6000)
-        assert refuels[0].price_per_litre_milli == 1500
-        assert refuels[0].derived_field is None
-        assert count(session, Expense) == 3
-        stations = {s.name for s in session.scalars(select(Station))}
-        assert stations == {"Alpha Fuel", "Beta Oil Main"}
-        assert all(s.brand is None for s in session.scalars(select(Station)))
+        assert count(session, Expense) == 2
 
-    def test_missing_figure_is_derived(self, session, fixtures_dir) -> None:
-        data = (fixtures_dir / "fuelly_import_metric.csv").read_bytes()
-        mapping = VehicleMapping(default_vehicle_id=_vehicle(session))
-        commit_import(session, data, "f.csv", mapping)
-        first = session.scalars(select(Refuel).order_by(Refuel.date)).first()
-        assert first.total_cents == 2991  # 20.5 L x 1.459
-        assert first.derived_field.value == "total"
-        assert first.station_id is not None  # the tags cell is the station
+    def test_batch_format_is_the_preset_id(self, session) -> None:
+        batch = commit_import(session, FUELLY, "f.csv", _mapping(session), REFUELS)
+        assert batch.format == "sample-refuels"
+        assert {r.source for r in session.scalars(select(Refuel))} == {"sample-refuels"}
 
-    def test_map_file_vehicle_to_existing_one(self, session, fuelio) -> None:
-        golf = _vehicle(session, "Golf")
-        mapping = VehicleMapping(by_name={"Test Golf": golf})
-        commit_import(session, fuelio, "f.csv", mapping)
-        assert [v.name for v in session.scalars(select(Vehicle))] == ["Golf"]
-        assert {r.vehicle_id for r in session.scalars(select(Refuel))} == {golf}
-
-    def test_same_name_vehicle_is_reused(self, session, fuelio) -> None:
-        existing = _vehicle(session, "Test Golf")
-        commit_import(session, fuelio, "f.csv", VehicleMapping())
-        assert count(session, Vehicle) == 1
-        assert {r.vehicle_id for r in session.scalars(select(Refuel))} == {existing}
-
-    def test_station_is_reused_across_imports(self, session, fixtures_dir) -> None:
-        mapping = VehicleMapping(default_vehicle_id=_vehicle(session))
-        commit_import(
-            session,
-            (fixtures_dir / "drivvo_refuel_en.csv").read_bytes(),
-            "a.csv",
-            mapping,
+    def test_unsaved_preset_uses_custom_as_format(self, session) -> None:
+        batch = commit_import(
+            session, FUELLY, "f.csv", _mapping(session), replace(REFUELS, id="")
         )
-        data = b"Date,Odometer,Volume,Total cost,Gas station\n2024-09-01,9000,30,45,Alpha Fuel\n"
-        commit_import(session, data, "b.csv", mapping)
+        assert batch.format == "custom"
+
+    def test_two_of_three_derivation(self, session) -> None:
+        commit_import(session, FUELLY, "f.csv", _mapping(session), REFUELS)
+        refuels = session.scalars(select(Refuel).order_by(Refuel.date)).all()
+        first, second, third = refuels
+        assert (first.litres_milli, first.price_per_litre_milli, first.total_cents) == (
+            40000, 1500, 6000,
+        )  # fmt: skip
+        assert first.derived_field == DerivedField.TOTAL
+        assert (second.price_per_litre_milli, second.derived_field) == (
+            1550, DerivedField.PRICE_PER_LITRE,
+        )  # fmt: skip
+        assert second.is_full is False
+        assert third.total_cents == 4200
+
+    def test_rows_with_errors_are_skipped_and_the_rest_commits(
+        self, session, fixtures_dir
+    ) -> None:
+        data = (fixtures_dir / "standard_bad_rows.csv").read_bytes()
+        batch = commit_import(session, data, "f.csv", _mapping(session), STANDARD)
+        assert (batch.refuels_imported, batch.expenses_imported) == (2, 1)
+        assert count(session, Refuel) == 2 and count(session, Expense) == 1
+
+    def test_station_created_once_with_location_and_brand(self, session, standard_file) -> None:
+        commit_import(session, standard_file, "f.csv", VehicleMapping(), STANDARD)
+        omv = session.scalar(select(Station).where(Station.name == "OMV Celje"))
+        assert (omv.location, omv.brand) == ("Celje", "OMV")
+        assert count(session, Station) == 2
+        assert all(s.import_batch_id for s in session.scalars(select(Station)))
+
+    def test_station_shared_by_several_refuels_is_created_once(self, session) -> None:
+        commit_import(session, FUELLY, "f.csv", _mapping(session), REFUELS)
+        assert {s.name for s in session.scalars(select(Station))} == {"Alpha Fuel", "Beta Oil"}
+        alpha = session.scalar(select(Station).where(Station.name == "Alpha Fuel"))
+        assert session.scalar(
+            select(func.count()).select_from(Refuel).where(Refuel.station_id == alpha.id)
+        ) == 2
+        assert alpha.brand is None  # a brand is never inferred
+
+    def test_station_is_reused_across_imports(self, session) -> None:
+        mapping = _mapping(session)
+        commit_import(session, FUELLY, "a.csv", mapping, REFUELS)
+        more = b"fuelup_date,odometer,litres,price,total,partial,tags\n2024-09-01,9000,30,1.5,,0,Alpha Fuel\n"
+        commit_import(session, more, "b.csv", mapping, REFUELS)
         assert count(session, Station) == 2
 
-    def test_failed_commit_leaves_no_trace(
-        self, session, fuelio, monkeypatch
-    ) -> None:
+    def test_file_provided_source_and_derived_are_kept(self, session, standard_file) -> None:
+        commit_import(session, standard_file, "f.csv", VehicleMapping(), STANDARD)
+        second = session.scalar(select(Refuel).where(Refuel.date == date(2026, 5, 20)))
+        assert second.source == "sample-preset"
+        assert second.derived_field == DerivedField.PRICE_PER_LITRE
+        assert second.price_per_litre_milli == 1450
+        assert second.missed_previous is True and second.is_full is False
+        first = session.scalar(select(Refuel).where(Refuel.date == date(2026, 5, 2)))
+        assert first.source == "manual" and first.source_ref == "r1"
+
+    def test_expense_fields(self, session, standard_file) -> None:
+        commit_import(session, standard_file, "f.csv", VehicleMapping(), STANDARD)
+        insurance = session.scalar(
+            select(Expense).where(Expense.category == ExpenseCategory.INSURANCE)
+        )
+        assert insurance.title == "Insurance 2026" and insurance.amount_cents == 42000
+        assert (insurance.coverage_start, insurance.coverage_end) == (
+            date(2026, 1, 1), date(2026, 12, 31),
+        )  # fmt: skip
+
+    def test_map_file_vehicle_to_existing_one(self, session, standard_file) -> None:
+        golf = _vehicle(session, "My car")
+        mapping = VehicleMapping(by_name={"Golf": golf, "Polo": golf})
+        commit_import(session, standard_file, "f.csv", mapping, STANDARD)
+        assert [v.name for v in session.scalars(select(Vehicle))] == ["My car"]
+        assert {r.vehicle_id for r in session.scalars(select(Refuel))} == {golf}
+
+    def test_same_name_vehicle_is_reused(self, session, standard_file) -> None:
+        existing = _vehicle(session, "Golf")
+        commit_import(session, standard_file, "f.csv", VehicleMapping(), STANDARD)
+        assert count(session, Vehicle) == 2
+        golf_refuels = session.scalars(select(Refuel).where(Refuel.vehicle_id == existing))
+        assert len(golf_refuels.all()) == 2
+
+    def test_failed_commit_leaves_no_trace(self, session, standard_file, monkeypatch) -> None:
         from glovebox.importers import pipeline
 
         def boom(*args, **kwargs):
@@ -201,79 +334,69 @@ class TestCommit:
 
         monkeypatch.setattr(pipeline, "_new_expense", boom)
         with pytest.raises(RuntimeError):
-            commit_import(session, fuelio, "f.csv", VehicleMapping())
+            commit_import(session, standard_file, "f.csv", VehicleMapping(), STANDARD)
         for model in (Refuel, Expense, Vehicle, Station, ImportBatch):
             assert count(session, model) == 0
 
 
 class TestDuplicates:
-    def test_reimport_is_a_noop(self, session, fuelio) -> None:
-        commit_import(session, fuelio, "f.csv", VehicleMapping())
-        second = preview_import(session, fuelio)
+    def test_reimport_is_a_noop(self, session, standard_file) -> None:
+        commit_import(session, standard_file, "f.csv", VehicleMapping(), STANDARD)
+        second = preview_import(session, standard_file, STANDARD)
         assert (second.new_refuels, second.new_expenses) == (0, 0)
-        assert (second.duplicate_refuels, second.duplicate_expenses) == (4, 3)
-        batch = commit_import(session, fuelio, "f.csv", VehicleMapping())
+        assert (second.duplicate_refuels, second.duplicate_expenses) == (3, 2)
+        batch = commit_import(session, standard_file, "f.csv", VehicleMapping(), STANDARD)
         assert (batch.refuels_imported, batch.expenses_imported) == (0, 0)
-        assert batch.duplicates_skipped == 7
-        assert count(session, Refuel) == 4 and count(session, Expense) == 3
-        assert count(session, Vehicle) == 1
+        assert batch.duplicates_skipped == 5
+        assert count(session, Refuel) == 3 and count(session, Expense) == 2
+        assert count(session, Vehicle) == 2
 
     def test_litres_compared_at_two_decimals(self, session) -> None:
-        mapping = VehicleMapping(default_vehicle_id=_vehicle(session))
-        first = b"fuelup_date,odometer,litres,price\n2024-01-01,1000,40.001,1.5\n"
-        second = b"fuelup_date,odometer,litres,price\n2024-01-01,1000,40.004,1.5\n"
-        commit_import(session, first, "a.csv", mapping)
-        assert preview_import(session, second, mapping=mapping).duplicate_refuels == 1
+        mapping = _mapping(session)
+        head = b"fuelup_date,odometer,litres,price,total,partial,tags\n"
+        first = head + b"2024-01-01,1000,40.001,1.5,,0,\n"
+        second = head + b"2024-01-01,1000,40.004,1.5,,0,\n"
+        commit_import(session, first, "a.csv", mapping, REFUELS)
+        assert preview_import(session, second, REFUELS, mapping=mapping).duplicate_refuels == 1
 
     def test_duplicates_inside_one_file(self, session) -> None:
         data = (
-            b"fuelup_date,odometer,litres,price\n"
-            b"2024-01-01,1000,40.0,1.5\n2024-01-01,1000,40.0,1.5\n"
+            b"fuelup_date,odometer,litres,price,total,partial,tags\n"
+            b"2024-01-01,1000,40.0,1.5,,0,\n2024-01-01,1000,40.0,1.5,,0,\n"
         )
-        mapping = VehicleMapping(default_vehicle_id=_vehicle(session))
-        preview = preview_import(session, data, mapping=mapping)
+        preview = preview_import(session, data, REFUELS, mapping=_mapping(session))
         assert (preview.new_refuels, preview.duplicate_refuels) == (1, 1)
 
-    def test_expense_key_includes_category_and_amount(self, session, fixtures_dir) -> None:
-        mapping = VehicleMapping(default_vehicle_id=_vehicle(session))
-        data = (fixtures_dir / "drivvo_expense_en.csv").read_bytes()
-        commit_import(session, data, "e.csv", mapping)
-        changed = data.replace(b",5.00,", b",6.00,")
-        preview = preview_import(session, changed, mapping=mapping)
+    def test_expense_key_includes_category_and_amount(self, session, standard_file) -> None:
+        commit_import(session, standard_file, "e.csv", VehicleMapping(), STANDARD)
+        changed = standard_file.replace(b",180.00,", b",181.00,")
+        preview = preview_import(session, changed, STANDARD)
         assert (preview.new_expenses, preview.duplicate_expenses) == (1, 1)
 
 
 class TestUndo:
-    def test_undo_removes_batch_and_its_stations(self, session, fuelio) -> None:
-        batch = commit_import(session, fuelio, "f.csv", VehicleMapping())
+    def test_undo_removes_batch_and_its_stations(self, session, standard_file) -> None:
+        batch = commit_import(session, standard_file, "f.csv", VehicleMapping(), STANDARD)
         undo_batch(session, batch.id)
         for model in (Refuel, Expense, Station, ImportBatch):
             assert count(session, model) == 0
-        assert count(session, Vehicle) == 1  # vehicles are kept
+        assert count(session, Vehicle) == 2  # vehicles are kept
 
-    def test_undo_keeps_other_batches_and_shared_stations(
-        self, session, fixtures_dir
-    ) -> None:
-        mapping = VehicleMapping(default_vehicle_id=_vehicle(session))
-        first = commit_import(
-            session, (fixtures_dir / "drivvo_refuel_en.csv").read_bytes(), "a", mapping
-        )
-        extra = b"Date,Odometer,Volume,Total cost,Gas station\n2024-09-01,9000,30,45,Alpha Fuel\n"
-        second = commit_import(session, extra, "b", mapping)
+    def test_undo_keeps_other_batches_and_shared_stations(self, session) -> None:
+        mapping = _mapping(session)
+        first = commit_import(session, FUELLY, "a", mapping, REFUELS)
+        extra = b"fuelup_date,odometer,litres,price,total,partial,tags\n2024-09-01,9000,30,1.5,,0,Alpha Fuel\n"
+        second = commit_import(session, extra, "b", mapping, REFUELS)
         undo_batch(session, second.id)
-        assert count(session, Refuel) == 2
-        assert {s.name for s in session.scalars(select(Station))} == {
-            "Alpha Fuel", "Beta Oil",
-        }
+        assert count(session, Refuel) == 3
+        assert {s.name for s in session.scalars(select(Station))} == {"Alpha Fuel", "Beta Oil"}
         assert [b.id for b in list_batches(session)] == [first.id]
         undo_batch(session, first.id)
         assert count(session, Station) == 0
 
-    def test_station_used_by_other_records_survives(self, session, fixtures_dir) -> None:
-        mapping = VehicleMapping(default_vehicle_id=_vehicle(session))
-        batch = commit_import(
-            session, (fixtures_dir / "drivvo_refuel_en.csv").read_bytes(), "a", mapping
-        )
+    def test_station_used_by_other_records_survives(self, session) -> None:
+        mapping = _mapping(session)
+        batch = commit_import(session, FUELLY, "a", mapping, REFUELS)
         alpha = session.scalar(select(Station).where(Station.name == "Alpha Fuel"))
         session.add(
             Refuel(
@@ -288,177 +411,244 @@ class TestUndo:
         )
         session.commit()
         undo_batch(session, batch.id)
-        assert [s.name for s in session.scalars(select(Station))] == ["Alpha Fuel"]
-        assert count(session, Refuel) == 1
+        assert {s.name for s in session.scalars(select(Station))} == {"Alpha Fuel"}
+        assert session.scalar(select(Station)).import_batch_id is None
 
-    def test_undo_unknown_batch(self, session) -> None:
-        with pytest.raises(NotFoundError):
-            undo_batch(session, 999)
-
-    def test_list_batches_newest_first(self, session, fuelio, fixtures_dir) -> None:
-        a = commit_import(session, fuelio, "a", VehicleMapping())
-        b = commit_import(
-            session,
-            (fixtures_dir / "fuelio_semicolon_miles.csv").read_bytes(),
-            "b",
-            VehicleMapping(),
-        )
+    def test_batches_newest_first(self, session) -> None:
+        mapping = _mapping(session)
+        a = commit_import(session, FUELLY, "a", mapping, REFUELS)
+        b = commit_import(session, FUELLY, "b", mapping, REFUELS)
         assert [x.id for x in list_batches(session)] == [b.id, a.id]
 
 
-class TestFuellyRoundTrip:
-    def test_station_survives_own_fuelly_export(self, session) -> None:
-        _populate(session)
-        exported = export_fuelly(session)
-        files = _fuelly_files(exported)
-        other_engine = make_engine()
-        run_migrations(other_engine)
-        with make_session_factory(other_engine)() as other:
-            vehicle = _vehicle(other, "Target")
-            for content in files:
-                commit_import(
-                    other, content, "f.csv", VehicleMapping(default_vehicle_id=vehicle)
-                )
-            names = {s.name for s in other.scalars(select(Station))}
-            used = {
-                other.get(Station, r.station_id).name
-                for r in other.scalars(select(Refuel))
-                if r.station_id
-            }
-        other_engine.dispose()
-        assert {"Alpha", "Beta"} <= names and used == {"Alpha", "Beta"}
+def _zip(members: dict[str, str]) -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for name, text in members.items():
+            archive.writestr(name, text)
+    return buffer.getvalue()
 
 
-def _fuelly_files(export) -> list[bytes]:
-    if export.media_type == "text/csv":
-        return [export.content]
-    with zipfile.ZipFile(io.BytesIO(export.content)) as archive:
-        return [archive.read(n) for n in archive.namelist()]
+RECORD_HEAD = (
+    "type,vehicle,date,time,odometer_km,fuel_l,price_per_l,total,currency,full,"
+    "missed_previous,station,station_location,station_brand,category,title,"
+    "coverage_start,coverage_end,notes,derived,source,source_ref\n"
+)
 
 
-class TestNativeRoundTrip:
-    def test_round_trip_into_empty_database(self, session) -> None:
-        _populate(session)
-        first = export_native(session, Settings())
-
-        other_engine = make_engine()
-        run_migrations(other_engine)
-        with make_session_factory(other_engine)() as other:
-            preview = preview_import(other, first)
-            assert preview.format == "native"
-            assert (preview.new_refuels, preview.new_expenses) == (3, 2)
-            commit_import(other, first, "export.zip", VehicleMapping())
-            second = export_native(other, Settings())
-        other_engine.dispose()
-
-        assert _tables(first) == _tables(second)
-
-    def test_native_values_restored(self, session) -> None:
-        _populate(session)
-        data = export_native(session, Settings())
-        other_engine = make_engine()
-        run_migrations(other_engine)
-        with make_session_factory(other_engine)() as other:
-            commit_import(other, data, "export.zip", VehicleMapping())
-            vehicle = other.scalar(select(Vehicle).where(Vehicle.name == "Golf"))
-            assert (vehicle.make, vehicle.plate, vehicle.initial_odometer) == (
-                "VW", "LJ-123", 500.0,
-            )  # fmt: skip
-            station = other.scalar(select(Station).where(Station.name == "Alpha"))
-            assert (station.brand, station.location) == ("Brandco", "Ljubljana")
-            unused = other.scalar(select(Station).where(Station.name == "Unused"))
-            assert unused is not None
-            insurance = other.scalar(
-                select(Expense).where(Expense.category == ExpenseCategory.INSURANCE)
-            )
-            assert insurance.coverage_end == date(2024, 12, 31)
-            archived = other.scalar(select(Vehicle).where(Vehicle.name == "Old"))
-            assert archived.archived
-            refuel = other.scalar(select(Refuel).where(Refuel.odometer_km == 1200))
-            assert refuel.missed_previous and not refuel.is_full
-            assert refuel.time is not None
-        other_engine.dispose()
-
-    def test_reimport_native_is_noop(self, session) -> None:
-        _populate(session)
-        data = export_native(session, Settings())
-        preview = preview_import(session, data)
-        assert (preview.new_refuels, preview.new_expenses) == (0, 0)
-        assert (preview.duplicate_refuels, preview.duplicate_expenses) == (3, 2)
-
-    def test_missing_member_is_an_error(self, session) -> None:
-        buffer = io.BytesIO()
-        with zipfile.ZipFile(buffer, "w") as archive:
-            archive.writestr("vehicles.csv", "id,name\n1,x\n")
-        preview = preview_import(session, buffer.getvalue(), format="native")
-        assert preview.errors
+def _backup(records: str | None = None, **extra: str) -> bytes:
+    members = {
+        "datapackage.json": "{}",
+        "records.csv": RECORD_HEAD
+        + (
+            records
+            if records is not None
+            else "refuel,Golf,2026-05-20,08:05,98600,40.000,1.450,58.00,EUR,false,true,"
+            "Petrol Ljubljana,Ljubljana,Petrol,,,,,,price_per_l,drivvo-refuelling,r2\n"
+            "expense,Golf,2026-05-10,,98400,,,180.00,EUR,,,,,,maintenance,Oil change,,,,,manual,e1\n"
+        ),
+        "vehicles.csv": "name,make,model,plate,fuel_type,initial_odometer_km,archived,notes\n"
+        "Golf,Volkswagen,Golf VII,LJ AB-123,Diesel,85000,false,Company car\n"
+        "Old Polo,VW,Polo,,Petrol,1000.5,true,\n",
+        "stations.csv": "name,location,brand\n"
+        "Petrol Ljubljana,Ljubljana,Petrol\nUnused Station,Maribor,\n",
+    }
+    members.update(extra)
+    return _zip(members)
 
 
-# --- helpers ---------------------------------------------------------------
+class TestBackupRestore:
+    def test_preview_counts_and_vehicles(self, session) -> None:
+        preview = preview_import(session, _backup(), STANDARD)
+        assert preview.is_backup and preview.format == "glovebox"
+        assert preview.vehicle_names == ["Golf", "Old Polo"]
+        assert (preview.new_refuels, preview.new_expenses) == (1, 1)
+        assert preview.errors == []
+        assert count(session, Vehicle) == 0
 
+    def test_backup_is_restored_whatever_preset_is_given(self, session) -> None:
+        batch = commit_import(session, _backup(), "b.zip", VehicleMapping(), REFUELS)
+        assert batch.format == "glovebox"
+        assert count(session, Refuel) == 1
 
-def _vehicle(session, name: str = "Target") -> int:
-    vehicle = Vehicle(name=name)
-    session.add(vehicle)
-    session.commit()
-    return vehicle.id
-
-
-def _populate(session) -> None:
-    from datetime import time
-
-    golf = Vehicle(
-        name="Golf", make="VW", model="Polo", plate="LJ-123",
-        fuel_type="Petrol", initial_odometer=500.0, notes="n, with comma",
-    )  # fmt: skip
-    old = Vehicle(name="Old", archived=True)
-    session.add_all([golf, old])
-    alpha = Station(name="Alpha", brand="Brandco", location="Ljubljana")
-    beta = Station(name="Beta")
-    session.add_all([alpha, beta, Station(name="Unused")])
-    session.flush()
-    for odo, d, litres, ppl, total, station, full, missed in [
-        (1000.0, date(2024, 1, 5), 40000, 1500, 6000, alpha, True, False),
-        (1200.0, date(2024, 1, 20), 20500, 1459, 2991, beta, False, True),
-        (1500.0, date(2024, 2, 3), 45200, 1459, 6595, None, True, False),
-    ]:
-        session.add(
-            Refuel(
-                vehicle_id=golf.id, date=d, odometer_km=odo, litres_milli=litres,
-                price_per_litre_milli=ppl, total_cents=total,
-                station_id=station.id if station else None, is_full=full,
-                missed_previous=missed, notes="note" if station else None,
-                time=time(8, 30) if odo == 1200.0 else None,
-            )
+    def test_vehicles_with_details_and_stations_without_refuels(self, session) -> None:
+        commit_import(session, _backup(), "b.zip", VehicleMapping(), STANDARD)
+        golf = session.scalar(select(Vehicle).where(Vehicle.name == "Golf"))
+        assert (golf.make, golf.model, golf.plate, golf.fuel_type) == (
+            "Volkswagen", "Golf VII", "LJ AB-123", "Diesel",
         )  # fmt: skip
-    session.add_all(
-        [
-            Expense(
-                vehicle_id=golf.id, date=date(2024, 1, 1),
-                category=ExpenseCategory.INSURANCE, title="Policy",
-                amount_cents=40000, coverage_start=date(2024, 1, 1),
-                coverage_end=date(2024, 12, 31),
-            ),
-            Expense(
-                vehicle_id=golf.id, date=date(2024, 2, 1), odometer_km=1400.0,
-                category=ExpenseCategory.MAINTENANCE, title="Oil change",
-                amount_cents=8990, notes="x",
-            ),
+        assert (golf.initial_odometer, golf.archived, golf.notes) == (85000.0, False, "Company car")
+        polo = session.scalar(select(Vehicle).where(Vehicle.name == "Old Polo"))
+        assert polo.archived is True and polo.initial_odometer == 1000.5
+        names = {s.name for s in session.scalars(select(Station))}
+        assert names == {"Petrol Ljubljana", "Unused Station"}
+        unused = session.scalar(select(Station).where(Station.name == "Unused Station"))
+        assert unused.location == "Maribor" and unused.brand is None
+
+    def test_derived_field_and_source_are_restored(self, session) -> None:
+        commit_import(session, _backup(), "b.zip", VehicleMapping(), STANDARD)
+        refuel = session.scalar(select(Refuel))
+        assert refuel.derived_field == DerivedField.PRICE_PER_LITRE
+        assert refuel.source == "drivvo-refuelling"
+        assert refuel.price_per_litre_milli == 1450
+
+    def test_restore_twice_is_a_noop(self, session) -> None:
+        commit_import(session, _backup(), "b.zip", VehicleMapping(), STANDARD)
+        again = commit_import(session, _backup(), "b.zip", VehicleMapping(), STANDARD)
+        assert (again.refuels_imported, again.expenses_imported) == (0, 0)
+        assert count(session, Vehicle) == 2 and count(session, Station) == 2
+
+    def test_vehicle_mapping_applies(self, session) -> None:
+        mine = _vehicle(session, "Mine")
+        mapping = VehicleMapping(by_name={"Golf": mine})
+        commit_import(session, _backup(), "b.zip", mapping, STANDARD)
+        assert {r.vehicle_id for r in session.scalars(select(Refuel))} == {mine}
+        assert {v.name for v in session.scalars(select(Vehicle))} == {"Mine", "Old Polo"}
+
+    def test_undo_removes_restored_records_and_stations(self, session) -> None:
+        batch = commit_import(session, _backup(), "b.zip", VehicleMapping(), STANDARD)
+        undo_batch(session, batch.id)
+        assert count(session, Refuel) == 0 and count(session, Station) == 0
+
+    def test_missing_records_file_is_an_error(self, session) -> None:
+        data = _zip({"datapackage.json": "{}", "vehicles.csv": "name\nGolf\n"})
+        preview = preview_import(session, data, STANDARD)
+        assert "records.csv" in preview.errors[0]
+
+    def test_bad_record_rows_are_reported(self, session) -> None:
+        bad = "refuel,Golf,2026-13-45,,98600,40.000,,58.00,,,,,,,,,,,,,,\n"
+        preview = preview_import(session, _backup(bad), STANDARD)
+        assert preview.row_errors and preview.new_refuels == 0
+
+    def test_bad_vehicle_odometer_is_reported_but_not_fatal(self, session) -> None:
+        vehicles = "name,initial_odometer_km\nGolf,abc\n"
+        preview = preview_import(session, _backup(**{"vehicles.csv": vehicles}), STANDARD)
+        assert preview.row_errors and "vehicles.csv" in preview.row_errors[0].message
+        assert preview.errors == []
+
+
+def _with_companions(**members: str) -> bytes:
+    """A ZIP of records.csv (standard format) plus the given tables, no datapackage.json."""
+    records = (
+        RECORD_HEAD
+        + "refuel,Golf,2026-05-20,,98600,40.000,1.450,58.00,,,,Petrol Ljubljana,Ljubljana,,,,,,,,,\n"
+    )
+    return _zip({"records.csv": records, **members})
+
+
+class TestCompanionTables:
+    """vehicles.csv and stations.csv in a normal import (no datapackage.json)."""
+
+    def test_detected_as_standard_and_not_a_backup(self, session) -> None:
+        data = _with_companions(**{"vehicles.csv": "name,make\nGolf,VW\n"})
+        assert detect_preset(session, data).id == "glovebox"
+        preview = preview_import(session, data, STANDARD)
+        assert not preview.is_backup and preview.vehicle_names == ["Golf"]
+
+    def test_records_table_is_not_a_vehicle_name(self, session) -> None:
+        data = _zip({"records.csv": "date,odo,l,price\n2024-01-01,5,40,1.5\n",
+                     "stations.csv": "name\nA\n"})
+        preset = replace(REFUELS, fields={**REFUELS.fields})
+        preview = preview_import(session, data, preset)
+        assert "records" not in preview.vehicle_names
+
+    def test_missing_vehicle_and_station_are_created_with_details(self, session) -> None:
+        data = _with_companions(**{
+            "vehicles.csv": "name,make,model,plate,fuel_type,initial_odometer_km,notes\n"
+                            "Golf,VW,Golf VII,LJ AB-123,Diesel,85000,Company car\n",
+            "stations.csv": "name,location,brand\nPetrol Ljubljana,Ljubljana,Petrol\n"
+                            "Unused,Maribor,OMV\n",
+        })
+        preview = preview_import(session, data, STANDARD)
+        listed = {(c.kind, c.action, c.name) for c in preview.companion_changes}
+        assert listed == {
+            ("vehicle", "create", "Golf"),
+            ("station", "create", "Petrol Ljubljana"),
+            ("station", "create", "Unused"),
+        }
+        assert count(session, Vehicle) == 0 and count(session, Station) == 0
+        commit_import(session, data, "x.zip", VehicleMapping(), STANDARD)
+        golf = session.scalar(select(Vehicle))
+        assert (golf.make, golf.plate, golf.initial_odometer) == ("VW", "LJ AB-123", 85000.0)
+        stations = {s.name: s for s in session.scalars(select(Station))}
+        assert set(stations) == {"Petrol Ljubljana", "Unused"}
+        assert stations["Unused"].brand == "OMV"
+        assert session.scalar(select(Refuel)).station_id == stations["Petrol Ljubljana"].id
+
+    def test_existing_vehicle_only_gets_empty_fields_filled(self, session) -> None:
+        session.add(Vehicle(name="Golf", make="Seat", plate=None, notes=""))
+        session.commit()
+        data = _with_companions(**{
+            "vehicles.csv": "name,make,plate,notes,fuel_type\nGolf,VW,LJ AB-123,Note,Diesel\n"
+        })
+        preview = preview_import(session, data, STANDARD)
+        (change,) = preview.companion_changes
+        assert (change.action, change.name) == ("fill", "Golf")
+        assert set(change.fields) == {"plate", "notes", "fuel_type"}
+        commit_import(session, data, "x.zip", VehicleMapping(), STANDARD)
+        golf = session.scalar(select(Vehicle))
+        assert (golf.make, golf.plate, golf.notes, golf.fuel_type) == (
+            "Seat", "LJ AB-123", "Note", "Diesel",
+        )  # fmt: skip
+        assert count(session, Vehicle) == 1
+
+    def test_existing_station_keeps_its_brand_and_gets_a_missing_one(self, session) -> None:
+        session.add_all([
+            Station(name="A", location="X", brand="Old"),
+            Station(name="B", location="Y", brand=None),
+            Station(name="B", location="Z", brand=None),
+        ])
+        session.commit()
+        data = _with_companions(**{
+            "stations.csv": "name,location,brand\nA,X,New\nB,Y,Petrol\n"
+        })
+        preview = preview_import(session, data, STANDARD)
+        assert [(c.action, c.name, c.location) for c in preview.companion_changes] == [
+            ("fill", "B", "Y")
         ]
-    )  # fmt: skip
-    session.commit()
+        commit_import(session, data, "x.zip", VehicleMapping(), STANDARD)
+        brands = {(s.name, s.location): s.brand for s in session.scalars(select(Station))}
+        assert brands[("A", "X")] == "Old"
+        assert brands[("B", "Y")] == "Petrol"
+        assert brands[("B", "Z")] is None
 
+    def test_nothing_to_fill_lists_nothing(self, session) -> None:
+        session.add(Vehicle(name="Golf", make="VW"))
+        session.commit()
+        data = _with_companions(**{"vehicles.csv": "name,make\nGolf,Other\n"})
+        assert preview_import(session, data, STANDARD).companion_changes == []
 
-def _tables(archive: bytes) -> dict[str, list[dict[str, str]]]:
-    """CSV contents of an export, ignoring the manifest and the ``source``
-    column (the importer stamps rows with its own source)."""
-    import csv
+    def test_works_with_a_non_standard_preset(self, session) -> None:
+        data = _zip({
+            "Golf.csv": "fuelup_date,odometer,litres,price,total,partial,tags\n"
+                        "2024-01-10,1000,40.000,1.500,,0,Alpha\n",
+            "vehicles.csv": "name,make\nGolf,VW\n",
+        })
+        commit_import(session, data, "x.zip", VehicleMapping(), REFUELS)
+        vehicle = session.scalar(select(Vehicle))
+        assert (vehicle.name, vehicle.make) == ("Golf", "VW")
 
-    tables = {}
-    with zipfile.ZipFile(io.BytesIO(archive)) as zf:
-        for name in ("vehicles.csv", "stations.csv", "refuels.csv", "expenses.csv"):
-            rows = list(csv.DictReader(io.StringIO(zf.read(name).decode())))
-            for row in rows:
-                row.pop("source", None)
-            tables[name] = rows
-    return tables
+    def test_vehicles_only_zip(self, session) -> None:
+        data = _zip({"vehicles.csv": "name,make\nGolf,VW\n"})
+        commit_import(session, data, "x.zip", VehicleMapping(), STANDARD)
+        assert session.scalar(select(Vehicle.make)) == "VW" and count(session, Refuel) == 0
+
+    def test_a_table_named_stations_with_dates_is_a_normal_table(self, session) -> None:
+        data = _zip({"stations.csv": "date,odometer_km,fuel_l,price_per_l,type\n"
+                                     "2024-01-01,5,40,1.5,refuel\n"})
+        preview = preview_import(session, data, STANDARD, mapping=_mapping(session))
+        assert preview.companion_changes == []
+        assert preview.new_refuels == 1
+
+    def test_backup_is_the_same_path_plus_datapackage(self, session) -> None:
+        plain = _backup()
+        members = zipfile.ZipFile(io.BytesIO(plain))
+        without = _zip({n: members.read(n).decode() for n in members.namelist()
+                        if n != "datapackage.json"})
+        a = preview_import(session, without, STANDARD)
+        b = preview_import(session, plain, STANDARD)
+        assert not a.is_backup and b.is_backup
+        assert a.companion_changes == b.companion_changes
+        assert (a.new_refuels, a.new_expenses, a.vehicle_names) == (
+            b.new_refuels, b.new_expenses, b.vehicle_names,
+        )

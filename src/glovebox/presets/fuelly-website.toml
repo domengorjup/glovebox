@@ -1,0 +1,28 @@
+# Fuelly website export format (headers "Fuelup Date", "Odometer", ...).
+# Source: converted from the earlier built-in mapping [export] section. Not checked
+# against a real file. The "Miles" column is the trip distance, not the
+# odometer, and is not mapped. The file does not say which units it uses, so
+# the preview asks. The format has no partial or missed flags: every fill-up
+# is imported as full.
+
+name = "Fuelly (website export)"
+note = "Fuelly website export. Units are asked. No partial or missed flags: all fill-ups are imported as full."
+verified = false
+export = false
+
+[format]
+date_format = "auto"
+decimal_char = "auto"
+group_char = ""
+distance_unit = "ask"
+volume_unit = "ask"
+
+[fields]
+type = { value = "refuel" }
+vehicle = { column = "Name" }
+date = { column = "Fuelup Date" }
+odometer_km = { column = "Odometer" }
+fuel_l = { column = ["Litres", "Liters", "Gallons"] }
+price_per_l = { column = "Price" }
+notes = { column = "Notes" }
+station = { column = "Tags" }

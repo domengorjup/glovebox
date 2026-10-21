@@ -1,0 +1,12 @@
+type,vehicle,date,odometer_km,fuel_l,price_per_l,total,title,notes
+refuel,Golf,2026-05-01,98000,40.000,1.500,,,fine
+refuel,Golf,31/31/2026,98100,40.000,1.500,,,bad date
+refuel,Golf,2026-05-03,"98,500",40.000,1.500,,,thousands separator
+refuel,Golf,2026-05-04,,40.000,1.500,,,no odometer
+banana,Golf,2026-05-05,98300,40.000,1.500,,,unknown type
+refuel,Golf,2026-05-06,98400,40.000,,,,only one figure
+expense,Golf,2026-05-07,,,,0,Zero,zero amount
+refuel,Golf,2026-05-08,98700,30.000,,45.00,,"two
+lines"
+expense,Golf,2026-05-12,,,,25.00,Wash,fine
+refuel,Golf,2026-05-13,x,40.000,1.500,,,garbage odometer

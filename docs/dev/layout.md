@@ -9,9 +9,11 @@ src/glovebox/
   urls.py           url(request, path) base-path helper
   migrations/       Alembic
   services/         records.py, stats.py
-  importers/        base.py, pipeline.py, drivvo.py, fuelio.py,
-                    fuelly.py, native.py, aliases/*.toml
-  exporters/        native.py, fuelly.py
+  standard.py       the standard CSV format (fields, descriptor)
+  formatdocs.py     generates docs/user/standard-format.md and presets.md
+  presets/          shipped presets (*.toml)
+  importers/        base.py, presets.py, engine.py, pipeline.py
+  exporters/        csv_export.py, backup.py
   api/v1.py         stats API
   web/              routes, templating.py, templates/, static/
 addon/glovebox/     config.yaml, Dockerfile, DOCS.md, CHANGELOG.md, icons

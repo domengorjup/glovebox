@@ -1,6 +1,6 @@
 # Glovebox
 
-Glovebox tracks what your cars cost to run: fuel, service, insurance and registration. It shows consumption and cost statistics, and imports your history from Drivvo, Fuelio or Fuelly.
+Glovebox tracks what your cars cost to run: fuel, service, insurance and registration. It shows consumption and cost statistics, and imports your history from CSV files (presets for Fuelly, Fuelio and Drivvo, or your own mapping) and exports it in a documented standard format.
 
 It runs as a Home Assistant add-on or as a standalone Docker container.
 

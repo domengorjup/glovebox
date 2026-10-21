@@ -1,11 +1,8 @@
 """
-Shared import types and locale helpers (design D6). FROZEN after task group 1.
+Shared import types and locale helpers (design D6).
 
 The preset engine (``importers/engine.py``) turns bytes into canonical records
-in storage units and never touches the database. ``ImporterAdapter``,
-``AliasTable``, ``load_aliases``, ``HeaderMismatch``, ``ImportOptions`` and
-``Ambiguity`` belong to the v1 per-app importers; they are DEPRECATED and are
-deleted together with those importers (task 7.1).
+in storage units and never touches the database.
 """
 
 from __future__ import annotations
@@ -14,14 +11,11 @@ import csv
 import io
 import re
 import struct
-import tomllib
 import zlib
 from dataclasses import dataclass, field
 from datetime import date, time
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from enum import StrEnum
-from pathlib import Path
-from typing import Protocol, runtime_checkable
 
 from glovebox.models import DerivedField, ExpenseCategory
 
@@ -126,50 +120,16 @@ class Answers:
     header_row: int | None = None  # over non-blank rows, 1 = first
 
 
-class Ambiguity(StrEnum):
-    """DEPRECATED (v1 adapters). Questions the preview must ask the user."""
-
-    DATE_ORDER = "date_order"  # day-first vs month-first
-    UNITS = "units"  # metric vs imperial
-
-
-@dataclass(frozen=True)
-class ImportOptions:
-    """
-    DEPRECATED (v1 adapters). User answers passed to ``parse``.
-    ``None`` means "not answered / auto".
-
-    Attributes
-    ----------
-    date_order : str | None
-        ``"dmy"`` or ``"mdy"``.
-    units : str | None
-        ``"metric"`` or ``"imperial"`` (miles and gallons).
-    """
-
-    date_order: str | None = None
-    units: str | None = None
-
-
-@dataclass(frozen=True)
-class HeaderMismatch:
-    """DEPRECATED (v1 adapters). Required headers are missing; nothing is imported."""
-
-    found: list[str]
-    expected: list[str]
-
-
 @dataclass
 class ImportResult:
     """
-    Output of ``engine.apply`` (and of the v1 ``ImporterAdapter.parse``).
+    Output of ``engine.apply``.
 
     ``questions`` lists unanswered questions; re-apply with ``Answers`` once
     the user answers. ``errors`` non-empty means the file cannot be imported
     (blocking). ``row_errors`` are rows skipped for a fault in the row;
     ``skipped`` counts rows dropped by the preset's skip rules.
-    ``warnings``, ``ambiguities`` and ``header_mismatch`` are kept for the v1
-    adapters (DEPRECATED).
+    ``warnings`` are non-blocking notes.
     """
 
     refuels: list[CanonicalRefuel] = field(default_factory=list)
@@ -177,40 +137,13 @@ class ImportResult:
     vehicles: list[CanonicalVehicleRef] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
-    ambiguities: list[Ambiguity] = field(default_factory=list)
-    header_mismatch: HeaderMismatch | None = None
     row_errors: list[RowError] = field(default_factory=list)
     questions: list[Question] = field(default_factory=list)
     skipped: int = 0
 
 
-@runtime_checkable
-class ImporterAdapter(Protocol):
-    """
-    DEPRECATED (v1 adapters). One file format.
-
-    Attributes
-    ----------
-    name : str
-        Format id stored in ``import_batch.format`` and ``source``:
-        ``"drivvo"``, ``"fuelio"``, ``"fuelly"`` or ``"native"``.
-    """
-
-    name: str
-
-    def detect(self, head: bytes) -> float:
-        """Return confidence 0.0-1.0 that the file (first bytes) is this format."""
-        ...
-
-    def parse(self, data: bytes, options: ImportOptions) -> ImportResult:
-        """Parse the whole file. Must not raise on bad content; report in
-        ``errors`` / ``header_mismatch`` instead."""
-        ...
-
-
 # --- Shared locale helpers (task 3.1) --------------------------------------
 
-ALIASES_DIR = Path(__file__).parent / "aliases"
 KM_PER_MILE = Decimal("1.609344")
 LITRES_PER_US_GALLON = Decimal("3.785411784")
 LITRES_PER_UK_GALLON = Decimal("4.54609")
@@ -430,48 +363,3 @@ def resolve_date_order(values: list[str], requested: str | None) -> DateDetectio
 def normalize_header(header: str) -> str:
     """Case- and whitespace-insensitive form of a header or alias."""
     return " ".join(header.replace("\ufeff", "").split()).casefold()
-
-
-@dataclass(frozen=True)
-class AliasTable:
-    """
-    DEPRECATED (v1 adapters). Alias data of one format: ``section -> canonical name -> [aliases]``.
-
-    ``provisional`` mirrors ``[meta] provisional`` in the TOML file.
-    """
-
-    provisional: bool
-    sections: dict[str, dict[str, list[str]]]
-
-    def match(self, section: str, headers: list[str]) -> dict[str, int]:
-        """Map canonical names to column indexes for the headers found."""
-        index = {}
-        for position, header in enumerate(headers):
-            index.setdefault(normalize_header(header), position)
-        found = {}
-        for canonical, aliases in self.sections[section].items():
-            for alias in aliases:
-                if (position := index.get(normalize_header(alias))) is not None:
-                    found[canonical] = position
-                    break
-        return found
-
-    def expected(self, section: str, required: list[str]) -> list[str]:
-        """The primary alias of each required canonical name."""
-        return [self.sections[section][name][0] for name in required]
-
-    def lookup(self, section: str, value: str) -> str | None:
-        """Reverse lookup: the canonical name whose aliases contain ``value``."""
-        wanted = normalize_header(value)
-        for canonical, aliases in self.sections[section].items():
-            if wanted in {normalize_header(a) for a in aliases}:
-                return canonical
-        return None
-
-
-def load_aliases(name: str, directory: Path = ALIASES_DIR) -> AliasTable:
-    """DEPRECATED (v1 adapters). Load ``aliases/<name>.toml``."""
-    with (directory / f"{name}.toml").open("rb") as handle:
-        raw = tomllib.load(handle)
-    meta = raw.pop("meta", {})
-    return AliasTable(provisional=bool(meta.get("provisional", False)), sections=raw)

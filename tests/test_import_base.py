@@ -111,29 +111,6 @@ class TestDates:
         assert base.parse_date_value("2024-02-30", "ymd") is None
 
 
-class TestAliases:
-    def test_matching_ignores_case_and_whitespace(self, tmp_path) -> None:
-        (tmp_path / "x.toml").write_text(
-            '[meta]\nprovisional = true\n[t]\nodo = ["Odometer", "Km  Stand"]\n'
-        )
-        table = base.load_aliases("x", tmp_path)
-        assert table.provisional
-        assert table.match("t", ["Date", " km STAND "]) == {"odo": 1}
-
-    def test_lookup_is_reverse_and_normalised(self, tmp_path) -> None:
-        (tmp_path / "x.toml").write_text('[c]\ninsurance = ["Car  Insurance"]\n')
-        table = base.load_aliases("x", tmp_path)
-        assert table.lookup("c", "car insurance") == "insurance"
-        assert table.lookup("c", "parking") is None
-
-    @pytest.mark.parametrize("name", ["drivvo", "fuelio", "fuelly"])
-    def test_shipped_files_load(self, name: str) -> None:
-        assert base.load_aliases(name).sections
-
-    def test_drivvo_is_marked_provisional(self) -> None:
-        assert base.load_aliases("drivvo").provisional
-
-
 def test_leading_zip_member_reads_name_and_content() -> None:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:

@@ -266,6 +266,11 @@ h2 { font-size: 14px; font-weight: 500; color: var(--secondary-text-color); marg
 .field.has-suffix input { padding-right: 36px; }
 .field.computed input { color: var(--primary-color); }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+/* Import mapping: the constant-value field shows only when "Constant value" is chosen. */
+.map-row { grid-template-columns: 1fr; }
+.map-row .map-const { display: none; }
+.map-row:has(select[name^="src."] option[value="="]:checked) { grid-template-columns: 1fr 1fr; }
+.map-row:has(select[name^="src."] option[value="="]:checked) .map-const { display: block; }
 .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
 .help { font-size: 12px; color: var(--secondary-text-color); margin: -8px 4px 0; }
 .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 4px 4px; }
@@ -406,6 +411,7 @@ a.btn, a.icon-btn, a.choice, a.chip, .seg a { text-decoration: none; }
 @media (max-width: 699px) { .tbl th.num { white-space: normal; } .tbl td:first-child, .tbl th:first-child { width: 38%; } }
 a.choice { color: inherit; } .choice .t, .choice .s { display: block; }
 .btn.with-icon { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+.btn.primary.with-icon { padding: 10px 24px; font-size: inherit; }
 .card + .summary-grid { margin-top: var(--ha-space-4); }
 .toast { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 60; max-width: min(90vw, 420px); padding: 12px 20px; border-radius: var(--ha-border-radius-md); background: var(--primary-text-color); color: var(--card-background-color); font-size: 14px; box-shadow: 0 3px 8px var(--shadow-color); }
 .page-head { display: flex; align-items: center; gap: var(--ha-space-2); margin: 0 0 var(--ha-space-4) -8px; }

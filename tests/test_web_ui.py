@@ -7,18 +7,22 @@ way they call the services, not the services themselves.
 
 from __future__ import annotations
 
+import json
 import re
 from datetime import date
+from html import unescape
+from html.parser import HTMLParser
 from types import SimpleNamespace
 
 import pytest
 
-from glovebox.exporters import fuelly as fuelly_exporter
-from glovebox.exporters import native as native_exporter
-from glovebox.exporters.fuelly import ExportFile
+from glovebox.exporters import backup as backup_exporter
+from glovebox.exporters import csv_export
 from glovebox.importers import pipeline
-from glovebox.importers.base import Ambiguity, HeaderMismatch
+from glovebox.importers.base import Question, QuestionKind, RowError
 from glovebox.importers.pipeline import ImportPreview
+from glovebox.importers.presets import load_preset
+from glovebox.standard import RECORD_FIELDS
 from glovebox.models import (
     DerivedField,
     Expense,
@@ -159,11 +163,8 @@ def fake_services(monkeypatch, calls):
             StationStat(1, "Petrol Trzaska", 3, 100000, 1450, 1400, 1500, None, 1)],
     )
 
-    monkeypatch.setattr(pipeline, "available_formats",
-                        lambda: [SimpleNamespace(name="fuelio"),
-                                 SimpleNamespace(name="native")])
     monkeypatch.setattr(pipeline, "list_batches", lambda session: [
-        ImportBatch(id=5, format="fuelio", filename="a.csv",
+        ImportBatch(id=5, format="fuelio-fillups", filename="a.csv",
                     created_at=__import__("datetime").datetime(2026, 1, 2, 3, 4),
                     refuels_imported=10, expenses_imported=2, duplicates_skipped=1)])
 
@@ -193,7 +194,7 @@ PAGES = [
     "/vehicles", "/vehicles/new", "/vehicles/1/edit", "/vehicles/1/delete",
     "/refuels/new", "/refuels/1/edit",
     "/expenses/new", "/expenses/new?kind=service", "/expenses/1/edit",
-    "/stations", "/stations/1/edit", "/import", "/export",
+    "/stations", "/stations/1/edit", "/import", "/export", "/presets",
 ]
 
 
@@ -661,94 +662,269 @@ def test_station_rename(client, calls):
     assert data.name == "Petrol Tržaška" and data.brand == "Petrol"
 
 
-# --- 6.7 import / export --------------------------------------------------
+# --- import / export / presets ---------------------------------------------
+
+STANDARD_CSV = (
+    b"type,vehicle,date,odometer_km,fuel_l,price_per_l,total\n"
+    b"refuel,Golf,2026-05-02,98000,40.000,1.500,60.00\n"
+)
+PLAIN_CSV = b"when,odo,litres,paid\n2026-05-02,98000,40.000,60.00\n"
 
 
-def fake_preview(**overrides):
-    values = dict(format="fuelio", vehicle_names=["My Golf"], new_refuels=5,
-                  new_expenses=1, duplicate_refuels=2, duplicate_expenses=0)
-    values.update(overrides)
-    return ImportPreview(**values)
+class _FormReader(HTMLParser):
+    """Collects what a browser would submit for the page's main form."""
+
+    def __init__(self):
+        super().__init__()
+        self.values: dict[str, list[str]] = {}
+        self._select = None
+        self._options: list[tuple[str, bool]] = []
+        self._textarea = None
+        self._text = ""
+
+    def _add(self, name, value):
+        self.values.setdefault(name, []).append(value)
+
+    def handle_starttag(self, tag, attrs):
+        a = {k: v or "" for k, v in attrs}
+        if tag == "input" and a.get("name"):
+            kind = a.get("type", "text")
+            if kind in ("checkbox", "radio"):
+                if "checked" in a:
+                    self._add(a["name"], a.get("value", "on"))
+            elif kind != "file":
+                self._add(a["name"], a.get("value", ""))
+        elif tag == "select":
+            self._select, self._options = a.get("name"), []
+        elif tag == "option" and self._select:
+            self._options.append((a.get("value", ""), "selected" in a))
+        elif tag == "textarea":
+            self._textarea, self._text = a.get("name"), ""
+
+    def handle_data(self, data):
+        if self._textarea:
+            self._text += data
+
+    def handle_endtag(self, tag):
+        if tag == "select" and self._select:
+            chosen = next((v for v, sel in self._options if sel),
+                          self._options[0][0] if self._options else "")
+            self._add(self._select, chosen)
+            self._select = None
+        elif tag == "textarea" and self._textarea:
+            self._add(self._textarea, self._text.strip("\n"))
+            self._textarea = None
 
 
-def upload(client, headers=None):
+def browser_form(html: str, **changes) -> dict:
+    """The form as the browser would send it, with ``changes`` typed in."""
+    reader = _FormReader()
+    reader.feed(html)
+    form = {k: (v if len(v) > 1 else v[0]) for k, v in reader.values.items()}
+    return form | changes
+
+
+def hidden(html: str, name: str) -> str:
+    """Value of a hidden input of the page."""
+    match = re.search(rf'<input type="hidden" name="{name}" value="([^"]*)">', html)
+    assert match, f"no hidden field {name}"
+    return unescape(match.group(1))
+
+
+def upload(client, data=STANDARD_CSV, headers=None):
     response = client.post("/import/upload",
-                           files={"file": ("log.csv", b"a,b\n1,2\n")},
-                           data={"format": ""}, headers=headers or {},
+                           files={"file": ("log.csv", data)}, headers=headers or {},
                            follow_redirects=False)
     assert response.status_code == 303
     return response.headers["location"]
 
 
-def test_upload_redirects_to_prefixed_preview(client, monkeypatch):
-    monkeypatch.setattr(pipeline, "preview_import", lambda *a, **k: fake_preview())
-    location = upload(client, INGRESS)
-    assert location.startswith(f"{PREFIX}/import/preview?token=")
+def token_of(location: str) -> str:
+    return location.split("token=")[1].split("&")[0]
+
+
+def state(html: str) -> dict:
+    """The hidden state that the mapping and preview pages carry."""
+    return {key: hidden(html, key)
+            for key in ("token", "filename", "base_toml", "selected_preset", "preset_id")}
+
+
+def fake_preview(**overrides):
+    values = dict(format="fuelly-metric", vehicle_names=["My Golf"], new_refuels=5,
+                  new_expenses=1, duplicate_refuels=2, duplicate_expenses=0)
+    values.update(overrides)
+    return ImportPreview(**values)
+
+
+def test_import_page_has_upload_and_no_format_choice(client):
+    html = client.get("/import").text
+    assert 'name="file"' in html and 'name="format"' not in html
+    assert "Presets" in html
+
+
+def test_upload_goes_to_the_prefixed_mapping_page(client):
+    location = upload(client, headers=INGRESS)
+    assert location.startswith(f"{PREFIX}/import/mapping?token=")
     page = client.get(location.removeprefix(PREFIX), headers=INGRESS)
     assert page.status_code == 200
     assert all(t.startswith(PREFIX + "/") for t in urls_in(page.text))
 
 
-def test_preview_shows_mapping_counts_and_duplicates(client, monkeypatch):
-    monkeypatch.setattr(pipeline, "preview_import", lambda *a, **k: fake_preview())
+def test_mapping_shows_detected_preset_and_one_row_per_field(client):
     html = client.get(upload(client)).text
-    assert "My Golf" in html and "skipped: 2" in html
-    assert 'name="maps"' in html and "Import now" in html
+    assert "Glovebox" in html
+    for name in ("type", "date", "odometer_km", "fuel_l", "station", "notes"):
+        assert f'name="src.{name}"' in html
+    assert re.search(r'<option value="col:date" selected>', html)
+    assert 'name="decimal_char"' in html and 'name="date_format"' in html
+    assert 'name="header_row"' in html and 'name="encoding"' in html
+
+
+def test_mapping_of_unknown_headers_starts_empty_and_asks_for_required_fields(client):
+    html = client.get(upload(client, PLAIN_CSV)).text
+    assert "Custom mapping" in html
+    assert "Map the required fields" in html and "type, date" in html
+    assert not re.search(r'<option value="col:[^"]*" selected>', html)
+    assert '<option value="col:odo" >' in html or '<option value="col:odo">' in html
+
+
+def test_mapping_keeps_edits_when_updated_and_resets_on_new_preset(client):
+    html = client.get(upload(client, PLAIN_CSV)).text
+    form = state(html) | {"edited": "1", "src.type": "=", "val.type": "refuel",
+                          "src.date": "col:when"}
+    updated = client.post("/import/mapping", data=form).text
+    assert re.search(r'<option value="col:when" selected>', updated)
+    assert re.search(r'<option value="refuel" selected>', updated)
+    again = client.post("/import/mapping", data=state(updated) | {"preset": "glovebox"}).text
+    assert not re.search(r'<option value="col:when" selected>', again)
+    assert re.search(r'<option value="glovebox" selected>', again)
+
+
+def test_mapping_rejects_invalid_value_with_the_key_name(client):
+    html = client.get(upload(client, PLAIN_CSV)).text
+    form = state(html) | {"edited": "1", "src.type": "=", "val.type": "bike",
+                          "src.date": "col:when"}
+    response = client.post("/import/mapping", data=form)
+    assert response.status_code == 422 and "fields.type.value" in response.text
+
+
+def mapped_form(client, extra=None):
+    """The mapping page of PLAIN_CSV as a browser submits it after the user maps it."""
+    html = client.get(upload(client, PLAIN_CSV)).text
+    return browser_form(html, **{
+        "src.type": "=", "val.type": "refuel", "src.date": "col:when",
+        "src.odometer_km": "col:odo", "src.fuel_l": "col:litres", "src.total": "col:paid",
+    } | (extra or {}))
+
+
+def test_preview_of_an_edited_mapping_asks_for_the_vehicle(client, monkeypatch):
+    seen = {}
+
+    def fake(session, data, preset, *, mapping=None, answers=None):
+        seen.update(preset=preset, mapping=mapping)
+        return fake_preview(vehicle_names=[], needs_vehicle_choice=True,
+                            errors=[pipeline.CHOOSE_VEHICLE_MESSAGE])
+
+    monkeypatch.setattr(pipeline, "preview_import", fake)
+    html = client.post("/import/preview", data=mapped_form(client)).text
+    assert "Which vehicle do these records belong to?" in html
+    assert "Import now" not in html
+    assert pipeline.CHOOSE_VEHICLE_MESSAGE not in html
+    preset = seen["preset"]
+    assert preset.fields["type"].value == "refuel"
+    assert preset.fields["date"].columns == ("when",)
+    assert preset.id == ""  # an edited mapping is not the stored preset
+
+
+def test_preview_carries_the_mapping_as_form_fields(client):
+    html = client.post("/import/preview", data=mapped_form(client)).text
+    assert 'name="base_toml"' in html and "[fields]" in unescape(hidden(html, "base_toml"))
+    assert 'name="edited"' not in html  # only the mapping page edits
+
+
+def test_preview_shows_counts_note_and_vehicle_mapping(client, monkeypatch):
+    monkeypatch.setattr(pipeline, "preview_import", lambda *a, **k: fake_preview(
+        preset_note="Based on public descriptions.", skipped=2))
+    html = client.post("/import/preview", data=mapped_form(client)).text
+    assert "My Golf" in html and "skipped: 2" in html and 'name="maps"' in html
+    assert "Based on public descriptions." in html
+    assert "Rows not imported" in html and "Import now" in html
 
 
 def test_preview_preselects_vehicle_with_same_name(client, monkeypatch):
     monkeypatch.setattr(pipeline, "preview_import",
                         lambda *a, **k: fake_preview(vehicle_names=["golf"]))
-    html = client.get(upload(client)).text
+    html = client.post("/import/preview", data=mapped_form(client)).text
     assert '<option value="1" selected>' in html
 
 
-def test_preview_asks_date_order_and_blocks_commit(client, monkeypatch):
-    monkeypatch.setattr(pipeline, "preview_import", lambda *a, **k:
-                        fake_preview(ambiguities=[Ambiguity.DATE_ORDER]))
-    html = client.get(upload(client)).text
-    assert 'name="date_order"' in html and "Import now" not in html
+def test_preview_lists_first_fifty_row_errors_with_the_total(client, monkeypatch):
+    errors = [RowError(i + 2, "date", "31/31/2024", "not a date") for i in range(60)]
+    monkeypatch.setattr(pipeline, "preview_import",
+                        lambda *a, **k: fake_preview(row_errors=errors))
+    html = client.post("/import/preview", data=mapped_form(client)).text
+    assert "Rows with errors (60, first 50 shown)" in html
+    assert html.count("31/31/2024") == 50
+    assert "<td class=\"num\">2</td>" in html and "Import now" in html
 
 
-def test_preview_header_mismatch_lists_headers(client, monkeypatch):
-    mismatch = HeaderMismatch(found=["colA", "colB"], expected=["Odo", "Fuel"])
-    monkeypatch.setattr(pipeline, "preview_import", lambda *a, **k:
-                        fake_preview(header_mismatch=mismatch))
-    html = client.get(upload(client)).text
-    assert "colA, colB" in html and "Odo, Fuel" in html and "Import now" not in html
+def test_preview_asks_questions_and_blocks_commit(client, monkeypatch):
+    question = Question(QuestionKind.DATE_ORDER, "Which order do the dates use?",
+                        ("dmy", "mdy"))
+    monkeypatch.setattr(pipeline, "preview_import",
+                        lambda *a, **k: fake_preview(questions=[question]))
+    html = client.post("/import/preview", data=mapped_form(client)).text
+    assert 'name="ans_date_order" value="dmy"' in html and "Import now" not in html
 
 
-def test_preview_passes_answers_to_pipeline(client, monkeypatch):
+def test_answered_question_stays_changeable(client, monkeypatch):
     seen = {}
 
-    def fake(session, data, *, format=None, options=None, mapping=None):
-        seen.update(format=format, options=options, mapping=mapping)
+    def fake(session, data, preset, *, mapping=None, answers=None):
+        seen["answers"] = answers
         return fake_preview()
 
     monkeypatch.setattr(pipeline, "preview_import", fake)
-    location = upload(client)
-    client.get(f"{location}&format=fuelio&date_order=dmy&names=My+Golf&maps=1")
-    assert seen["format"] == "fuelio" and seen["options"].date_order == "dmy"
-    assert seen["mapping"].by_name == {"My Golf": 1}
+    html = client.post("/import/preview",
+                       data=mapped_form(client) | {"ans_date_order": "mdy"}).text
+    assert seen["answers"].date_order == "mdy"
+    assert re.search(r'value="mdy" checked', html)
 
 
-def test_commit_uses_mapping_and_removes_upload(client, monkeypatch, settings, calls):
-    monkeypatch.setattr(pipeline, "preview_import", lambda *a, **k: fake_preview())
+def test_commit_uses_preset_answers_mapping_and_removes_upload(
+        client, monkeypatch, settings):
     committed = {}
 
-    def fake_commit(session, data, filename, mapping, *, format=None, options=None):
-        committed.update(data=data, filename=filename, mapping=mapping)
+    def fake_commit(session, data, filename, mapping, preset, *, answers=None):
+        committed.update(data=data, filename=filename, mapping=mapping,
+                         preset=preset, answers=answers)
         return ImportBatch(id=9)
 
+    monkeypatch.setattr(pipeline, "preview_import", lambda *a, **k: fake_preview())
     monkeypatch.setattr(pipeline, "commit_import", fake_commit)
-    token = upload(client).split("token=")[1].split("&")[0]
-    response = client.post("/import/commit", data={
-        "token": token, "filename": "log.csv", "names": ["My Golf", "Polo"],
-        "maps": ["1", "new"]}, headers=INGRESS, follow_redirects=False)
+    form = mapped_form(client) | {"names": ["My Golf", "Polo"], "maps": ["1", "new"],
+                                  "ans_date_order": "dmy"}
+    response = client.post("/import/commit", data=form, headers=INGRESS,
+                           follow_redirects=False)
     assert response.headers["location"] == f"{PREFIX}/import"
-    assert committed["data"] == b"a,b\n1,2\n" and committed["filename"] == "log.csv"
+    assert committed["data"] == PLAIN_CSV and committed["filename"] == "log.csv"
     assert committed["mapping"].by_name == {"My Golf": 1, "Polo": None}
+    assert committed["answers"].date_order == "dmy"
+    assert committed["preset"].fields["total"].columns == ("paid",)
     assert not list((settings.data_dir / "uploads").glob("*.upload"))
+
+
+def test_commit_of_an_untouched_preset_keeps_its_id(client, monkeypatch):
+    committed = {}
+    monkeypatch.setattr(pipeline, "commit_import", lambda session, data, filename,
+                        mapping, preset, *, answers=None:
+                        committed.update(preset=preset) or ImportBatch(id=1))
+    form = browser_form(client.get(upload(client)).text)
+    client.post("/import/commit", data=form, follow_redirects=False)
+    assert committed["preset"].id == "glovebox"
+    form = browser_form(client.get(upload(client)).text, **{"default.notes": "x"})
+    client.post("/import/commit", data=form, follow_redirects=False)
+    assert committed["preset"].id == ""
 
 
 def test_commit_error_returns_to_preview(client, monkeypatch):
@@ -758,52 +934,282 @@ def test_commit_error_returns_to_preview(client, monkeypatch):
         raise ValueError("cannot import")
 
     monkeypatch.setattr(pipeline, "commit_import", boom)
-    token = upload(client).split("token=")[1].split("&")[0]
-    response = client.post("/import/commit", data={"token": token})
+    response = client.post("/import/commit", data=mapped_form(client))
     assert response.status_code == 422 and "cannot import" in response.text
 
 
+def test_commit_of_a_file_with_more_sections_says_so(client, monkeypatch):
+    monkeypatch.setattr(pipeline, "commit_import", lambda *a, **k: ImportBatch(id=1))
+    data = b'## Log\nData,Odo (km)\n2026-05-02,98000\n## Costs\nCostTitle\nOil\n'
+    html = client.get(upload(client, data)).text
+    form = state(html)
+    form["base_toml"] = form["base_toml"].replace("[format]", '[file]\nsection = "Log"\n\n[format]', 1)
+    response = client.post("/import/commit", data=form, follow_redirects=False)
+    assert response.headers["location"].endswith("/import?more=Costs")
+    assert "Costs" in client.get(response.headers["location"]).text
+
+
+def test_save_preset_from_the_preview_then_it_is_listed(client, monkeypatch):
+    monkeypatch.setattr(pipeline, "preview_import", lambda *a, **k: fake_preview())
+    form = mapped_form(client) | {"preset_name": "My bank"}
+    response = client.post("/import/save-preset", data=form)
+    assert response.status_code == 200 and 'Saved as preset: My bank' in response.text
+    assert hidden(response.text, "preset_id") == "user-my-bank"
+    assert "My bank" in client.get("/presets").text
+    clash = client.post("/import/save-preset", data=form)
+    assert clash.status_code == 422 and "already exists" in clash.text
+
+
 def test_unknown_or_malicious_token_is_404(client):
-    assert client.get("/import/preview?token=../../etc/passwd").status_code == 404
+    assert client.get("/import/mapping?token=../../etc/passwd").status_code == 404
     assert client.get("/import/preview?token=" + "0" * 32).status_code == 404
+    assert client.post("/import/preview", data={"token": "0" * 32}).status_code == 404
 
 
 def test_import_page_lists_batches_with_undo(client, monkeypatch):
     html = client.get("/import", headers=INGRESS).text
     assert "a.csv" in html and f'action="{PREFIX}/import/5/undo"' in html
+    assert "Fuelio (fill-ups)" in html  # the preset name, not its id
     undone = []
     monkeypatch.setattr(pipeline, "undo_batch", lambda session, batch_id: undone.append(batch_id))
     client.post("/import/5/undo", follow_redirects=False)
     assert undone == [5]
 
 
-def test_export_page_notes_expenses_omitted(client):
+def test_backup_upload_goes_straight_to_the_preview(client, monkeypatch):
+    import io
+    import zipfile
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("datapackage.json", "{}")
+        archive.writestr("records.csv", "type,vehicle,date\n")
+    monkeypatch.setattr(pipeline, "preview_import",
+                        lambda *a, **k: fake_preview(is_backup=True))
+    location = upload(client, buffer.getvalue())
+    assert "/import/preview?token=" in location
+    html = client.get(location).text
+    assert "Glovebox" in html and 'name="src.' not in html
+
+
+def test_import_walks_through_the_real_engine_and_pipeline(client, monkeypatch, engine):
+    """No fakes: upload, map, preview, save the preset, commit, undo."""
+    from sqlalchemy import select
+
+    from glovebox.db import make_session_factory
+    from glovebox.models import Refuel, Vehicle
+
+    monkeypatch.undo()
+    with make_session_factory(engine)() as session:
+        session.add(Vehicle(name="Golf"))
+        session.commit()
+        vehicle_id = session.scalar(select(Vehicle.id))
+    form = mapped_form(client) | {"default_vehicle": str(vehicle_id)}
+    preview = client.post("/import/preview", data=form).text
+    assert "New refuels: <strong>1</strong>" in preview and "Import now" in preview
+    saved = client.post("/import/save-preset", data=form | {"preset_name": "Plain"})
+    assert hidden(saved.text, "preset_id") == "user-plain"
+    committed = client.post("/import/commit", data=form, follow_redirects=False)
+    assert committed.status_code == 303
+    with make_session_factory(engine)() as session:
+        refuel = session.scalars(select(Refuel)).one()
+        assert (refuel.litres_milli, refuel.total_cents) == (40000, 6000)
+    # The next upload of this layout finds the saved preset.
+    assert 'value="user-plain" selected' in client.get(upload(client, PLAIN_CSV)).text
+
+
+# --- export ---------------------------------------------------------------
+
+
+def test_export_page_offers_presets_backup_and_format_description(client):
     html = client.get("/export").text
+    assert "Glovebox" in html and "Fuelly (metric)" in html
+    assert "Fuelio (fill-ups)" not in html  # not usable for export
+    assert 'formaction="/export/csv"' in html and 'formaction="/export/backup"' in html
+    assert 'href="/export/format.json"' in html
+    assert "Expenses are not included" not in html
+
+
+def test_export_page_for_fuelly_says_expenses_are_not_included(client):
+    html = client.get("/export?preset=fuelly-metric").text
     assert "Expenses are not included" in html
-    assert 'action="/export/native"' in html and 'action="/export/fuelly"' in html
+    assert re.search(r'<option value="fuelly-metric" selected>', html)
 
 
-def test_native_download(client, monkeypatch):
+def test_export_page_rejects_unknown_or_non_exportable_preset(client):
+    assert client.get("/export?preset=nope").status_code == 404
+    assert client.get("/export?preset=fuelio-fillups").status_code == 422
+
+
+def test_export_preset_change_keeps_the_ticked_vehicles(client):
+    html = client.post("/export", data={"preset": "fuelly-metric", "vehicle": "1"}).text
+    assert re.search(r'name="vehicle" value="1" checked', html)
+    assert re.search(r'<option value="fuelly-metric" selected>', html)
+
+
+def test_export_page_names_a_vehicle_that_is_renamed(client, monkeypatch):
+    monkeypatch.setattr(csv_export, "renamed_vehicles",
+                        lambda session, ids=None: {"Golf": "Golf (archived)"})
+    assert 'Golf" is exported as "Golf (archived)' in unescape(client.get("/export").text)
+
+
+def test_csv_download_uses_the_preset_and_vehicles(client, monkeypatch):
+    seen = {}
+
+    def fake(session, settings, preset, vehicle_ids=None):
+        seen.update(preset=preset, ids=vehicle_ids)
+        return b"a,b\r\n", "text/csv"
+
+    monkeypatch.setattr(csv_export, "export_csv", fake)
+    base = {"base_preset": "glovebox"}
+    response = client.post("/export/csv", data=base | {"vehicle": ["1", "2"]}
+                           | {f"include.{f.name}": "1" for f in RECORD_FIELDS}
+                           | {f"header.{f.name}": f.name for f in RECORD_FIELDS})
+    assert response.content == b"a,b\r\n" and seen["ids"] == [1, 2]
+    assert response.headers["content-type"].startswith("text/csv")
+    assert response.headers["content-disposition"].endswith('.csv"')
+    assert list(seen["preset"].fields) == [f.name for f in RECORD_FIELDS]
+
+
+def test_csv_download_with_customised_columns_and_format(client, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(csv_export, "export_csv", lambda session, settings, preset,
+                        ids=None: seen.update(preset=preset, ids=ids) or (b"x", "text/csv"))
+    client.post("/export/csv", data={
+        "base_preset": "glovebox", "delimiter": ";", "decimal_char": ",",
+        "date_format": "%d.%m.%Y", "distance_unit": "mi", "volume_unit": "gal_us",
+        "include.date": "1", "header.date": "Datum",
+        "include.fuel_l": "1", "header.fuel_l": "fuel_l",
+        "include.total": "1", "header.total": "total",
+    })
+    preset = seen["preset"]
+    assert [m.columns[0] for m in preset.fields.values()] == ["Datum", "fuel_l", "total"]
+    assert preset.file.delimiter == ";" and preset.format.decimal_char == ","
+    assert preset.format.date_format == "%d.%m.%Y"
+    assert (preset.format.distance_unit, preset.format.volume_unit) == ("mi", "gal_us")
+    assert seen["ids"] is None
+
+
+def test_csv_download_of_fuelly_keeps_the_type_filter_and_zips(client, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(csv_export, "export_csv", lambda session, settings, preset,
+                        ids=None: seen.update(preset=preset) or (b"PK", "application/zip"))
+    page = client.get("/export?preset=fuelly-metric").text
+    form = {"base_preset": "fuelly-metric"}
+    for name in re.findall(r'name="include\.([a-z_]+)" value="1" checked', page):
+        form[f"include.{name}"] = "1"
+        form[f"header.{name}"] = unescape(re.search(
+            rf'name="header\.{name}" value="([^"]*)"', page).group(1))
+    response = client.post("/export/csv", data=form)
+    assert response.headers["content-type"] == "application/zip"
+    assert response.headers["content-disposition"].endswith('.zip"')
+    assert seen["preset"].fields["type"].value == "refuel"
+    assert seen["preset"].split_by_vehicle
+
+
+def test_csv_download_without_columns_is_an_error(client):
+    response = client.post("/export/csv", data={"base_preset": "glovebox"})
+    assert response.status_code == 422 and "choose at least one column" in response.text
+
+
+def test_save_export_as_preset_makes_it_exportable_and_importable(client):
+    response = client.post("/export/preset", data={
+        "base_preset": "glovebox", "preset_name": "Mine", "delimiter": ";",
+        "include.date": "1", "header.date": "Datum",
+        "include.total": "1", "header.total": "Summe"})
+    assert response.status_code == 200 and 'Saved as preset: Mine' in response.text
+    assert re.search(r'<option value="user-mine" selected>', response.text)
+    own = get_preset_for_test(client, "user-mine")
+    assert own.export and own.file.delimiter == ";"
+    assert own.fields["date"].columns == ("Datum",)
+
+
+def get_preset_for_test(client, preset_id):
+    from glovebox.importers.presets import get_preset
+
+    with client.app.state.session_factory() as session:
+        return get_preset(session, preset_id)
+
+
+def test_backup_download(client, monkeypatch):
     seen = []
-    monkeypatch.setattr(native_exporter, "export_native",
+    monkeypatch.setattr(backup_exporter, "export_backup",
                         lambda session, settings, ids=None: seen.append(ids) or b"PK-zip")
-    response = client.get("/export/native?vehicle=1")
+    response = client.post("/export/backup", data={"vehicle": "1"})
     assert response.content == b"PK-zip" and seen == [[1]]
     assert response.headers["content-type"] == "application/zip"
-    assert "attachment; filename=" in response.headers["content-disposition"]
+    assert "glovebox-backup-" in response.headers["content-disposition"]
 
 
-def test_fuelly_download_all_vehicles(client, monkeypatch):
-    seen = []
+def test_format_description_is_a_data_package(client):
+    response = client.get("/export/format.json")
+    descriptor = json.loads(response.content)
+    assert [r["name"] for r in descriptor["resources"]][:1] == ["records"]
+    assert "attachment" in response.headers["content-disposition"]
 
-    def fake(session, ids=None):
-        seen.append(ids)
-        return ExportFile("golf.csv", "text/csv", b"fuelup_date\n")
 
-    monkeypatch.setattr(fuelly_exporter, "export_fuelly", fake)
-    response = client.get("/export/fuelly?vehicle=")
-    assert response.content == b"fuelup_date\n" and seen == [None]
-    assert 'filename="golf.csv"' in response.headers["content-disposition"]
+# --- presets page -----------------------------------------------------------
+
+USER_PRESET = """name = "Bank export"
+[fields]
+date = { column = "when" }
+"""
+
+
+def test_presets_page_lists_shipped_presets_with_status_and_download(client):
+    html = client.get("/presets", headers=INGRESS).text
+    assert "Glovebox" in html and "Verified" in html and "Unverified" in html
+    assert "Best effort, untested" in html
+    assert f'href="{PREFIX}/presets/glovebox/download"' in html
+    assert "No own presets yet." in html and "Delete" not in html.split("Shipped presets")[1]
+
+
+def test_shipped_preset_download_is_the_original_file(client):
+    response = client.get("/presets/fuelly-metric/download")
+    assert response.status_code == 200 and b"name =" in response.content
+    assert 'filename="fuelly-metric.toml"' in response.headers["content-disposition"]
+    assert client.get("/presets/nope/download").status_code == 404
+
+
+def test_preset_upload_download_and_delete(client):
+    response = client.post("/presets/upload", files={"file": ("bank.toml", USER_PRESET.encode())},
+                           follow_redirects=False)
+    assert response.status_code == 303
+    html = client.get("/presets").text
+    assert "Bank export" in html and 'action="/presets/user-bank-export/delete"' in html
+    download = client.get("/presets/user-bank-export/download")
+    assert load_preset(download.text).fields["date"].columns == ("when",)
+    deleted = client.post("/presets/user-bank-export/delete", follow_redirects=False)
+    assert deleted.status_code == 303
+    assert "Bank export" not in client.get("/presets").text
+    assert client.post("/presets/user-bank-export/delete").status_code == 404
+
+
+def test_preset_upload_errors_name_the_key(client):
+    bad = USER_PRESET + '[fields.litres]\ncolumn = "l"\n'
+    response = client.post("/presets/upload", files={"file": ("bad.toml", bad.encode())})
+    assert response.status_code == 422 and "fields.litres" in response.text
+    assert "Bank export" not in client.get("/presets").text
+
+
+def test_preset_upload_rejects_a_name_clash_and_non_text(client):
+    clash = USER_PRESET.replace("Bank export", "Glovebox")
+    response = client.post("/presets/upload", files={"file": ("a.toml", clash.encode())})
+    assert response.status_code == 422 and "already exists" in response.text
+    binary = client.post("/presets/upload", files={"file": ("a.toml", b"\xff\xfe\x00")})
+    assert binary.status_code == 422
+
+
+def test_shipped_preset_cannot_be_deleted(client):
+    response = client.post("/presets/glovebox/delete")
+    assert response.status_code == 422 and "cannot be deleted" in response.text
+
+
+def test_manage_links_to_import_export_and_presets(client):
+    html = client.get("/manage", headers=INGRESS).text
+    assert "CSV files with presets" in html
+    assert "Standard CSV, Fuelly-compatible CSV or full backup" in html
+    assert f'href="{PREFIX}/presets"' in html
 
 
 def test_vehicle_edit_prefills_form(client):
@@ -814,7 +1220,7 @@ def test_vehicle_edit_prefills_form(client):
 # --- round 2: sub-page header, links, currency, summary picker --------------
 
 
-@pytest.mark.parametrize("path", ["/vehicles", "/stations", "/import", "/export"])
+@pytest.mark.parametrize("path", ["/vehicles", "/stations", "/import", "/export", "/presets"])
 def test_manage_sub_pages_have_the_back_icon_button(client, path):
     html = client.get(path, headers=INGRESS).text
     assert 'aria-label="Back to Manage"' in html
@@ -824,10 +1230,11 @@ def test_manage_sub_pages_have_the_back_icon_button(client, path):
     assert "‹" not in html
 
 
-def test_import_preview_goes_back_to_import(client, monkeypatch):
+def test_import_steps_go_back_to_import(client, monkeypatch):
     monkeypatch.setattr(pipeline, "preview_import", lambda *a, **k: fake_preview())
-    html = client.get(upload(client)).text
-    assert 'aria-label="Back to Import"' in html and 'class="page-head"' in html
+    for html in (client.get(upload(client)).text,
+                 client.post("/import/preview", data=mapped_form(client)).text):
+        assert 'aria-label="Back to Import"' in html and 'class="page-head"' in html
 
 
 @pytest.mark.parametrize("path", PAGES)

@@ -1,0 +1,6 @@
+type,vehicle,date,time,odometer_km,fuel_l,price_per_l,total,currency,full,missed_previous,station,station_location,station_brand,category,title,coverage_start,coverage_end,notes,derived,source,source_ref
+refuel,Golf,2026-05-02,14:30,98000,45.200,1.459,65.95,EUR,true,false,OMV Celje,Celje,OMV,,,,,First fill,,manual,r1
+refuel,Golf,2026-05-20,08:05,98600,40.000,,58.00,EUR,false,true,Petrol Ljubljana,Ljubljana,Petrol,,,,,Partial,price_per_l,sample-preset,r2
+expense,Golf,2026-05-10,,98400,,,180.00,EUR,,,,,,maintenance,Oil change,,,Winter tyres,,manual,e1
+expense,Golf,2026-01-05,,,,,420.00,EUR,,,,,,insurance,Insurance 2026,2026-01-01,2026-12-31,,,manual,e2
+refuel,Polo,2026-06-01,,12000,30.000,1.500,45.00,EUR,true,false,,,,,,,,,,manual,r3

@@ -51,6 +51,8 @@ nav:
       - Gas stations: user/stations.md
       - Import: user/import.md
       - Export and backup: user/export.md
+      - Standard CSV format: user/standard-format.md
+      - Presets: user/presets.md
       - Stats API: user/api.md
       - Troubleshooting and FAQ: user/faq.md
   - Developer guide:

@@ -1,0 +1,29 @@
+# Fuelly import-format CSV, metric (litres, kilometres).
+# Source: converted from the earlier built-in mapping [import] section and its
+# exporter. Based on public descriptions of the format; not checked against a
+# real file. The same layout is what Glovebox writes for this preset.
+# The file has no vehicle column: the file name (or ZIP member) names the vehicle.
+
+name = "Fuelly (metric)"
+note = "Fuelly import-format CSV with litres. Based on public descriptions of the format."
+verified = false
+export = true
+split_by_vehicle = true
+
+[format]
+date_format = "auto"
+decimal_char = "auto"
+group_char = ""
+distance_unit = "km"
+volume_unit = "l"
+
+[fields]
+type = { value = "refuel" }
+date = { column = "fuelup_date" }
+odometer_km = { column = ["odometer", "km"] }
+fuel_l = { column = ["litres", "liters"] }
+price_per_l = { column = "price" }
+full = { column = "partial_fuelup", true_values = ["0"], false_values = ["1"] }
+missed_previous = { column = "missed_fuelup", true_values = ["1"], false_values = ["0"] }
+notes = { column = "notes" }
+station = { column = "tags" }

@@ -61,15 +61,15 @@ Check the field names against `/api/v1/vehicles/1/summary` before relying on the
 
 ## Data and backups
 
-The SQLite database is stored in the add-on's `/data` folder, which survives restarts and upgrades and is included in Home Assistant backups. Database migrations run automatically at startup. You can also use the native CSV export in the app as a backup that does not depend on Home Assistant.
+The SQLite database is stored in the add-on's `/data` folder, which survives restarts and upgrades and is included in Home Assistant backups. Database migrations run automatically at startup. You can also use the full backup in the app as a backup that does not depend on Home Assistant.
 
 ## Importing
 
-Import a CSV (or a ZIP for Fuelio and the native export) on the Import page. The preview shows what would be added and writes nothing until you confirm. Re-importing the same file adds nothing, and every import can be undone from the batch list.
+Import a CSV (or a ZIP of CSV files, such as a full backup) on the Import page. A preset maps the columns; you can adjust it in the mapping step. The preview shows what would be added and writes nothing until you confirm. Re-importing the same file adds nothing, and every import can be undone from the batch list.
 
-- Files without a vehicle name (Drivvo, Fuelly) ask which vehicle the records belong to.
+- Files without a vehicle name (Drivvo, Fuelly, Fuelio) ask which vehicle the records belong to.
 - Fuelly: the `tags` column is taken as the gas station name (the whole cell, so several tags become one station), which is how our own Fuelly export keeps the station. Brands are never guessed.
-- The Drivvo column mapping is provisional (not yet checked against a real export). If headers are not recognised, the preview lists the headers found and expected.
+- The Drivvo presets are best effort and untested. If headers are not recognised, map the columns in the mapping step and save the mapping as a preset.
 
 ## Known limitations
 

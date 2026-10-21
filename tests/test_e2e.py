@@ -68,28 +68,49 @@ def _price_rows(html: str) -> list[list[str]]:
 
 
 class _Form(HTMLParser):
-    """Collects the fields a browser would submit for the first import form."""
+    """Collects the fields a browser would submit for the first form on a page."""
 
     def __init__(self) -> None:
         super().__init__()
         self.fields: list[tuple[str, str]] = []
         self._select: str | None = None
         self._options: list[tuple[str, bool]] = []
+        self._area: str | None = None
+        self._text = ""
+        self._skip_form = False  # the navbar's vehicle switch is not part of the page's form
 
     def handle_starttag(self, tag: str, attrs: list) -> None:
         a = dict(attrs)
+        if tag == "form":
+            self._skip_form = "vehicle-select" in a.get("class", "")
+        if self._skip_form:
+            return
         if tag == "input":
             kind, name = a.get("type", "text"), a.get("name")
-            if name and kind == "hidden":
+            if name and kind in ("radio", "checkbox"):
+                if "checked" in a:
+                    self.fields.append((name, a.get("value", "on")))
+            elif name and kind not in ("submit", "button", "file"):
                 self.fields.append((name, a.get("value", "")))
-            elif name and kind == "radio" and "checked" in a:
-                self.fields.append((name, a.get("value", "")))
+        elif tag == "textarea" and a.get("name"):
+            self._area, self._text = a["name"], ""
         elif tag == "select":
             self._select, self._options = a.get("name"), []
         elif tag == "option" and self._select:
             self._options.append((a.get("value", ""), "selected" in a))
 
+    def handle_data(self, data: str) -> None:
+        if self._area and not self._skip_form:
+            self._text += data
+
     def handle_endtag(self, tag: str) -> None:
+        if tag == "form":
+            self._skip_form = False
+        if self._skip_form:
+            return
+        if tag == "textarea" and self._area:
+            self.fields.append((self._area, self._text))
+            self._area = None
         if tag == "select" and self._select:
             chosen = next((v for v, sel in self._options if sel), None)
             if chosen is None and self._options:
@@ -375,34 +396,52 @@ def test_api_station_stats_equal_stats_table(client: TestClient) -> None:
 # --- Imports through the web flow ------------------------------------------
 
 
-def _upload(client: TestClient, name: str, data: bytes, fmt: str = "") -> str:
-    """Upload; return the preview URL path with query."""
+def _upload(client: TestClient, name: str, data: bytes) -> str:
+    """Upload; return the next page's URL path with query (mapping or backup preview)."""
     response = client.post(
-        "/import/upload", data={"format": fmt}, files={"file": (name, data)},
-        follow_redirects=False,
-    )  # fmt: skip
+        "/import/upload", files={"file": (name, data)}, follow_redirects=False
+    )
     assert response.status_code == 303
     return response.headers["location"].removeprefix(
         client.headers.get("X-Ingress-Path", "")
     )
 
 
-def _import_file(
-    client: TestClient, name: str, data: bytes, answers: dict[str, str] | None = None
+def _merged(fields: list[tuple[str, str]], changes: dict[str, str]) -> dict[str, list[str]]:
+    """The form a browser sends after the user changed some fields."""
+    kept = [(k, v) for k, v in fields if k not in changes]
+    return _as_form(kept + list(changes.items()))
+
+
+def _preview_of(
+    client: TestClient, name: str, data: bytes, changes: dict[str, str] | None = None
 ) -> str:
-    """Upload, answer the preview questions, commit; return the preview HTML."""
-    location = _upload(client, name, data)
-    preview = client.get(location)
-    assert preview.status_code == 200
-    # answer the questions the way a user would: change fields, update preview
-    pairs = [(k, v) for k, v in _form_fields(preview.text) if k not in (answers or {})]
-    pairs += list((answers or {}).items())
-    updated = client.get("/import/preview", params=pairs)
-    assert updated.status_code == 200
-    pairs = _form_fields(updated.text)
-    committed = client.post("/import/commit", data=_as_form(pairs), follow_redirects=False)
+    """
+    Upload, open the mapping (when there is one), change fields, press Preview, answer
+    the questions and press Update preview; return the preview HTML.
+    """
+    changes = changes or {}
+    page = client.get(_upload(client, name, data))
+    assert page.status_code == 200
+    if "Map columns" in page.text:
+        page = client.post("/import/preview", data=_merged(_form_fields(page.text), changes))
+        assert page.status_code == 200, page.text[:500]
+    page = client.post("/import/preview", data=_merged(_form_fields(page.text), changes))
+    assert page.status_code == 200, page.text[:500]
+    return page.text
+
+
+def _import_file(
+    client: TestClient, name: str, data: bytes, changes: dict[str, str] | None = None
+) -> str:
+    """Upload, go through the mapping and the preview, commit; return the preview HTML."""
+    preview = _preview_of(client, name, data, changes)
+    committed = client.post(
+        "/import/commit", data=_merged(_form_fields(preview), changes or {}),
+        follow_redirects=False,
+    )
     assert committed.status_code == 303, committed.text[:800]
-    return updated.text
+    return preview
 
 
 def _counts(engine: Engine) -> tuple[int, int, int]:
@@ -414,18 +453,18 @@ def _counts(engine: Engine) -> tuple[int, int, int]:
         )
 
 
-# file, answers, (refuels, expenses, vehicles) after commit
+# file, form changes, (refuels, expenses, vehicles) after commit
 IMPORT_CASES = [
     ("drivvo_refuel_en.csv", {"default_vehicle": "1"}, (2, 0, 1)),
     ("drivvo_service_en.csv", {"default_vehicle": "1"}, (0, 3, 1)),
     ("drivvo_expense_en.csv", {"default_vehicle": "1"}, (0, 2, 1)),
-    ("fuelio_comma_km.csv", {}, (4, 3, 2)),
-    ("fuelio_semicolon_miles.csv", {}, (2, 1, 2)),
+    ("fuelio_comma_km.csv", {"default_vehicle": "1"}, (4, 0, 1)),
+    ("fuelio_semicolon_miles.csv", {"default_vehicle": "1", "ans_distance_unit": "mi"}, (2, 0, 1)),
     ("fuelly_import_metric.csv", {"default_vehicle": "1"}, (3, 0, 1)),
     ("fuelly_import_gallons.csv", {"default_vehicle": "1"}, (2, 0, 1)),
     ("fuelly_import_ambiguous_dates.csv",
-     {"default_vehicle": "1", "date_order": "dmy"}, (2, 0, 1)),
-    ("fuelly_export.csv", {"units": "imperial"}, (2, 0, 2)),
+     {"default_vehicle": "1", "ans_date_order": "dmy"}, (2, 0, 1)),
+    ("fuelly_export.csv", {"ans_distance_unit": "mi", "ans_volume_unit": "gal_us"}, (2, 0, 2)),
 ]  # fmt: skip
 
 
@@ -458,11 +497,25 @@ def test_import_each_fixture_then_undo(
     assert batch_id in batches
 
 
-def test_preview_writes_nothing(client: TestClient, engine: Engine, fixtures_dir: Path):
+def test_mapping_and_preview_write_nothing(
+    client: TestClient, engine: Engine, fixtures_dir: Path
+) -> None:
     _post(client, "/vehicles/new", {"name": "Existing"})
     data = (fixtures_dir / "fuelio_comma_km.csv").read_bytes()
     assert client.get(_upload(client, "f.csv", data)).status_code == 200
+    _preview_of(client, "f.csv", data, {"default_vehicle": "1"})
     assert _counts(engine) == (0, 0, 1)
+
+
+def test_the_best_preset_is_preselected_on_the_mapping_page(
+    client: TestClient, fixtures_dir: Path
+) -> None:
+    data = (fixtures_dir / "fuelio_comma_km.csv").read_bytes()
+    page = client.get(_upload(client, "f.csv", data)).text
+    assert _selected_option(page, "preset") == "fuelio-fillups"
+    other = (fixtures_dir / "fuelly_import_metric.csv").read_bytes()
+    page = client.get(_upload(client, "f.csv", other)).text
+    assert _selected_option(page, "preset") == "fuelly-metric"
 
 
 def test_vehicle_question_is_not_shown_as_failure(
@@ -470,33 +523,96 @@ def test_vehicle_question_is_not_shown_as_failure(
 ) -> None:
     _post(client, "/vehicles/new", {"name": "Existing"})
     data = (fixtures_dir / "fuelly_import_metric.csv").read_bytes()
-    html = client.get(_upload(client, "f.csv", data)).text
+    html = _preview_of(client, "f.csv", data)
     assert "Which vehicle do these records belong to?" in html
     assert "Choose a target vehicle" not in html
     assert 'class="alert error' not in html and "Import now" not in html
 
 
-def test_unknown_headers_show_found_and_expected(
+def test_unknown_headers_open_the_mapping_and_block_the_import(
     client: TestClient, fixtures_dir: Path
 ) -> None:
     data = (fixtures_dir / "drivvo_unknown_headers.csv").read_bytes()
-    html = client.get(_upload(client, "f.csv", data, "drivvo")).text
-    assert "Found:" in html and "Datum" in html and "Expected:" in html
+    page = client.get(_upload(client, "f.csv", data)).text
+    assert "Map columns" in page and "Datum" in page
+    assert _selected_option(page, "preset") == ""  # "Custom mapping"
+    html = _preview_of(client, "f.csv", data)
+    assert "Import now" not in html and "Fix the points above" in html
 
 
 def test_choosing_new_vehicle_when_name_is_taken_is_reported(
     client: TestClient, fixtures_dir: Path
 ) -> None:
     _post(client, "/vehicles/new", {"name": "Test Golf"})
-    data = (fixtures_dir / "fuelio_comma_km.csv").read_bytes()
-    html = _preview_with(client, data, {"maps": "new", "names": "Test Golf"})
+    data = (fixtures_dir / "standard_records.csv").read_bytes()
+    first = _preview_of(client, "f.csv", data)
+    name = re.search(r'name="names" value="([^"]+)"', first).group(1)
+    _post(client, "/vehicles/new", {"name": name})
+    html = _preview_of(client, "f.csv", data, {"maps": "new"})
     assert "already exists" in html and "Import now" not in html
 
 
-def _preview_with(client: TestClient, data: bytes, extra: dict) -> str:
-    location = _upload(client, "f.csv", data)
-    token = re.search(r"token=([0-9a-f]+)", location).group(1)
-    return client.get("/import/preview", params={"token": token, **extra}).text
+def test_user_preset_saved_from_the_mapping_is_detected_next_time(
+    client: TestClient, engine: Engine
+) -> None:
+    _post(client, "/vehicles/new", {"name": "Golf"})
+    first = (
+        "Datum;Stand;Liter;Preis pro Liter;Tankstelle\n"
+        "05.03.2024;10000;40,5;1,550;Alpha\n19.03.2024;10600;38,0;1,600;Alpha\n"
+    ).encode()
+    second = first.replace(b"05.03", b"05.04").replace(b"19.03", b"19.04")
+    page = client.get(_upload(client, "bank.csv", first))
+    assert _selected_option(page.text, "preset") == ""
+    mapping = {
+        "src.type": "=", "val.type": "refuel", "src.date": "col:Datum",
+        "src.odometer_km": "col:Stand", "src.fuel_l": "col:Liter",
+        "src.price_per_l": "col:Preis pro Liter", "src.station": "col:Tankstelle",
+        "date_format": "%d.%m.%Y", "decimal_char": ",", "default_vehicle": "1",
+    }
+    preview = client.post(
+        "/import/preview", data=_merged(_form_fields(page.text), mapping)
+    )
+    assert "New refuels: <strong>2</strong>" in preview.text
+    saved = client.post(
+        "/import/save-preset",
+        data=_merged(_form_fields(preview.text), {"preset_name": "My bank"}),
+    )
+    assert saved.status_code == 200 and "Saved as preset: My bank" in saved.text
+    committed = client.post(
+        "/import/commit", data=_as_form(_form_fields(saved.text)), follow_redirects=False
+    )
+    assert committed.status_code == 303 and _counts(engine)[0] == 2
+
+    # a later file with the same headers selects the saved preset and imports cleanly
+    again = client.get(_upload(client, "bank2.csv", second)).text
+    assert _selected_option(again, "preset") == "user-my-bank"
+    html = _preview_of(client, "bank2.csv", second, {"default_vehicle": "1"})
+    assert "New refuels: <strong>2</strong>" in html and "Rows with errors" not in html
+
+
+def test_zip_with_vehicles_and_stations_but_no_datapackage(
+    client: TestClient, engine: Engine
+) -> None:
+    records = (
+        "type,vehicle,date,odometer_km,fuel_l,price_per_l,total,station,station_location\n"
+        "refuel,Golf,2025-01-10,10000,40,1.5,60.00,Alpha,Celje\n"
+    )
+    members = {
+        "records.csv": records,
+        "vehicles.csv": "name,make,plate\nGolf,VW,LJ AB-123\n",
+        "stations.csv": "name,location,brand\nAlpha,Celje,OMV\nBeta,Maribor,\n",
+    }
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for member, text in members.items():
+            archive.writestr(member, text)
+    html = _import_file(client, "tables.zip", buffer.getvalue())
+    assert "Vehicles and stations from the file" in html
+    with Session(engine) as session:
+        golf = session.scalar(select(Vehicle))
+        assert (golf.make, golf.plate) == ("VW", "LJ AB-123")
+        brands = {s.name: s.brand for s in session.scalars(select(Station))}
+        assert brands == {"Alpha": "OMV", "Beta": None}
 
 
 def test_undo_unknown_batch_is_404(client: TestClient) -> None:
@@ -516,49 +632,70 @@ def _stats_numbers(client: TestClient) -> dict:
     }
 
 
-def test_native_export_reimports_identically(
+def _backup(client: TestClient) -> bytes:
+    response = client.post("/export/backup")
+    assert response.status_code == 200
+    return response.content
+
+
+def test_backup_round_trip_restores_identically(
     client: TestClient, second_app: tuple[TestClient, Engine]
 ) -> None:
     _build_scenario(client)
-    exported = client.get("/export/native")
-    assert exported.status_code == 200
-    with zipfile.ZipFile(io.BytesIO(exported.content)) as archive:
+    exported = _backup(client)
+    with zipfile.ZipFile(io.BytesIO(exported)) as archive:
         assert set(archive.namelist()) == {
-            "vehicles.csv", "stations.csv", "refuels.csv", "expenses.csv",
-            "manifest.json",
+            "records.csv", "vehicles.csv", "stations.csv", "datapackage.json",
         }  # fmt: skip
 
     other, other_engine = second_app
-    _import_file(other, "export.zip", exported.content)
+    _import_file(other, "backup.zip", exported)
     assert _counts(other_engine) == (5, 2, 1)
     assert _stats_numbers(other) == _stats_numbers(client)
-    # exporting again gives the same tables
-    again = other.get("/export/native").content
-    assert _tables(again) == _tables(exported.content)
-    # the manifest carries the running app's currency
-    assert b'"currency": "EUR"' in zipfile.ZipFile(io.BytesIO(again)).read("manifest.json")
+    # backing up again gives the same tables
+    again = _backup(other)
+    assert _tables(again) == _tables(exported)
+    # the descriptor carries the running app's currency
+    assert b'"currency": "EUR"' in zipfile.ZipFile(io.BytesIO(again)).read("datapackage.json")
 
 
 def _tables(data: bytes) -> dict[str, str]:
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
-        return {n: archive.read(n).decode() for n in archive.namelist() if n != "manifest.json"}
+        return {
+            n: archive.read(n).decode() for n in archive.namelist() if n != "datapackage.json"
+        }
 
 
-def test_native_manifest_uses_app_settings(tmp_path: Path, monkeypatch) -> None:
+def test_backup_descriptor_uses_app_settings(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("CURRENCY", "USD")  # must not leak into the export
     engine = make_engine()
     run_migrations(engine)
     with TestClient(create_app(Settings(data_dir=tmp_path, currency="CHF"), engine)) as c:
-        data = c.get("/export/native").content
+        data = c.post("/export/backup").content
     engine.dispose()
-    assert b'"currency": "CHF"' in zipfile.ZipFile(io.BytesIO(data)).read("manifest.json")
+    assert b'"currency": "CHF"' in zipfile.ZipFile(io.BytesIO(data)).read("datapackage.json")
+
+
+def _download(client: TestClient, preset: str):
+    """Press Download on the export page of ``preset`` with its default columns."""
+    page = client.get("/export", params={"preset": preset})
+    return client.post("/export/csv", data=_as_form(_form_fields(page.text)))
+
+
+def test_standard_export_has_the_standard_columns(client: TestClient) -> None:
+    _build_scenario(client)
+    exported = _download(client, "glovebox")
+    assert exported.headers["content-type"].startswith("text/csv")
+    header = exported.text.splitlines()[0].split(",")
+    assert header[:5] == ["type", "vehicle", "date", "time", "odometer_km"]
+    assert len(exported.text.splitlines()) == 1 + 5 + 2  # refuels and expenses
 
 
 def test_fuelly_export_reimports_with_stations(
     client: TestClient, second_app: tuple[TestClient, Engine]
 ) -> None:
     _build_scenario(client)
-    exported = client.get("/export/fuelly")
+    exported = _download(client, "fuelly-metric")
     assert exported.headers["content-type"].startswith("text/csv")
     assert exported.text.splitlines()[0] == (
         "fuelup_date,odometer,litres,price,partial_fuelup,missed_fuelup,notes,tags"
@@ -616,18 +753,23 @@ def test_whole_flow_under_ingress_prefix(
     location = client.post(
         "/import/upload", files={"file": ("f.csv", data)}, follow_redirects=False
     ).headers["location"]
-    assert location.startswith(f"{PREFIX}/import/preview?")
-    preview = client.get(location.removeprefix(PREFIX))
+    assert location.startswith(f"{PREFIX}/import/mapping?")
+    mapping = client.get(location.removeprefix(PREFIX))
+    _assert_prefixed(mapping.text)
+    fields = _merged(_form_fields(mapping.text), {"default_vehicle": str(vid)})
+    preview = client.post("/import/preview", data=fields)
     _assert_prefixed(preview.text)
-    fields = _form_fields(preview.text)
-    commit = client.post("/import/commit", data=_as_form(fields), follow_redirects=False)
-    assert commit.headers["location"] == f"{PREFIX}/import"
+    fields = _merged(_form_fields(preview.text), {"default_vehicle": str(vid)})
+    commit = client.post("/import/commit", data=fields, follow_redirects=False)
+    assert commit.headers["location"].startswith(f"{PREFIX}/import")
     batches = client.get("/import").text
     _assert_prefixed(batches)
     batch_id = re.search(r"/import/(\d+)/undo", batches).group(1)
     assert f'action="{PREFIX}/import/{batch_id}/undo"' in batches
 
-    assert client.get("/export/native").status_code == 200
+    export_page = client.get("/export")
+    _assert_prefixed(export_page.text)
+    assert client.post("/export/backup").status_code == 200
     assert client.get("/static/app.js").status_code == 200
 
 

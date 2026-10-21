@@ -10,6 +10,7 @@ from glovebox.web import (
     imports,
     manage,
     preferences,
+    presets,
     refuels,
     stations,
     statistics,
@@ -20,6 +21,6 @@ from glovebox.web import (
 router = APIRouter()
 for module in (
     timeline, statistics, manage, preferences, vehicles, refuels, expenses,
-    stations, imports, exports,
+    stations, imports, exports, presets,
 ):
     router.include_router(module.router)

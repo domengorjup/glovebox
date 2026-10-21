@@ -1,47 +1,35 @@
 {% extends layout %}
-{% from "_macros.html" import messages, page_head with context %}
+{% from "_macros.html" import messages, page_head, field with context %}
 {% block title %}Import preview - Glovebox{% endblock %}
 {% block content %}
 {{ page_head(request, 'Import preview', '/import', 'Import') }}
-<p class="help flush">File: <strong>{{ p.filename }}</strong> - detected format: <strong>{{ preview.format }}</strong></p>
-{{ messages(errors, preview.warnings) }}
+<p class="help flush">File: <strong>{{ sub.filename }}</strong> - preset: <strong>{{ preset.name }}</strong>{{ '' if preset.verified else ' (unverified)' }}</p>
+{{ messages(errors, warnings) }}
+{% for note in notes %}<p class="help flush">{{ note }}</p>{% endfor %}
 
-{% if preview.header_mismatch %}
-<div class="alert error">
-  <p>The column headers were not recognised, so nothing can be imported.</p>
-  <p><strong>Found:</strong> {{ preview.header_mismatch.found | join(', ') }}</p>
-  <p><strong>Expected:</strong> {{ preview.header_mismatch.expected | join(', ') }}</p>
-</div>
-{% endif %}
+<form class="stack" method="post" action="{{ url(request, '/import/preview') }}">
+  <input type="hidden" name="token" value="{{ sub.token }}">
+  <input type="hidden" name="filename" value="{{ sub.filename }}">
+  <input type="hidden" name="base_toml" value="{{ base_toml }}">
+  <input type="hidden" name="selected_preset" value="{{ sub.selected }}">
+  <input type="hidden" name="preset_id" value="{{ preset.id }}">
 
-<form class="stack" method="get" action="{{ url(request, '/import/preview') }}">
-  <input type="hidden" name="token" value="{{ p.token }}">
-  <input type="hidden" name="filename" value="{{ p.filename }}">
-
+  {% if questions %}
+  <h2>Questions</h2>
   <div class="card card-pad stack">
-    <div class="field">
-      <label for="i-format">Format</label>
-      <select id="i-format" name="format">
-        <option value="">Detect automatically</option>
-        {% for name in formats %}<option value="{{ name }}" {{ 'selected' if p.format == name }}>{{ name }}</option>{% endfor %}
-      </select>
+    {% for q in questions %}
+    <div class="filter-line">
+      <span class="lbl">{{ q.message }}</span>
+      <div class="seg">
+        {% for value, text in q.options %}
+        <label><input type="radio" name="ans_{{ q.kind }}" value="{{ value }}" {{ 'checked' if q.answer == value }}>{{ text }}</label>
+        {% endfor %}
+      </div>
     </div>
-
-    {% if 'date_order' in ambiguities or p.date_order %}
-    <fieldset class="choices">
-      <legend>The dates are ambiguous. Which order do they use?</legend>
-      <label><input type="radio" name="date_order" value="dmy" {{ 'checked' if p.date_order == 'dmy' }}> Day first (31/12/2025)</label>
-      <label><input type="radio" name="date_order" value="mdy" {{ 'checked' if p.date_order == 'mdy' }}> Month first (12/31/2025)</label>
-    </fieldset>
-    {% endif %}
-    {% if 'units' in ambiguities or p.units %}
-    <fieldset class="choices">
-      <legend>Which units does the file use?</legend>
-      <label><input type="radio" name="units" value="metric" {{ 'checked' if p.units == 'metric' }}> Kilometres and litres</label>
-      <label><input type="radio" name="units" value="imperial" {{ 'checked' if p.units == 'imperial' }}> Miles and gallons</label>
-    </fieldset>
-    {% endif %}
+    {% endfor %}
+    <p class="help flush">Press Update preview after answering.</p>
   </div>
+  {% endif %}
 
   <h2>Vehicles</h2>
   <div class="card card-pad stack">
@@ -61,7 +49,7 @@
         <label for="i-default_vehicle">{% if preview.needs_vehicle_choice %}Which vehicle do these records belong to?{% else %}The file has no vehicle names. Import into{% endif %}</label>
         <select id="i-default_vehicle" name="default_vehicle">
           <option value="">Choose...</option>
-          {% for v in vehicles %}<option value="{{ v.id }}" {{ 'selected' if p.default_vehicle == v.id | string }}>{{ v.name }}</option>{% endfor %}
+          {% for v in vehicles %}<option value="{{ v.id }}" {{ 'selected' if sub.default_vehicle == v.id | string }}>{{ v.name }}</option>{% endfor %}
         </select>
       </div>
     {% endif %}
@@ -73,17 +61,56 @@
       <span class="detail">already present, skipped: {{ preview.duplicate_refuels }}</span></span></div>
     <div class="row"><span class="body"><span class="title">New expenses: <strong>{{ preview.new_expenses }}</strong></span>
       <span class="detail">already present, skipped: {{ preview.duplicate_expenses }}</span></span></div>
+    {% if skipped or row_error_total %}
+    <div class="row"><span class="body"><span class="title">Rows not imported: <strong>{{ skipped + row_error_total }}</strong></span>
+      <span class="detail">skipped by the preset: {{ skipped }} · with errors: {{ row_error_total }}</span></span></div>
+    {% endif %}
   </div>
 
+  {% if preview.companion_changes %}
+  <h2>Vehicles and stations from the file</h2>
+  <div class="card list-card">
+    {% for c in preview.companion_changes %}
+    <div class="row"><span class="body"><span class="title">{{ 'Create' if c.action == 'create' else 'Fill empty details of' }} {{ c.kind }} <strong>{{ c.name }}</strong>{{ ' (' ~ c.location ~ ')' if c.location }}</span>
+      {% if c.fields %}<span class="detail">{{ c.fields | join(', ') }}</span>{% endif %}</span></div>
+    {% endfor %}
+  </div>
+  <p class="help flush">Existing vehicles and stations keep what they have; only empty details are filled.</p>
+  {% endif %}
+
+  {% if row_error_total %}
+  <h2>Rows with errors ({{ row_error_total }}{{ ', first ' ~ row_errors | length ~ ' shown' if row_error_total > row_errors | length }})</h2>
+  <div class="card card-pad table-scroll">
+    <table class="tbl">
+      <thead><tr><th class="num">Line</th><th>Field</th><th>Value</th><th>Problem</th></tr></thead>
+      <tbody>
+        {% for e in row_errors %}
+        <tr><td class="num">{{ e.line }}</td><td>{{ e.field }}</td><td>{{ e.value }}</td><td>{{ e.message }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="help flush">These rows are left out. The other rows can still be imported.</p>
+  {% endif %}
+
   <div class="actions">
-    <button type="submit" class="btn outline">Update preview</button>
-    {% if not blocked %}
-    <button type="submit" class="btn primary" formmethod="post" formaction="{{ url(request, '/import/commit') }}">Import now</button>
-    {% endif %}
     <a class="btn" href="{{ url(request, '/import') }}">Cancel</a>
+    <button type="submit" class="btn outline">Update preview</button>
+    <button type="submit" class="btn outline" formaction="{{ url(request, '/import/mapping') }}">Edit mapping</button>
+    {% if not blocked %}
+    <button type="submit" class="btn primary" formaction="{{ url(request, '/import/commit') }}">Import now</button>
+    {% endif %}
   </div>
   {% if blocked %}
-  <p class="help">Fix the points above (or answer the questions) and update the preview before importing.</p>
+  <p class="help">Fix the points above (answer the questions or edit the mapping) before importing.</p>
   {% endif %}
+
+  <details class="archived">
+    <summary>Save this mapping as a preset</summary>
+    <div class="card card-pad stack">
+      {{ field('Preset name', 'preset_name', '', placeholder='e.g. My bank export') }}
+      <div><button type="submit" class="btn outline" formaction="{{ url(request, '/import/save-preset') }}">Save preset</button></div>
+    </div>
+  </details>
 </form>
 {% endblock %}

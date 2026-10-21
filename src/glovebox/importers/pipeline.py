@@ -1,6 +1,12 @@
 """
-Import pipeline (D6): detect, parse, dedupe, preview, commit, undo.
-FROZEN SIGNATURES; implemented in group 3. The web UI calls only this module.
+Import pipeline (D6): read, apply a preset, map vehicles, dedupe, preview,
+commit, undo. The web UI calls only this module.
+
+Every import goes through ``engine.apply`` with a ``Preset``. A ZIP may also
+hold ``vehicles.csv`` and ``stations.csv``: missing vehicles and stations are
+created with their details and existing ones only get empty fields filled. A
+full backup is that case plus ``datapackage.json``, restored with the standard
+preset.
 """
 
 from __future__ import annotations
@@ -10,25 +16,20 @@ from dataclasses import dataclass, field
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
+from glovebox.importers import engine
 from glovebox.importers.base import (
-    Ambiguity,
+    Answers,
     CanonicalExpense,
     CanonicalRefuel,
-    CanonicalVehicleRef,
-    HeaderMismatch,
-    ImportOptions,
-    ImporterAdapter,
     ImportResult,
+    Question,
+    RowError,
+    parse_flag,
 )
-from glovebox.importers.base import Answers
-from glovebox.importers.presets import Preset
-from glovebox.importers.drivvo import DrivvoAdapter
-from glovebox.importers.fuelio import FuelioAdapter
-from glovebox.importers.fuelly import FuellyAdapter
-from glovebox.importers.native import NativeAdapter
+from glovebox.importers.engine import SourceTable, find_column
+from glovebox.importers.presets import STANDARD_ID, Preset, list_presets
 from glovebox.models import (
     Expense,
-    DerivedField,
     ExpenseCategory,
     ImportBatch,
     Refuel,
@@ -42,23 +43,30 @@ from glovebox.services.records import (
     derive_price_figures,
 )
 
-HEAD_BYTES = 64 * 1024
 CHOOSE_VEHICLE_MESSAGE = "Choose a target vehicle for this file."
-_ADAPTERS: list[ImporterAdapter] = [
-    DrivvoAdapter(),
-    FuelioAdapter(),
-    FuellyAdapter(),
-    NativeAdapter(),
-]
-_VEHICLE_EXTRAS = (
-    "make",
-    "model",
-    "plate",
-    "fuel_type",
-    "initial_odometer",
-    "archived",
-    "notes",
-)
+CUSTOM_FORMAT = "custom"  # batch format of a preset that was never saved
+DETECT_THRESHOLD = 0.5
+# A Fuelio backup holds both sections and scores 1.0 for both Fuelio presets;
+# among tied shipped presets this one wins. Tied user presets always win.
+PREFERRED_ON_TIE = "fuelio-fillups"
+_BACKUP_TABLES = ("records", "vehicles", "stations")
+
+
+@dataclass(frozen=True)
+class CompanionChange:
+    """
+    A vehicle or station from ``vehicles.csv`` / ``stations.csv`` that the
+    import creates or fills.
+
+    ``fields`` lists the details set: all given ones for ``create``, only the
+    empty ones of the existing item for ``fill``.
+    """
+
+    kind: str  # "vehicle" or "station"
+    action: str  # "create" or "fill"
+    name: str
+    location: str | None
+    fields: tuple[str, ...]
 
 
 @dataclass
@@ -67,10 +75,11 @@ class ImportPreview:
     What would happen on commit; ``preview_import`` writes nothing.
 
     ``duplicate_*`` are counted against existing rows (D6 keys). A preview
-    with ``errors`` or ``header_mismatch`` cannot be committed.
+    with ``errors`` or ``questions`` cannot be committed. ``row_errors`` are
+    the rows that are skipped for a fault; the rest stays committable.
     """
 
-    format: str
+    format: str  # id of the preset used
     vehicle_names: list[str]
     new_refuels: int
     new_expenses: int
@@ -78,8 +87,12 @@ class ImportPreview:
     duplicate_expenses: int
     warnings: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
-    ambiguities: list[Ambiguity] = field(default_factory=list)
-    header_mismatch: HeaderMismatch | None = None
+    questions: list[Question] = field(default_factory=list)
+    row_errors: list[RowError] = field(default_factory=list)
+    skipped: int = 0  # rows dropped by the preset's skip rules
+    preset_note: str = ""
+    is_backup: bool = False
+    companion_changes: list[CompanionChange] = field(default_factory=list)
     needs_vehicle_choice: bool = False  # question for the user, not a file fault
 
 
@@ -98,75 +111,87 @@ class VehicleMapping:
     default_vehicle_id: int | None = None
 
 
+@dataclass(frozen=True)
+class _StationRow:
+    name: str
+    location: str | None
+    brand: str | None
+
+
 @dataclass
 class _Plan:
     """Parsed, mapped and de-duplicated import, ready to preview or commit."""
 
     format: str
     preview: ImportPreview
-    vehicles: list[CanonicalVehicleRef] = field(default_factory=list)
     refuels: list[tuple[CanonicalRefuel, DerivedFigures, int | str]] = field(
         default_factory=list
     )
     expenses: list[tuple[CanonicalExpense, int | str]] = field(default_factory=list)
     vehicle_ids: dict[str, int | None] = field(default_factory=dict)
-    stations: list = field(default_factory=list)  # native: every station row
+    vehicle_details: dict[str, dict] = field(default_factory=dict)  # vehicles.csv
+    stations: list[_StationRow] = field(default_factory=list)  # stations.csv
+    vehicle_fills: dict[int, dict] = field(default_factory=dict)  # id -> empty fields to set
+    station_fills: dict[tuple[str, str | None], str] = field(default_factory=dict)  # -> brand
 
     @property
     def blocked(self) -> bool:
         """True if the preview has errors or unanswered questions."""
-        return bool(self.preview.errors or self.preview.ambiguities)
-
-
-def available_formats() -> list[ImporterAdapter]:
-    """Registered adapters (drivvo, fuelio, fuelly, native)."""
-    return list(_ADAPTERS)
-
-
-def detect_format(data: bytes) -> str | None:
-    """Return the best-matching adapter name, or ``None`` if none matches."""
-    head = data[:HEAD_BYTES]
-    scored = [(adapter.detect(head), adapter.name) for adapter in _ADAPTERS]
-    confidence, name = max(scored, key=lambda pair: pair[0])
-    return name if confidence > 0 else None
+        return bool(self.preview.errors or self.preview.questions)
 
 
 def detect_preset(session: Session, data: bytes) -> Preset | None:
     """
     The best-matching preset for an upload (user presets first, then shipped),
-    or ``None`` if none finds at least half of its columns. Implemented by
-    task 2.2.
+    or ``None`` if none finds at least half of its columns. On a tie the first
+    user preset wins, and among shipped presets ``PREFERRED_ON_TIE``. A full
+    backup gets the standard preset. When this returns ``None``, start the mapping from
+    ``engine.fallback_preset(engine.read_file(data))``.
     """
-    raise NotImplementedError("task 2.2")
+    presets = list_presets(session)
+    if all(p.id != STANDARD_ID for p in presets):
+        presets.append(engine.standard_preset())
+    if engine.read_file(data).is_backup:
+        return next(p for p in presets if p.id == STANDARD_ID)
+    best: Preset | None = None
+    best_score = 0.0
+    for preset in presets:
+        value = engine.score(preset, engine.read_file(data, preset))
+        if value < DETECT_THRESHOLD:
+            continue
+        tie_win = (
+            best is not None
+            and value == best_score
+            and best.shipped
+            and preset.id == PREFERRED_ON_TIE
+        )
+        if best is None or value > best_score or tie_win:
+            best, best_score = preset, value
+    return best
 
 
 def preview_import(
     session: Session,
     data: bytes,
-    *,
-    format: str | None = None,
-    options: ImportOptions | None = None,
-    mapping: VehicleMapping | None = None,
     preset: Preset | None = None,
+    *,
+    mapping: VehicleMapping | None = None,
     answers: Answers | None = None,
 ) -> ImportPreview:
     """
-    Parse and count without writing. ``format`` overrides detection.
+    Read the file with ``preset`` and count what would be imported, writing
+    nothing. ``answers`` carries the user's choices (date order, units,
+    encoding, delimiter, header row).
 
-    ``preset`` and ``answers`` are the new interface (design D6): task 2.4
-    makes them required (``preset`` positional after ``data``) and removes
-    ``format`` and ``options`` together with the v1 adapters. Until then
-    passing ``preset`` raises ``NotImplementedError``.
-
-    A file vehicle name that is absent from the mapping is matched to the active vehicle
-    of the same name, or else counted as a vehicle to create. Records of a
-    file without vehicle names need ``mapping.default_vehicle_id``; without
-    it the preview carries an error and ``needs_vehicle_choice`` is set, so
-    a UI can ask for the vehicle instead of reporting a failed file.
+    A file vehicle name that is absent from the mapping is matched to the
+    active vehicle of the same name, or else counted as a vehicle to create.
+    Records of a file without vehicle names need ``mapping.default_vehicle_id``;
+    without it the preview carries an error and ``needs_vehicle_choice`` is
+    set, so a UI can ask for the vehicle instead of reporting a failed file.
+    A full backup ZIP is restored with the standard preset whatever ``preset``
+    says; only a backup may be previewed without a preset.
     """
-    if preset is not None or answers is not None:
-        raise NotImplementedError("task 2.4")
-    return _plan(session, data, format, options, mapping).preview
+    return _plan(session, data, preset, answers, mapping).preview
 
 
 def commit_import(
@@ -174,25 +199,21 @@ def commit_import(
     data: bytes,
     filename: str,
     mapping: VehicleMapping,
-    *,
-    format: str | None = None,
-    options: ImportOptions | None = None,
     preset: Preset | None = None,
+    *,
     answers: Answers | None = None,
 ) -> ImportBatch:
     """
     Write all new records in one transaction under a new ``ImportBatch``;
-    duplicates are skipped and counted. ``preset`` and ``answers`` as in
-    ``preview_import``; the batch records the preset id as its ``format``.
+    duplicates are skipped and counted. The batch records the preset id as its
+    ``format`` (``custom`` for a preset that was never saved).
 
     Raises
     ------
     ValidationError
         If the preview has errors or unanswered questions.
     """
-    if preset is not None or answers is not None:
-        raise NotImplementedError("task 2.4")
-    plan = _plan(session, data, format, options, mapping)
+    plan = _plan(session, data, preset, answers, mapping)
     if plan.blocked:
         raise ValidationError(plan.preview.errors or ["Unanswered import questions"])
     try:
@@ -245,28 +266,169 @@ def undo_batch(session: Session, batch_id: int) -> None:
 def _plan(
     session: Session,
     data: bytes,
-    format: str | None,
-    options: ImportOptions | None,
+    preset: Preset | None,
+    answers: Answers | None,
     mapping: VehicleMapping | None,
 ) -> _Plan:
-    name = format or detect_format(data)
-    adapter = next((a for a in _ADAPTERS if a.name == name), None)
-    preview = ImportPreview(name or "", [], 0, 0, 0, 0)
+    mapping = mapping or VehicleMapping()
+    source = engine.read_file(data, preset, answers)
+    if source.is_backup:  # a full backup is always read with the standard preset
+        preset = engine.standard_preset()
+        source = engine.read_file(data, preset, answers)
+    if preset is None:
+        preview = ImportPreview(CUSTOM_FORMAT, [], 0, 0, 0, 0)
+        preview.errors.append("Choose a preset for this file.")
+        return _Plan(CUSTOM_FORMAT, preview)
+    preview = ImportPreview(
+        preset.id or CUSTOM_FORMAT, [], 0, 0, 0, 0, is_backup=source.is_backup
+    )
+    preview.preset_note = preset.note
     plan = _Plan(preview.format, preview)
-    if adapter is None:
-        preview.errors.append("The file format was not recognised.")
+    has_companions = source.vehicles is not None or source.stations is not None
+    if source.is_backup and not source.tables:
+        preview.errors.append("The backup has no records.csv.")
         return plan
-    result = adapter.parse(data, options or ImportOptions())
+    if source.tables or not has_companions:
+        result = engine.apply(preset, source, answers)
+    else:  # only vehicles.csv and/or stations.csv
+        result = ImportResult()
+    _collect(plan, result)
+    names = _read_vehicles(source.vehicles, plan)
+    _read_stations(source.stations, plan)
+    preview.vehicle_names = [*names, *(n for n in _vehicle_names(result) if n not in names)]
+    if not plan.blocked:
+        _map_and_dedupe(session, result, mapping, plan)
+        _plan_companions(session, plan)
+    return plan
+
+
+def _collect(plan: _Plan, result: ImportResult) -> None:
+    preview = plan.preview
     preview.warnings.extend(result.warnings)
     preview.errors.extend(result.errors)
-    preview.ambiguities.extend(result.ambiguities)
-    preview.header_mismatch = result.header_mismatch
-    preview.vehicle_names = _vehicle_names(result)
-    plan.vehicles = result.vehicles
-    plan.stations = getattr(result, "stations", [])
-    if not plan.blocked:
-        _map_and_dedupe(session, result, mapping or VehicleMapping(), plan)
-    return plan
+    preview.questions.extend(result.questions)
+    preview.row_errors.extend(result.row_errors)
+    preview.skipped += result.skipped
+
+
+def _read_vehicles(table: SourceTable | None, plan: _Plan) -> list[str]:
+    """Read ``vehicles.csv`` into ``plan.vehicle_details``; return the names."""
+    if table is None:
+        return []
+    column = {
+        name: find_column([name], table.headers)
+        for name in (
+            "name", "make", "model", "plate", "fuel_type",
+            "initial_odometer_km", "archived", "notes",
+        )
+    }  # fmt: skip
+    if column["name"] is None:
+        plan.preview.errors.append("vehicles.csv has no 'name' column.")
+        return []
+    names = []
+    for line, row in table.rows:
+        name = _cell(row, column["name"])
+        if not name:
+            continue
+        details: dict = {
+            attribute: value
+            for attribute in ("make", "model", "plate", "fuel_type", "notes")
+            if (value := _cell(row, column[attribute]))
+        }
+        odometer = _cell(row, column["initial_odometer_km"])
+        if odometer:
+            try:
+                details["initial_odometer"] = float(odometer)
+            except ValueError:
+                plan.preview.row_errors.append(
+                    RowError(
+                        line, "initial_odometer_km", odometer,
+                        "vehicles.csv: not a number; the vehicle is imported without it.",
+                    )
+                )  # fmt: skip
+        details["archived"] = parse_flag(_cell(row, column["archived"]))
+        plan.vehicle_details.setdefault(name, details)
+        if name not in names:
+            names.append(name)
+    return names
+
+
+def _read_stations(table: SourceTable | None, plan: _Plan) -> None:
+    """Read ``stations.csv`` into ``plan.stations``."""
+    if table is None:
+        return
+    column = {n: find_column([n], table.headers) for n in ("name", "location", "brand")}
+    if column["name"] is None:
+        plan.preview.errors.append("stations.csv has no 'name' column.")
+        return
+    for _, row in table.rows:
+        name = _cell(row, column["name"])
+        if name:
+            plan.stations.append(
+                _StationRow(
+                    name,
+                    _cell(row, column["location"]) or None,
+                    _cell(row, column["brand"]) or None,
+                )
+            )
+
+
+_VEHICLE_DETAILS = ("make", "model", "plate", "fuel_type", "initial_odometer", "notes")
+
+
+def _plan_companions(session: Session, plan: _Plan) -> None:
+    """
+    List what ``vehicles.csv`` and ``stations.csv`` create or fill, and keep
+    the empty fields to set on existing rows. Nothing existing is overwritten.
+    """
+    changes = plan.preview.companion_changes
+    for name, details in plan.vehicle_details.items():
+        vehicle_id = plan.vehicle_ids.get(name)
+        if vehicle_id is None:
+            given = tuple(_label(k) for k in _VEHICLE_DETAILS if details.get(k) is not None)
+            changes.append(CompanionChange("vehicle", "create", name, None, given))
+            continue
+        vehicle = session.get(Vehicle, vehicle_id)
+        empty = {
+            k: details[k]
+            for k in _VEHICLE_DETAILS
+            if details.get(k) not in (None, "") and getattr(vehicle, k) in (None, "")
+        }
+        if empty:
+            plan.vehicle_fills[vehicle_id] = empty
+            changes.append(
+                CompanionChange("vehicle", "fill", name, None, tuple(_label(k) for k in empty))
+            )
+    seen: set[tuple[str, str | None]] = set()
+    for station in plan.stations:
+        key = (station.name, station.location)
+        if key in seen:
+            continue
+        seen.add(key)
+        existing = session.scalar(
+            select(Station).where(
+                Station.name == station.name,
+                Station.location.is_(None)
+                if station.location is None
+                else Station.location == station.location,
+            )
+        )
+        if existing is None:
+            given = ("brand",) if station.brand else ()
+            changes.append(CompanionChange("station", "create", *key, given))
+        elif station.brand and not existing.brand:
+            plan.station_fills[key] = station.brand
+            changes.append(CompanionChange("station", "fill", *key, ("brand",)))
+
+
+def _label(attribute: str) -> str:
+    return "initial_odometer_km" if attribute == "initial_odometer" else attribute
+
+
+def _cell(row: list[str], index: int | None) -> str:
+    if index is None or index >= len(row):
+        return ""
+    return row[index].strip()
 
 
 def _vehicle_names(result: ImportResult) -> list[str]:
@@ -282,7 +444,8 @@ def _map_and_dedupe(
 ) -> None:
     preview = plan.preview
     for name in preview.vehicle_names:
-        plan.vehicle_ids[name] = _resolve_vehicle(session, name, mapping)
+        archived = bool(plan.vehicle_details.get(name, {}).get("archived"))
+        plan.vehicle_ids[name] = _resolve_vehicle(session, name, mapping, archived)
         if name in mapping.by_name and mapping.by_name[name] is None:
             if _active_vehicle_id(session, name) is not None:
                 preview.errors.append(
@@ -336,12 +499,19 @@ def _hundredths(figures: DerivedFigures) -> int:
 
 
 def _resolve_vehicle(
-    session: Session, name: str, mapping: VehicleMapping
+    session: Session, name: str, mapping: VehicleMapping, archived_ok: bool = False
 ) -> int | None:
-    """Mapped id (``None`` = create), else the active vehicle with that name."""
+    """
+    Mapped id (``None`` = create), else the active vehicle with that name.
+    ``archived_ok`` (a backup restoring an archived vehicle) also accepts an
+    archived vehicle of that name, so a second restore creates nothing.
+    """
     if name in mapping.by_name:
         return mapping.by_name[name]
-    return _active_vehicle_id(session, name)
+    found = _active_vehicle_id(session, name)
+    if found is None and archived_ok:
+        found = session.scalar(select(Vehicle.id).where(Vehicle.name == name))
+    return found
 
 
 def _active_vehicle_id(session: Session, name: str) -> int | None:
@@ -399,7 +569,7 @@ class _ExistingKeys:
 
 def _write(session: Session, plan: _Plan, filename: str) -> ImportBatch:
     batch = ImportBatch(
-        format=plan.format,
+        format=plan.format[:50],
         filename=filename[:255],
         refuels_imported=len(plan.refuels),
         expenses_imported=len(plan.expenses),
@@ -409,11 +579,17 @@ def _write(session: Session, plan: _Plan, filename: str) -> ImportBatch:
     session.add(batch)
     session.flush()
     created = _create_vehicles(session, plan)
+    for vehicle_id, values in plan.vehicle_fills.items():
+        vehicle = session.get(Vehicle, vehicle_id)
+        for attribute, value in values.items():
+            setattr(vehicle, attribute, value)
     stations: dict[tuple[str, str | None], int] = {}
     for station in plan.stations:
-        _get_or_create_station(
+        station_id = _get_or_create_station(
             session, station.name, station.brand, station.location, batch.id, stations
         )
+        if brand := plan.station_fills.get((station.name, station.location)):
+            session.get(Station, station_id).brand = brand
     for record, figures, target in plan.refuels:
         vehicle_id = created[target] if isinstance(target, str) else target
         station_id = _station_id(session, record, batch.id, stations)
@@ -428,23 +604,13 @@ def _write(session: Session, plan: _Plan, filename: str) -> ImportBatch:
 def _create_vehicles(session: Session, plan: _Plan) -> dict[str, int]:
     """Create the vehicles the mapping left unresolved; return name -> id."""
     created = {}
-    for ref in plan.vehicles:
-        if plan.vehicle_ids.get(ref.name) is not None:
+    for name, vehicle_id in plan.vehicle_ids.items():
+        if vehicle_id is not None:
             continue
-        vehicle = Vehicle(name=ref.name)
-        for attribute in _VEHICLE_EXTRAS:
-            value = getattr(ref, attribute, None)
-            if value is not None:
-                setattr(vehicle, attribute, value)
+        vehicle = Vehicle(name=name, **plan.vehicle_details.get(name, {}))
         session.add(vehicle)
         session.flush()
-        created[ref.name] = vehicle.id
-    for name, vehicle_id in plan.vehicle_ids.items():
-        if vehicle_id is None and name not in created:
-            vehicle = Vehicle(name=name)
-            session.add(vehicle)
-            session.flush()
-            created[name] = vehicle.id
+        created[name] = vehicle.id
     return created
 
 
@@ -461,7 +627,7 @@ def _station_id(
         session,
         name,
         record.station_brand,
-        getattr(record, "station_location", None),
+        record.station_location,
         batch_id,
         cache,
     )
@@ -515,22 +681,15 @@ def _new_refuel(
         litres_milli=figures.litres_milli,
         price_per_litre_milli=figures.price_per_litre_milli,
         total_cents=figures.total_cents,
-        derived_field=_derived_field(record, figures),
+        derived_field=figures.derived_field or record.derived,
         station_id=station_id,
         is_full=record.is_full,
         missed_previous=record.missed_previous,
         notes=record.notes,
-        source=(getattr(record, "source", None) or batch.format)[:20],
+        source=(record.source or batch.format)[:50],
         source_ref=_short(record.source_ref),
         import_batch_id=batch.id,
     )
-
-
-def _derived_field(record: CanonicalRefuel, figures: DerivedFigures):
-    """Native files carry their own ``derived_field``; others use the derived one."""
-    if hasattr(record, "derived_field"):
-        return DerivedField(record.derived_field) if record.derived_field else None
-    return figures.derived_field
 
 
 def _new_expense(
@@ -546,18 +705,18 @@ def _new_expense(
         coverage_start=record.coverage_start,
         coverage_end=record.coverage_end,
         notes=record.notes,
-        source=(getattr(record, "source", None) or batch.format)[:20],
+        source=(record.source or batch.format)[:50],
         source_ref=_short(record.source_ref),
         import_batch_id=batch.id,
     )
 
 
 __all__ = [
+    "CompanionChange",
     "ImportPreview",
     "VehicleMapping",
-    "available_formats",
     "commit_import",
-    "detect_format",
+    "detect_preset",
     "list_batches",
     "preview_import",
     "undo_batch",

@@ -18,7 +18,7 @@ You need both a token (16+ characters) and a host port set for `8100/tcp`. Resta
 
 ## My import says headers are not recognised
 
-The preview lists the headers found and expected. This is most likely with Drivvo, whose mapping is provisional, or with a non-English file. Nothing is imported.
+The mapping step lists the columns of your file and the required fields that are still unmapped. This is most likely with a Drivvo file (the presets are untested) or a non-English file. Map the columns yourself and save the mapping as a preset. Nothing is imported until you confirm the preview.
 
 ## Consumption shows n/a
 

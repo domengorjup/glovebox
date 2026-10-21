@@ -190,6 +190,18 @@ A native `<details>` with a `<summary>`; no custom widget. Used for the archived
 
 `<div class="empty">No entries</div>` inside the place where the content would be (inside a `.card` when a card is expected). One short sentence; if the user can fix it, add a primary button under it.
 
+### Import mapping, export customise and preset rows
+
+These pages reuse existing elements; the only new classes are listed under "Mapping row layout".
+
+- **Mapping field** (import mapping): inside one `.card.card-pad.stack`, each standard field is a `.grid2` of two filled fields (source select, constant value), a `.help` line with the description, and a `details.archived` "Options" block (value map, true/false values, missing values, default). The select's first options are "Not mapped" and "Constant value", then the file's headers.
+- **Mapping row layout** (new class `map-row` on the `.grid2`, `map-const` on the constant field): the constant-value field is hidden until "Constant value" is chosen in the source select (CSS `:has()`, no script), so a row is one select, one help line and the Options link on a phone. The common fields come first; the rarely used ones (`currency`, `station_location`, `station_brand`, `coverage_start`, `coverage_end`, `notes`, `derived`, `source`, `source_ref`) sit in a collapsible "More fields" section (`details.archived`), which opens by itself when one of them is mapped.
+- **Step state**: mapping, preview and confirm are one `form.stack`; the edited mapping travels as hidden fields (`base_toml`, `selected_preset`, `preset_id`) plus the mapping inputs. Buttons switch the step with `formaction`; the default (first) submit button must be the harmless one.
+- **Questions**: a `.filter-line` with `span.lbl` and a `.seg` of radio labels.
+- **Row errors**: `table.tbl` in `.card.card-pad.table-scroll`; the heading gives the total and how many are shown.
+- **Vehicle picker** (export): `.list-card` rows with `label.pick` and a `label.body` for the name.
+- **Preset rows**: `.list-card` rows with a badge, name, status and note lines, a download `icon-btn` and, for own presets, a `post_button` Delete.
+
 ## Checklist for a new page or element
 
 1. Does an element above already do this? Use it.

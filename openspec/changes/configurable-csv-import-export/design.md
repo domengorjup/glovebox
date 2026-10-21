@@ -187,7 +187,7 @@ apply(preset: Preset, source: SourceFile, answers: Answers) -> ImportResult
 - **Reading:**
   - **Encoding:** UTF-8 with or without BOM, then cp1252 (the v1 helper).
   - **Delimiter:** sniffed among `,` `;` tab from the header row.
-  - **ZIP upload:** every `.csv` member is a table, and the member's file stem serves as the default vehicle name when the preset has no `vehicle` field. A ZIP with `datapackage.json` is a full backup (D7).
+  - **ZIP upload:** every `.csv` member is a table, and the member's file stem serves as the default vehicle name when the preset has no `vehicle` field. A ZIP with `datapackage.json` is a full backup, and `vehicles.csv` / `stations.csv` members are companion tables (D7).
   - **Sections:** if the preset names a `section`, only the lines after `## <section>` (quoted or not) up to the next `## ` line are read.
   - **Header row:** the first row, within the first 20 non-blank rows, that contains the most of the preset's candidate headers. Without a preset, the first non-blank row. The user can override it.
 - **Detection:**
@@ -207,10 +207,11 @@ apply(preset: Preset, source: SourceFile, answers: Answers) -> ImportResult
 ### D7. Full backup replaces the native ZIP
 
 - **Contents:** `records.csv` (the standard format, all fields), `vehicles.csv`, `stations.csv`, `datapackage.json` (D3, with the `glovebox` metadata).
-- **Restore** goes through the same pipeline:
-  - vehicles are created from `vehicles.csv` with their details, and the vehicle mapping is still offered;
-  - all stations are created or reused from `stations.csv`;
-  - records are applied with the `glovebox` preset;
+- **Restore** goes through the same pipeline, and is the general "companion tables" import plus `datapackage.json`:
+  - any ZIP may hold `vehicles.csv` and/or `stations.csv` next to the records (a ZIP member counts as one when its stem is `vehicles` or `stations`, it has a `name` column and no `date` column); they are read without the preset, because their layout is fixed;
+  - a missing vehicle or station is created with its details; an existing one (vehicle by name, station by name and location) only has empty details filled, so a normal import can never overwrite what the user entered. The preview lists both, and undo removes created stations but does not revert filled details;
+  - the vehicle mapping is still offered, and a fill goes to whichever existing vehicle the name resolves to;
+  - `datapackage.json` only changes two things: the records are read with the `glovebox` preset whatever preset was chosen (so the upload skips the mapping step), and a missing `records.csv` is an error;
   - `derived` and `source` are restored as written.
 - **Why replace rather than keep the native ZIP:**
   - one format to define, document and test instead of two;

@@ -42,7 +42,7 @@ Import and export are on their own pages. Files without a vehicle name ask which
 
 ## Backup and restore
 
-Use the native full export in the app (a ZIP of CSV files plus a manifest) as a backup. To restore, start the app on a fresh `/data` volume and import that ZIP. In the add-on, `/data` is also included in Home Assistant backups.
+Use the full backup in the app (a ZIP of CSV files plus a `datapackage.json`) as a backup. To restore, start the app on a fresh `/data` volume and import that ZIP. In the add-on, `/data` is also included in Home Assistant backups.
 
 ## Licence
 

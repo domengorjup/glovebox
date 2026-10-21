@@ -1,0 +1,4 @@
+type;vehicle;date;odometer_km;fuel_l;price_per_l;total;station;title
+refuel;Golf;2026-05-02;98000;45,20;1,459;65,95;OMV Celje;
+refuel;Golf;2026-05-20;98600;40,00;;58,00;Petrol Ljubljana;
+expense;Golf;2026-05-10;98400;;;180,50;;Oil change
