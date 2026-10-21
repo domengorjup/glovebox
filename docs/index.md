@@ -4,7 +4,14 @@ Glovebox tracks what your cars cost to run: fuel, service, insurance and registr
 
 It runs as a Home Assistant add-on or as a standalone Docker container.
 
-![Glovebox timeline](assets/screenshots/timeline-all-desktop-light.png)
+![Timeline](assets/screenshots/timeline-all-desktop-light.png)
+*Costs, consumption and every entry at a glance.*
+
+![Stats](assets/screenshots/stats-top-desktop-dark.png)
+*Consumption and costs over time, in HA's dark theme.*
+
+![Import](assets/screenshots/import-mapping-top-desktop-light.png)
+*Map any CSV once, then save it as a preset.*
 
 - **Using Glovebox?** Start with the [user guide](user/overview.md), or go straight to [Install](user/install.md).
 - **Working on Glovebox?** See the [developer guide](dev/architecture.md).

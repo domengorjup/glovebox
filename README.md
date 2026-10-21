@@ -11,17 +11,14 @@
 
 Documentation: **<https://domengorjup.github.io/glovebox/>**
 
-<p align="center">
-  <img src="docs/assets/screenshots/timeline-all-desktop-light.png" alt="Glovebox Timeline on a desktop" width="62%">
-  <img src="docs/assets/screenshots/timeline-all-phone-light.png" alt="Glovebox Timeline on a phone" width="22%">
-</p>
-<p align="center">
-  <img src="docs/assets/screenshots/timeline-all-desktop-dark.png" alt="Glovebox Timeline, dark theme" width="62%">
-</p>
-<p align="center">
-  <img src="docs/assets/screenshots/stats-desktop-light.png" alt="Glovebox Stats" width="48%">
-  <img src="docs/assets/screenshots/stats-desktop-dark.png" alt="Glovebox Stats, dark theme" width="48%">
-</p>
+![Timeline](docs/assets/screenshots/timeline-all-desktop-light.png)
+*Costs, consumption and every entry at a glance.*
+
+![Stats](docs/assets/screenshots/stats-top-desktop-dark.png)
+*Consumption and costs over time, in HA's dark theme.*
+
+![Import](docs/assets/screenshots/import-mapping-top-desktop-light.png)
+*Map any CSV once, then save it as a preset.*
 
 ## Features
 
