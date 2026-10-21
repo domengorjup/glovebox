@@ -4,7 +4,7 @@ Track the running costs of your cars: refuelling, maintenance, insurance and reg
 
 ## Installation
 
-1. In Home Assistant open Settings, Add-ons, Add-on store, menu (three dots), Repositories.
+1. In Home Assistant open Settings, Add-ons, Add-on store, menu (three dots), Repositories. In newer versions add-ons are called apps: Settings, Apps, Install app, menu, Repositories.
 2. Add the repository URL of this project and close the dialog.
 3. Select Glovebox, then Install. The image is built on your Home Assistant host, so the first install takes a few minutes.
 4. Start the add-on. Optionally enable "Show in sidebar". The panel "Glovebox" opens the app through Ingress.
@@ -65,7 +65,7 @@ The SQLite database is stored in the add-on's `/data` folder, which survives res
 
 ## Importing
 
-Import a CSV (or a ZIP of CSV files, such as a full backup) on the Import page. A preset maps the columns; you can adjust it in the mapping step. The preview shows what would be added and writes nothing until you confirm. Re-importing the same file adds nothing, and every import can be undone from the batch list.
+Import a CSV (or a ZIP of CSV files, such as a full backup) under Manage, Import. A preset maps the columns; you can adjust it in the mapping step and save your own mappings as presets (Manage, Presets). The preview shows what would be added and writes nothing until you confirm. Re-importing the same file adds nothing, and every import can be undone from the batch list.
 
 - Files without a vehicle name (Drivvo, Fuelly, Fuelio) ask which vehicle the records belong to.
 - Fuelly: the `tags` column is taken as the gas station name (the whole cell, so several tags become one station), which is how our own Fuelly export keeps the station. Brands are never guessed.
@@ -74,7 +74,7 @@ Import a CSV (or a ZIP of CSV files, such as a full backup) on the Import page. 
 ## Known limitations
 
 - The web app is only reachable through Ingress (no app login); the optional API port serves the stats API only. Anyone who can open the Home Assistant sidebar entry can use the app.
-- Expenses need a title (for example the service type) and may have an optional coverage period; the dashboard can spread such costs over the period or show them as paid.
+- Expenses need a title (for example the service type) and may have an optional coverage period; the Stats page can spread such costs over the period or show them as paid.
 - Only the `amd64` and `aarch64` architectures are supported.
 
 ## Support

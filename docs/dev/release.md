@@ -15,7 +15,7 @@
 4. Commit, then tag `v<version>`.
 5. Push `master` and the tag.
 
-Users then see the update after the add-on store checks for updates.
+The `Tests` and `Docs` workflows run on the push. Users then see the update after the add-on store checks for updates.
 
 ## Later
 

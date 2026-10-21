@@ -21,6 +21,8 @@ repository.yaml     add-on repository descriptor
 Dockerfile          standalone image
 docker/entrypoint.sh
 tests/              pytest suite; fixtures/ holds anonymised samples
-docs/               this documentation
+docs/               this documentation (assets/screenshots/ holds the images)
 mkdocs.yml
+.github/workflows/  tests.yml (pytest), docs.yml (GitHub Pages)
+.dev/               local helper scripts and demo data (make_demo_data.py)
 ```

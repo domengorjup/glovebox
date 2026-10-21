@@ -1,6 +1,6 @@
 # Offline use (draft)
 
-Status: ideas only, nothing is implemented. The approach should match the sibling app built on the same infrastructure, so changes here are compared with its notes before any work starts.
+Status: ideas only, nothing is implemented.
 
 ## The case to cover
 
@@ -22,6 +22,5 @@ So the minimum is: **capture a refuel or expense while offline and send it once 
 
 ## Open questions
 
-- Which of these does the sibling app choose, and why?
 - Is offline *viewing* needed at all, or only offline *capture*?
 - How are conflicts handled if the same entry is edited on two devices? (Possibly out of scope: entries are append-only in practice.)

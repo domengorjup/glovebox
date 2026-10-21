@@ -4,7 +4,7 @@ Glovebox tracks what your cars cost to run: fuel, service, insurance and registr
 
 It runs as a Home Assistant add-on or as a standalone Docker container.
 
-![Glovebox timeline](assets/screenshots/timeline-desktop-light.png)
+![Glovebox timeline](assets/screenshots/timeline-all-desktop-light.png)
 
 - **Using Glovebox?** Start with the [user guide](user/overview.md), or go straight to [Install](user/install.md).
 - **Working on Glovebox?** See the [developer guide](dev/architecture.md).

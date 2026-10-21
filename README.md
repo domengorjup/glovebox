@@ -1,12 +1,45 @@
+<p align="center"><img src="addon/glovebox/icon.png" alt="Glovebox" width="96" height="96"></p>
+
 # Glovebox
 
-Self-hosted tracker for car running costs (fuel, maintenance, insurance and registration) with statistics, CSV import (Drivvo, Fuelio, Fuelly) and export. Runs as a Home Assistant add-on or as a standalone Docker container.
+**Self-hosted tracker for what your cars cost to run: fuel, service, insurance and registration, with statistics.**
+
+[![Tests](https://github.com/domengorjup/glovebox/actions/workflows/tests.yml/badge.svg)](https://github.com/domengorjup/glovebox/actions/workflows/tests.yml)
+[![Docs](https://github.com/domengorjup/glovebox/actions/workflows/docs.yml/badge.svg)](https://github.com/domengorjup/glovebox/actions/workflows/docs.yml)
+[![Licence: MIT](https://img.shields.io/github/license/domengorjup/glovebox)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/tag/domengorjup/glovebox?label=release)](https://github.com/domengorjup/glovebox/tags)
+
+Documentation: **<https://domengorjup.github.io/glovebox/>**
+
+<p align="center">
+  <img src="docs/assets/screenshots/timeline-all-desktop-light.png" alt="Glovebox Timeline on a desktop" width="62%">
+  <img src="docs/assets/screenshots/timeline-all-phone-light.png" alt="Glovebox Timeline on a phone" width="22%">
+</p>
+<p align="center">
+  <img src="docs/assets/screenshots/timeline-all-desktop-dark.png" alt="Glovebox Timeline, dark theme" width="62%">
+</p>
+<p align="center">
+  <img src="docs/assets/screenshots/stats-desktop-light.png" alt="Glovebox Stats" width="48%">
+  <img src="docs/assets/screenshots/stats-desktop-dark.png" alt="Glovebox Stats, dark theme" width="48%">
+</p>
+
+## Features
+
+- Refuelling, service and other expenses (insurance, registration, parking) for any number of vehicles.
+- Statistics: consumption between full tanks, cost per km, monthly costs, price comparison by gas station and brand.
+- Configurable CSV import: a column mapping step with presets (Fuelly, Fuelio, Drivvo, your own), a preview before anything is written, and undo per import.
+- A documented standard CSV format, a Fuelly-compatible export and a full backup ZIP.
+- Looks like Home Assistant and follows its light and dark theme; opens in the sidebar through Ingress, no separate login.
+- Read-only stats API for Home Assistant sensors.
+- Runs as a Home Assistant add-on or as a standalone Docker container; the data is one SQLite file.
 
 ## Install as a Home Assistant add-on
 
-1. Settings, Add-ons, Add-on store, menu, Repositories: add this repository's URL.
-2. Install "Glovebox". The image is built locally on the HA host from `addon/glovebox/Dockerfile`.
-3. Start it and enable "Show in sidebar".
+[![Add the repository to Home Assistant](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fdomengorjup%2Fglovebox)
+
+Press the button, or add the repository by hand: **Settings > Add-ons > Add-on store > menu (three dots) > Repositories**, paste `https://github.com/domengorjup/glovebox` and click **Add**. In Home Assistant 2026.6 and later add-ons are called apps: **Settings > Apps > Install app > menu > Repositories**.
+
+Then install **Glovebox** (the image is built on your Home Assistant host, so the first install takes a few minutes), start it and enable **Show in sidebar**.
 
 Options and details: [addon/glovebox/DOCS.md](addon/glovebox/DOCS.md).
 
@@ -38,7 +71,7 @@ Without `GLOVEBOX_PASSWORD` there is no login: put a reverse proxy in front if t
 
 ## Import notes
 
-Import and export are on their own pages. Files without a vehicle name ask which vehicle to use. For Fuelly files the `tags` column is imported as the gas station name. Re-importing a file is a no-op and each import can be undone.
+Import is under Manage, Import (upload, map columns, preview, confirm); export is under Manage, Export. Files without a vehicle name ask which vehicle to use. For Fuelly files the `tags` column is imported as the gas station name. Re-importing a file is a no-op and each import can be undone.
 
 ## Backup and restore
 

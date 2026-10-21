@@ -2,7 +2,7 @@
 
 ## The add-on does not appear in the store
 
-Open the add-on store menu and choose **Check for updates** (or reload the page). Then check that the repository URL under **Repositories** is `https://github.com/domengorjup/glovebox`. Glovebox supports `amd64` and `aarch64` only.
+Open the add-on store menu (in newer Home Assistant versions the apps store, **Settings → Apps → Install app**) and choose **Check for updates** (or reload the page). Then check that the repository URL under **Repositories** is `https://github.com/domengorjup/glovebox`. Glovebox supports `amd64` and `aarch64` only.
 
 ## The add-on will not start
 

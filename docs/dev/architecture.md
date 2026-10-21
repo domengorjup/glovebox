@@ -9,6 +9,7 @@ Glovebox is one Python app (FastAPI) that serves server-rendered HTML pages and 
 | `web/` | HTML routes, Jinja2 templates, vendored static files. Forms work through normal POST requests; JavaScript only enhances them (charts, dialogs). |
 | `api/v1.py` | Read-only stats API. |
 | `services/records.py` | Create, read, update, delete and validation. Derives the third price figure. |
+| `services/preferences.py` | Server-side UI preferences (selected vehicle, Timeline cards and summaries). |
 | `services/stats.py` | Consumption, cost, allocation and station statistics. Used by both the HTML pages and the API, so their numbers cannot differ. |
 | `importers/` | One pipeline and one preset-driven engine; presets are TOML files in `presets/`. |
 | `exporters/` | Preset-driven CSV export and the full backup ZIP. |
@@ -42,10 +43,7 @@ All templates build URLs through `urls.url(request, path)` so the prefix is alwa
 
 ## Preferences
 
-The UI remembers the selected vehicle and the choice of summary cards on the server, in a small preferences table, so they are the same on every device.
-
-!!! note
-    The preferences table belongs to the rebuilt UI. Check `models.py` and `migrations/` for the exact schema.
+The UI remembers the selected vehicle, the choice of Timeline summary cards and the hidden summaries on the server, in the key/value `setting` table, so they are the same on every device.
 
 ## Database
 

@@ -247,7 +247,7 @@ def render_presets_markdown() -> str:
         "A preset describes how one CSV layout maps onto the standard fields: "
         "which source column feeds which field, and how dates, numbers and "
         "units are written. Presets are TOML files. You can create and edit "
-        "them in the app (**Manage → Import**); this page lists every key and "
+        "them in the app (**Manage → Presets**; a mapping is saved from the import preview); this page lists every key and "
         "the presets that ship with Glovebox. For the target fields see "
         "[Standard CSV format](standard-format.md).",
         "",

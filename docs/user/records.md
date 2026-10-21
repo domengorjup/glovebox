@@ -1,14 +1,19 @@
 # Adding and editing records
 
-Tap **+** and choose the record type. Every form has a **Vehicle** dropdown. It starts with the selected vehicle, or with the last specific vehicle when *All vehicles* is selected.
+Tap **+** on the Timeline and choose the record type (**Refuelling**, **Service** or **Expense**). Every form has a **Vehicle** dropdown. It starts with the selected vehicle, or with the last specific vehicle when *All vehicles* is selected.
 
 ![Add menu on a phone](../assets/screenshots/add-chooser-phone-light.png){ width="260" }
+![Add menu on a desktop](../assets/screenshots/add-chooser-desktop-light.png)
 
 To edit or delete a record, open it from the Timeline.
 
 ## Refuelling
 
-See [First steps](first-steps.md#2-add-a-refuelling). Fields: vehicle, date, odometer, any two of litres / price per litre / total, station, full tank, missed previous fill-up, notes.
+See [First steps](first-steps.md#2-add-a-refuelling). On a phone the form fills the screen:
+
+![Refuelling form on a phone](../assets/screenshots/refuel-form-phone-light.png){ width="260" }
+
+ Fields: vehicle, date, odometer, any two of litres / price per litre / total, station, full tank, missed previous fill-up, notes.
 
 ## Service
 
@@ -16,7 +21,7 @@ For maintenance: oil change, tyres, repairs. Fields: vehicle, date, odometer (op
 
 ## Expense
 
-For everything else. Choose a type:
+For everything else. Choose a type with the **Type** switch:
 
 - **Insurance**
 - **Registration**

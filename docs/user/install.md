@@ -4,7 +4,14 @@
 
 You need Home Assistant OS or Supervised (the add-on store). Supported architectures: `amd64` and `aarch64`.
 
-1. Open **Settings → Add-ons → Add-on store**.
+!!! note "Add-ons are called apps in newer Home Assistant"
+    Since Home Assistant 2026.6, add-ons are called **apps**: **Settings → Apps** and the **Install app** button replace **Settings → Add-ons** and the **Add-on store**. The steps are the same. This guide says "add-on" throughout.
+
+[![Add the Glovebox repository to your Home Assistant](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fdomengorjup%2Fglovebox)
+
+Press the button above, or add the repository by hand:
+
+1. Open **Settings → Add-ons → Add-on store** (newer versions: **Settings → Apps → Install app**).
 2. Open the menu (three dots, top right) and choose **Repositories**.
 3. Paste `https://github.com/domengorjup/glovebox` and click **Add**, then close the dialog.
 4. Find **Glovebox** in the store and click **Install**. The image is built on your Home Assistant host, so the first install takes a few minutes.

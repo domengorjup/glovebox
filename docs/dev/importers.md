@@ -42,6 +42,6 @@ fuel_l = { column = "Liter" }
 
 ## Add a layout
 
-No code change. Write the preset in the app (mapping step, then "Save as preset") or as a file in `src/glovebox/presets/`, add an anonymised fixture to `tests/fixtures/` and a case in `tests/test_presets_shipped.py`. Set `verified = true` only after checking against a real export. A shipped preset used for export needs `export = true` and no skip rules.
+No code change. Write the preset in the app (preview step, then **Save this mapping as a preset**) or as a file in `src/glovebox/presets/`, add an anonymised fixture to `tests/fixtures/` and a case in `tests/test_presets_shipped.py`. Set `verified = true` only after checking against a real export. A shipped preset used for export needs `export = true` and no skip rules.
 
 Notes: stations are created by name and location; a brand is only set when the file provides one. Duplicate keys are (vehicle, date, odometer, litres to 0.01) for refuels and (vehicle, date, category, amount) for expenses.

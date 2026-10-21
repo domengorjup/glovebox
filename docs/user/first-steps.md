@@ -2,13 +2,15 @@
 
 ## 1. Add a vehicle
 
-Go to **Manage → Vehicles** and add your car. Only the name is essential. Make, model, plate, fuel type and initial odometer are optional.
+Go to **Manage → Vehicles** and press **Add vehicle**. Only the name is essential. Make, model, plate, fuel type and initial odometer are optional.
+
+![Vehicles](../assets/screenshots/vehicles-desktop-light.png)
 
 ## 2. Add a refuelling
 
-Tap the **+** button and choose **Refuelling**.
+Tap the **+** button on the Timeline and choose **Refuelling**.
 
-![Refuelling form](../assets/screenshots/form-refuel-desktop-light.png)
+![Refuelling form](../assets/screenshots/refuel-form-desktop-light.png)
 
 Fill in the vehicle, date and odometer (km). Then enter the fuel figures.
 
@@ -20,7 +22,7 @@ Example: 40.00 L and a total of 60.00 gives a price of 1.500 per litre.
 
 If you enter all three and the total differs from litres × price by more than 1 %, Glovebox warns you but still lets you save.
 
-The station is optional. Pick an existing one or choose **New station** to create it on the spot (name, and optionally a brand).
+The station is optional. Pick an existing one or choose **New station…** to create it on the spot (name, and optionally a brand).
 
 ### Full tank
 

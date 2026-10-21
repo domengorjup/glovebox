@@ -2,18 +2,22 @@
 
 Go to **Manage → Import**.
 
-![Import preview](../assets/screenshots/import-preview-desktop-light.png)
+![Import preview](../assets/screenshots/import-mapping-desktop-light.png)
 
 Every import works the same way: a **preset** says which column of your file feeds which Glovebox field and how dates, numbers and units are written. Glovebox ships presets for several apps and for its own [standard CSV format](standard-format.md). You can adjust a preset for a single import and save the result as your own preset. See [Presets](presets.md) for the list and for every key of the preset file.
 
 ## Steps
 
-1. **Upload** a CSV file, or a ZIP of CSV files. Glovebox reads it and selects the best-fitting preset. It changes nothing yet.
-2. **Map columns.** Check the preset, the file settings (encoding, delimiter, header row, section) and the value formats (date pattern, decimal and thousands separators, units). Each Glovebox field takes a column of your file, a constant value, or nothing. Rarely used fields are under **More fields**. A file that no preset fits starts as a custom mapping; the required fields (`type`, `date`, and `odometer_km` for refuels, `total` and `title` for expenses) must be mapped before you can go on.
-3. **Preview.** It shows the preset and its note, record counts, the vehicles found, duplicates, rows that are left out and why, and warnings. Nothing is written yet.
+1. **Upload**: choose a CSV file, or a ZIP of CSV files, and press **Upload and map**. Glovebox reads it and selects the best-fitting preset. It changes nothing yet.
+2. **Map columns.** (Screenshot above.) Check the preset, the file settings (encoding, delimiter, header row, section) and the value formats (date pattern, decimal and thousands separators, units). Each Glovebox field takes a column of your file, a constant value, or nothing. Rarely used fields are under **More fields**. A file that no preset fits starts as a custom mapping; the required fields (`type`, `date`, and `odometer_km` for refuels, `total` and `title` for expenses) must be mapped before you can go on.
+3. **Preview.** (Screenshot below.) It shows the preset and its note, record counts, the vehicles found, duplicates, rows that are left out and why, and warnings. Nothing is written yet.
 4. **Answer questions** if there are any (see below), then press **Import now**. All records are added together as one **import batch**. The Import page then shows how many were added, with an **Undo** button. If every row is already present, the preview says so and offers no **Import now**; no empty batch is created.
 
-Standard files and full backups: a file in the standard format picks the **Glovebox** preset; a full backup goes straight to the preview.
+![Import preview](../assets/screenshots/import-preview-desktop-light.png)
+
+Standard files and full backups: a file in the standard format picks the **Glovebox** preset; a full backup (a ZIP with a `datapackage.json`) goes straight to the preview.
+
+![Import done](../assets/screenshots/import-done-desktop-light.png)
 
 ## Supported layouts
 
@@ -46,7 +50,9 @@ A ZIP can hold `vehicles.csv` and/or `stations.csv` next to the records, with or
 
 ## Save a mapping as a preset
 
-Under the preview, **Save this mapping as a preset** stores it under a name you choose. Next time a file with the same columns is uploaded, your preset is selected. Shipped presets are never changed: editing one and saving creates your own copy. Presets can be downloaded, uploaded and deleted on the **Presets** page (**Manage → Presets**).
+Under the preview, **Save this mapping as a preset** stores it under a name you choose. Next time a file with the same columns is uploaded, your preset is selected. Shipped presets are never changed: editing one and saving creates your own copy. Presets can be downloaded, uploaded and deleted on the **Presets** page (**Manage → Presets**, or the **Presets** button on the Import page).
+
+![Presets page](../assets/screenshots/presets-desktop-light.png)
 
 ## Good to know
 

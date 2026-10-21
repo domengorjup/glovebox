@@ -2,7 +2,7 @@
 
 Glovebox is a small web app for the running costs of your cars. It looks like part of Home Assistant when used as an add-on, and works on phones and desktops.
 
-![Timeline on desktop](../assets/screenshots/timeline-desktop-light.png)
+![Timeline on desktop](../assets/screenshots/timeline-all-desktop-light.png)
 
 ## What it does
 
@@ -17,6 +17,12 @@ No reminders, no receipts or photos, no electric charging records, no currency c
 
 ## Screen layout
 
-The top bar has the vehicle dropdown and three tabs: **Timeline**, **Stats** and **Manage**. On phones the tabs move to a bottom bar. The **+** button adds a record.
+The top bar has the vehicle dropdown and three tabs: **Timeline**, **Stats** and **Manage**. On phones the tabs move to a bottom bar. The **+** button on the Timeline adds a record.
+
+![Manage](../assets/screenshots/manage-desktop-light.png)
+
+**Manage** is the home of everything else: Vehicles, Gas stations, Import, Export and Presets.
+
+![Manage on a phone](../assets/screenshots/manage-phone-light.png){ width="260" }
 
 Choose a vehicle in the dropdown, or **All vehicles** to see everything together. Glovebox remembers your choice.

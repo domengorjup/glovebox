@@ -7,15 +7,15 @@ Open the **Stats** tab. Everything follows the vehicle chosen in the top dropdow
 ## Filters
 
 - **What**: All, Refuelling, Service or Expense.
-- **When**: 3 months, 12 months, this year, all time, or a custom date range.
-- **Refine**: a single station or brand (for refuelling), or an expense type.
-- **Costs**: Spread or As paid (see below). Shown when expenses are included.
+- **When**: **3 M**, **12 M**, **This year**, **All**, or **Custom** (a from and to date).
+- **Refine**: shown for Refuelling (a single station or brand) and Expense (an expense type).
+- **Costs**: **Spread** or **As paid** (see below). Shown when expenses are included.
 
-The summary numbers, charts and tables all update together.
+The summary numbers, charts and tables all update together. The page shows total cost, cost per km, average consumption and distance, then the consumption chart, the monthly cost chart and the price table.
 
-On phones the charts sit below the filters; scroll down to see them.
+On phones everything is in one column; scroll down to see the charts.
 
-![Stats charts on a phone](../assets/screenshots/stats-charts-phone-light.png){ width="260" }
+![Stats charts on a phone](../assets/screenshots/stats-phone-light.png){ width="260" }
 
 ## How consumption is calculated
 

@@ -3,10 +3,9 @@ site_url: https://domengorjup.github.io/glovebox/
 site_description: Self-hosted tracker for car running costs
 repo_url: https://github.com/domengorjup/glovebox
 repo_name: domengorjup/glovebox
+edit_uri: edit/master/docs/
 docs_dir: docs
 strict: true
-exclude_docs: |
-  assets/screenshots/NEEDED.md
 
 theme:
   name: material
