@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2
+
+- Drivvo presets verified against real Android exports; equal expenses in one file are no longer merged as duplicates; contributing guide.
+
 ## 0.2.1
 
 - Expenses and services: the form shows the last recorded odometer; if left empty, that reading is used, marked as estimated and kept out of distance statistics.
