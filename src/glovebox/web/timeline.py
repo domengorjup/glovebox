@@ -229,6 +229,9 @@ def _expense_entry(expense: Expense, names: dict[int, str]) -> Entry:
             detail = f"{label} · covers {expense.coverage_start} → {expense.coverage_end}"
         else:
             detail = f"{label} · {expense.notes}" if expense.notes else label
+    if expense.odometer_estimated and expense.odometer_km is not None:
+        estimate = "≈" + NBSP + with_unit(formatting.format_km(expense.odometer_km, grouped=True), "km")
+        detail = f"{detail} · {estimate}" if detail else estimate
     return Entry(
         "service" if service else "expense", expense.id, expense.title, detail,
         expense.amount_cents, expense.date, names.get(expense.vehicle_id, ""),
@@ -261,6 +264,20 @@ def group_by_month(entries: list[Entry]) -> list[MonthGroup]:
         for key, items in groupby(entries, key=lambda e: (e.day.year, e.day.month))
         for group in [list(items)]
     ]
+
+
+def _flash_warnings(notice: dict | None) -> list[str]:
+    """Message for the one-time notice left by saving an expense or service."""
+    if not notice:
+        return []
+    if notice.get("kind") == "estimated" and notice.get("km") is not None:
+        km = with_unit(formatting.format_km(notice["km"], grouped=True), "km")
+        return [f"Odometer not entered \u2014 used the last recorded {km}. "
+                "Edit the entry if that's wrong."]
+    if notice.get("kind") == "missing":
+        return ["Odometer not entered. There is no earlier reading to use, "
+                "so it was left empty. Entering it is recommended."]
+    return []
 
 
 @router.get("/")
@@ -298,6 +315,7 @@ def timeline(request: Request, session: SessionDep, type: str = "all"):
             if groups else []
         ),
         hidden_summaries=preferences.get_hidden_summaries(session),
+        warnings=_flash_warnings(preferences.pop_flash(session)),
         months=group_by_month(build_entries(session, chrome, type)),
         has_vehicles=bool(everyone),
         title="All vehicles" if combined else shown[0].name,

@@ -63,6 +63,7 @@ class CanonicalExpense:
     amount_cents: int
     title: str = ""
     odometer_km: float | None = None
+    odometer_estimated: bool = False
     coverage_start: date | None = None
     coverage_end: date | None = None
     notes: str | None = None

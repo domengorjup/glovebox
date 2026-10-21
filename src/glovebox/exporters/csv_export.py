@@ -281,6 +281,7 @@ def _expense_values(
         "vehicle": vehicle_name,
         "date": _date(e.date, u),
         "odometer_km": _odometer(e.odometer_km, u) if e.odometer_km is not None else None,
+        "odometer_estimated": e.odometer_estimated,
         "total": _number(Decimal(e.amount_cents) / 100, "total", u),
         "currency": settings.currency,
         "category": e.category.value,

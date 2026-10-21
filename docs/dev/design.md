@@ -154,7 +154,7 @@ Dialog pages set `{% set dialog_page = true %}` so the page behind them gets no 
 
 ### Messages
 
-`{{ messages(errors, warnings) }}` renders `.alert.error` and `.alert.warning` blocks at the top of a form or page. `.alert.success` reports the result of a finished action on the page it returns to (the import result: counts plus an outlined Undo button on the right, via `post_button`). Use it instead of a toast when the user needs to see what happened or reverse it. A field-level hint is `.help` (`.help.err` for an error).
+`{{ messages(errors, warnings) }}` renders `.alert.error` and `.alert.warning` blocks at the top of a form or page. `.alert.success` reports the result of a finished action on the page it returns to (the import result: counts plus an outlined Undo button on the right, via `post_button`). Use it instead of a toast when the user needs to see what happened or reverse it. A field-level hint is `.help` (`.help.err` for an error). A notice that must survive a redirect (the odometer warning after saving an expense) is stored once with `preferences.set_flash` and shown by the Timeline as `.alert.warning`, because the page script reloads the page and ignores the redirect target. An estimated odometer in a list row is written as `≈ 104,163 km` in the `.detail` line; it needs no extra element.
 
 ### Form fields, select and switch
 

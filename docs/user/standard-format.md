@@ -45,6 +45,7 @@ Refuels and expenses. Used by every standard import and export.
 | `date` | date |  | always | both | Date of the record, YYYY-MM-DD. | `2026-05-02` |
 | `time` | time |  | no | refuel | Time of day, HH:MM (HH:MM:SS is also accepted). | `14:30` |
 | `odometer_km` | number | `km` | refuel rows | both | Odometer reading. | `98000` |
+| `odometer_estimated` | boolean |  | no | expense | Written by Glovebox: the expense odometer is the last known reading, not an entered one. Leave empty. Empty means `false`. | `false` |
 | `fuel_l` | number | `l` | no | refuel | Fuel quantity. Give two of fuel_l, price_per_l and total; the third is derived. | `45.200` |
 | `price_per_l` | number | `currency/l` | no | refuel | Price per litre. Give two of fuel_l, price_per_l and total; the third is derived. | `1.459` |
 | `total` | number | `currency` | expense rows | both | Refuel total, or expense amount (greater than 0). Refuel: give two of fuel_l, price_per_l and total. Expense: required. | `65.95` |
@@ -93,9 +94,9 @@ Optional. Station details and stations without refuels; see [Optional tables](#o
 One refuel and one expense (`records.csv`):
 
 ```csv
-type,vehicle,date,time,odometer_km,fuel_l,price_per_l,total,currency,full,missed_previous,station,station_location,station_brand,category,title,coverage_start,coverage_end,notes,derived,source,source_ref
-refuel,Golf,2026-05-02,14:30,98000,45.200,1.459,65.95,EUR,true,false,OMV Celje,Celje,OMV,,,,,,,,
-expense,Golf,2026-05-10,,98400,,,180.00,EUR,,,,,,maintenance,Oil change,,,Winter tyres,,,
+type,vehicle,date,time,odometer_km,odometer_estimated,fuel_l,price_per_l,total,currency,full,missed_previous,station,station_location,station_brand,category,title,coverage_start,coverage_end,notes,derived,source,source_ref
+refuel,Golf,2026-05-02,14:30,98000,,45.200,1.459,65.95,EUR,true,false,OMV Celje,Celje,OMV,,,,,,,,
+expense,Golf,2026-05-10,,98400,,,,180.00,EUR,,,,,,maintenance,Oil change,,,Winter tyres,,,
 ```
 
 ## Convert your own export

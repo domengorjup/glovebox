@@ -129,9 +129,18 @@ class ExpenseInput:
     amount_cents: int
     title: str = ""
     odometer_km: float | None = None
+    odometer_estimated: bool = False
     coverage_start: date | None = None
     coverage_end: date | None = None
     notes: str | None = None
+
+
+@dataclass(frozen=True)
+class LastOdometer:
+    """A vehicle's last known reading; ``date`` is ``None`` for the initial one."""
+
+    km: float
+    date: date | None
 
 
 @dataclass(frozen=True)
@@ -547,9 +556,79 @@ def _apply_expense(session: Session, expense: Expense, data: ExpenseInput) -> No
     expense.title = data.title.strip()
     expense.amount_cents = data.amount_cents
     expense.odometer_km = data.odometer_km
+    expense.odometer_estimated = data.odometer_estimated and data.odometer_km is not None
     expense.coverage_start = start
     expense.coverage_end = end
     expense.notes = _clean(data.notes)
+
+
+def last_known_odometer(
+    session: Session,
+    vehicle_id: int,
+    on_date: date,
+    exclude_expense_id: int | None = None,
+) -> LastOdometer | None:
+    """
+    Highest real reading of the vehicle on or before ``on_date``.
+
+    Refuels and expenses with an entered odometer count; estimated ones do
+    not, so an estimate never feeds the next one. The vehicle's initial
+    odometer is the fallback. ``None`` if there is nothing at all.
+    """
+    best: LastOdometer | None = None
+    refuels = select(Refuel.odometer_km, Refuel.date).where(
+        Refuel.vehicle_id == vehicle_id, Refuel.date <= on_date
+    )
+    expenses = select(Expense.odometer_km, Expense.date).where(
+        Expense.vehicle_id == vehicle_id,
+        Expense.date <= on_date,
+        Expense.odometer_km.is_not(None),
+        Expense.odometer_estimated.is_(False),
+    )
+    if exclude_expense_id is not None:
+        expenses = expenses.where(Expense.id != exclude_expense_id)
+    for km, day in [*session.execute(refuels), *session.execute(expenses)]:
+        if best is None or km > best.km:
+            best = LastOdometer(km, day)
+    initial = get_vehicle(session, vehicle_id).initial_odometer
+    if initial is not None and (best is None or initial > best.km):
+        best = LastOdometer(initial, None)
+    return best
+
+
+def odometer_steps(
+    session: Session, vehicle_ids: Sequence[int], exclude_expense_id: int | None = None
+) -> dict[int, list[tuple[date | None, float]]]:
+    """
+    Per vehicle, the dates at which its last known odometer rises.
+
+    The same readings as ``last_known_odometer``, reduced to the points where
+    the running maximum increases (oldest first; ``None`` is the initial
+    odometer). The last point on or before a date is the answer for that date,
+    so a form can follow a changing date without asking the server.
+    """
+    steps: dict[int, list[tuple[date | None, float]]] = {}
+    for vehicle_id in vehicle_ids:
+        readings = list(session.execute(
+            select(Refuel.date, Refuel.odometer_km).where(Refuel.vehicle_id == vehicle_id)
+        ))
+        expenses = select(Expense.date, Expense.odometer_km).where(
+            Expense.vehicle_id == vehicle_id,
+            Expense.odometer_km.is_not(None),
+            Expense.odometer_estimated.is_(False),
+        )
+        if exclude_expense_id is not None:
+            expenses = expenses.where(Expense.id != exclude_expense_id)
+        readings += list(session.execute(expenses))
+        initial = get_vehicle(session, vehicle_id).initial_odometer
+        points: list[tuple[date | None, float]] = [] if initial is None else [(None, initial)]
+        top = initial
+        for day, km in sorted(readings, key=lambda r: r[0]):
+            if top is None or km > top:
+                points.append((day, km))
+                top = km
+        steps[vehicle_id] = points
+    return steps
 
 
 def create_expense(session: Session, data: ExpenseInput) -> Expense:

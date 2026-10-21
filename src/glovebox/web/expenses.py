@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from dataclasses import replace
 from datetime import date
 from typing import Annotated
 
@@ -10,7 +12,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from glovebox.models import Expense, ExpenseCategory
-from glovebox.services import records
+from glovebox.services import preferences, records
 from glovebox.services.records import ExpenseInput, ValidationError
 from glovebox.web.common import SessionDep, load_chrome, redirect, render
 from glovebox.web.formatting import parse_decimal, to_scaled_int
@@ -40,8 +42,11 @@ def _form_from_expense(expense: Expense) -> dict[str, str]:
         category=expense.category.value,
         title=expense.title,
         amount=f"{expense.amount_cents / 100:.2f}",
+        # An estimated value is not shown as typed; saving it empty re-estimates.
         odometer_km=(
-            "" if expense.odometer_km is None else f"{expense.odometer_km:g}"
+            ""
+            if expense.odometer_km is None or expense.odometer_estimated
+            else f"{expense.odometer_km:g}"
         ),
         coverage_start=expense.coverage_start.isoformat() if expense.coverage_start else "",
         coverage_end=expense.coverage_end.isoformat() if expense.coverage_end else "",
@@ -58,6 +63,18 @@ def _form_page(request: Request, session: Session, entered: dict[str, str],
     selected = entered.get("vehicle_id", "")
     if selected and not any(str(v.id) == selected for v in vehicles):
         vehicles.append(records.get_vehicle(session, int(selected)))
+    last = None
+    if selected:
+        try:
+            on_day = date.fromisoformat(entered.get("date", ""))
+        except ValueError:
+            on_day = date.today()
+        last = records.last_known_odometer(session, int(selected), on_day, expense_id)
+    estimated = None
+    if expense_id is not None:
+        stored = records.get_expense(session, expense_id)
+        if stored.odometer_estimated:
+            estimated = stored.odometer_km
     return render(
         request,
         "expenses/form.html",
@@ -70,6 +87,14 @@ def _form_page(request: Request, session: Session, entered: dict[str, str],
         vehicles=vehicles,
         categories=[c for c in ExpenseCategory if c is not ExpenseCategory.MAINTENANCE],
         errors=errors or [],
+        last_odometer=last,
+        odometer_steps=json.dumps({
+            str(vid): [[d.isoformat() if d else "", km] for d, km in points]
+            for vid, points in records.odometer_steps(
+                session, [v.id for v in vehicles], expense_id
+            ).items()
+        }),
+        estimated_km=estimated,
     )
 
 
@@ -146,6 +171,16 @@ def _save(request: Request, session: Session, form: ExpenseForm, expense_id: int
     """Validate and save; on problems show the form again with messages."""
     try:
         data = _parse_form(form)
+        notice = None
+        if data.odometer_km is None:
+            last = records.last_known_odometer(
+                session, data.vehicle_id, data.date, expense_id
+            )
+            if last is None:
+                notice = ("missing", None)
+            else:
+                data = replace(data, odometer_km=last.km, odometer_estimated=True)
+                notice = ("estimated", last.km)
         if expense_id is None:
             records.create_expense(session, data)
         else:
@@ -154,6 +189,8 @@ def _save(request: Request, session: Session, form: ExpenseForm, expense_id: int
         session.rollback()
         messages = exc.messages if isinstance(exc, ValidationError) else [str(exc)]
         return _form_page(request, session, form.model_dump(), expense_id, 422, messages)
+    if notice is not None:
+        preferences.set_flash(session, *notice)
     return redirect(request, "/")
 
 

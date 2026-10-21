@@ -498,6 +498,11 @@ def _map_and_dedupe(
             continue
         expense_keys.add(key)
         plan.expenses.append((expense, target))
+    # Odometers are never invented on import; only point out the gaps.
+    without = sum(1 for expense, _ in plan.expenses if expense.odometer_km is None)
+    if without:
+        noun = "expense has" if without == 1 else "expenses have"
+        preview.warnings.append(f"{without} {noun} no odometer.")
     preview.new_refuels = len(plan.refuels)
     preview.new_expenses = len(plan.expenses)
 
@@ -708,6 +713,7 @@ def _new_expense(
         vehicle_id=vehicle_id,
         date=record.date,
         odometer_km=record.odometer_km,
+        odometer_estimated=record.odometer_estimated,
         category=ExpenseCategory(record.category),
         title=record.title[:200],
         amount_cents=record.amount_cents,

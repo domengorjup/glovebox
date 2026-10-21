@@ -54,9 +54,13 @@ def format_milli(milli: int, places: int = 2) -> str:
     return f"{Decimal(milli) / 1000:.{places}f}"
 
 
-def format_km(value: float) -> str:
-    """Return an odometer or distance value without a needless ``.0``."""
-    return f"{value:.0f}" if float(value).is_integer() else f"{value:.1f}"
+def format_km(value: float, grouped: bool = False) -> str:
+    """Return an odometer or distance value without a needless ``.0``.
+
+    ``grouped`` adds a comma between thousands (``104,163``), for sentences.
+    """
+    comma = "," if grouped else ""
+    return f"{value:{comma}.0f}" if float(value).is_integer() else f"{value:{comma}.1f}"
 
 
 def format_consumption(value: float | None) -> str:

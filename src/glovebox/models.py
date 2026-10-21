@@ -177,6 +177,7 @@ class Expense(Base):
     """
     A non-fuel cost. ``amount_cents`` is always the full price paid.
     ``coverage_start``/``coverage_end`` are both set or both NULL (inclusive).
+    ``odometer_estimated`` marks an odometer that is a stand-in, not a reading.
     """
 
     __tablename__ = "expense"
@@ -191,6 +192,11 @@ class Expense(Base):
     )
     date: Mapped[date] = mapped_column(Date)
     odometer_km: Mapped[float | None] = mapped_column(Float)
+    # True when the odometer was filled in by the app (last known reading),
+    # not entered; such values never count as real readings in statistics.
+    odometer_estimated: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("0")
+    )
     category: Mapped[ExpenseCategory] = mapped_column(
         _enum(ExpenseCategory, "expense_category")
     )

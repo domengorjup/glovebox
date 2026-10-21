@@ -1,4 +1,5 @@
 {% extends layout %}
+{% from "_macros.html" import messages with context %}
 {% block title %}Timeline - Glovebox{% endblock %}
 {% set kind_icons = {'refuel': 'gas-station', 'service': 'wrench', 'expense': 'file-document-outline'} %}
 {% macro stat_card(key, c) %}
@@ -9,6 +10,7 @@
 </div>
 {% endmacro %}
 {% block content %}
+{{ messages(None, warnings) }}
 {% if not has_vehicles %}
 <div class="card empty">
   <p>No vehicles yet.</p>

@@ -21,6 +21,7 @@ vehicle = { column = "vehicle" }
 date = { column = "date" }
 time = { column = "time" }
 odometer_km = { column = "odometer_km" }
+odometer_estimated = { column = "odometer_estimated" }
 fuel_l = { column = "fuel_l" }
 price_per_l = { column = "price_per_l" }
 total = { column = "total" }

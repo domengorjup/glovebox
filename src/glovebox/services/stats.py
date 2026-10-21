@@ -142,7 +142,7 @@ class CostPerKm:
     Cost per km for a filter.
 
     ``distance_km`` is max minus min odometer over all records in the period
-    (D5). ``per_km`` is in currency units per km, ``None`` if distance <= 0.
+    (D5), not counting estimated expense odometers. ``per_km`` is in currency units per km, ``None`` if distance <= 0.
     """
 
     allocation: Allocation
@@ -462,7 +462,9 @@ def _distance_driven(session: Session, flt: StatsFilter) -> float | None:
         readings[refuel.vehicle_id].append(refuel.odometer_km)
     if not (flt.stations or flt.brands):
         for expense in session.scalars(select_expenses(flt)):
-            if expense.odometer_km is not None:
+            # An estimated odometer is a copy of an earlier reading; leaving it
+            # out keeps it from stretching the span (D5).
+            if expense.odometer_km is not None and not expense.odometer_estimated:
                 readings[expense.vehicle_id].append(expense.odometer_km)
     if not readings:
         return None
@@ -630,7 +632,9 @@ def _last_odometer(
     readings = [r.odometer_km for r in refuels]
     expense_odos = session.scalars(
         select(Expense.odometer_km).where(
-            Expense.vehicle_id == vehicle_id, Expense.odometer_km.is_not(None)
+            Expense.vehicle_id == vehicle_id,
+            Expense.odometer_km.is_not(None),
+            Expense.odometer_estimated.is_(False),
         )
     )
     readings.extend(expense_odos)

@@ -102,6 +102,12 @@ RECORD_FIELDS: tuple[StandardField, ...] = (
         required=REQUIRED_REFUEL, unit="km",
     ),
     StandardField(
+        "odometer_estimated", BOOLEAN,
+        "Written by Glovebox: the expense odometer is the last known reading, "
+        "not an entered one. Leave empty.", "false",
+        applies_to=(EXPENSE,), enum=(TRUE_VALUE, FALSE_VALUE), default=FALSE_VALUE,
+    ),
+    StandardField(
         "fuel_l", NUMBER, "Fuel quantity.", "45.200",
         applies_to=(REFUEL,), unit="l", export_decimals=3,
         rule="Give two of fuel_l, price_per_l and total; the third is derived.",

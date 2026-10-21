@@ -7,7 +7,7 @@ import json
 from glovebox import standard
 
 RECORD_COLUMNS = [
-    "type", "vehicle", "date", "time", "odometer_km", "fuel_l", "price_per_l",
+    "type", "vehicle", "date", "time", "odometer_km", "odometer_estimated", "fuel_l", "price_per_l",
     "total", "currency", "full", "missed_previous", "station",
     "station_location", "station_brand", "category", "title", "coverage_start",
     "coverage_end", "notes", "derived", "source", "source_ref",

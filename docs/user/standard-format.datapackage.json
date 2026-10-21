@@ -61,6 +61,18 @@
             "unit": "km"
           },
           {
+            "name": "odometer_estimated",
+            "type": "boolean",
+            "description": "Written by Glovebox: the expense odometer is the last known reading, not an entered one. Leave empty. Applies to expense rows only.",
+            "example": "false",
+            "trueValues": [
+              "true"
+            ],
+            "falseValues": [
+              "false"
+            ]
+          },
+          {
             "name": "fuel_l",
             "type": "number",
             "description": "Fuel quantity. Unit: l. Give two of fuel_l, price_per_l and total; the third is derived. Applies to refuel rows only.",

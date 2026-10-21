@@ -65,6 +65,7 @@ templates.env.filters["short_date"] = formatting.short_date
 templates.env.filters["litres"] = lambda milli: formatting.format_milli(milli, 2)
 templates.env.filters["price"] = _price
 templates.env.filters["km"] = formatting.format_km
+templates.env.filters["km_grouped"] = lambda km: formatting.format_km(km, grouped=True)
 templates.env.filters["consumption"] = formatting.format_consumption
 templates.env.filters["milli_input"] = lambda milli: (
     "" if milli is None else formatting.format_milli(milli, 3).rstrip("0").rstrip(".")

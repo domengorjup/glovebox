@@ -971,6 +971,8 @@ class _RowReader:
             amount_cents=scale_to_int(total, 100),
             title=title,
             odometer_km=odometer,
+            # An estimate without a value means nothing; never invent one.
+            odometer_estimated=odometer is not None and self.boolean("odometer_estimated"),
             coverage_start=start[0] if start else None,
             coverage_end=end[0] if end else None,
             notes=notes,

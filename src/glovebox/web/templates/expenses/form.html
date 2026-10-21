@@ -1,6 +1,17 @@
 {% extends layout %}
 {% from "_macros.html" import messages, field, textarea, dialog_head, vehicle_select with context %}
 {% set dialog_page = true %}
+{% macro odometer_hint() %}
+  <div class="help" data-odo-hint data-steps='{{ odometer_steps }}'>
+    <span data-odo-text>
+    {% if not f.vehicle_id %}Choose a vehicle to see its last recorded odometer.
+    {% elif last_odometer %}Last recorded: {{ last_odometer.km | km_grouped }}&nbsp;km{% if last_odometer.date %} ({{ last_odometer.date | short_date }}){% else %} (initial){% endif %}.
+    Left empty, this is used and marked as estimated.
+    {% else %}No earlier reading for this vehicle. Entering the odometer is recommended.{% endif %}
+    </span>
+    {% if estimated_km is not none %}The saved value ({{ estimated_km | km_grouped }}&nbsp;km) is an estimate; enter the real reading to replace it.{% endif %}
+  </div>
+{% endmacro %}
 {% set noun = 'service' if is_service else 'expense' %}
 {% set heading = ('Edit ' if expense_id else 'New ') ~ noun %}
 {% block title %}{{ heading }} - Glovebox{% endblock %}
@@ -18,6 +29,7 @@
         {{ field('Date', 'date', f.date, type='date', required=True) }}
         {{ field('Odometer', 'odometer_km', f.odometer_km, suffix='km', inputmode='decimal') }}
       </div>
+      {{ odometer_hint() }}
       {{ field('Title', 'title', f.title, required=True, placeholder='e.g. Oil and filter change') }}
       {{ field('Amount', 'amount', f.amount, suffix=currency, inputmode='decimal', required=True) }}
       {# Keep coverage dates a service may already have; this form does not edit them. #}
@@ -32,7 +44,8 @@
       {{ field('Date (paid)', 'date', f.date, type='date', required=True) }}
       {{ field('Title', 'title', f.title, required=True, placeholder='e.g. Insurance 2026') }}
       {{ field('Amount (full price paid)', 'amount', f.amount, suffix=currency, inputmode='decimal', required=True) }}
-      {{ field('Odometer (optional)', 'odometer_km', f.odometer_km, suffix='km', inputmode='decimal') }}
+      {{ field('Odometer', 'odometer_km', f.odometer_km, suffix='km', inputmode='decimal') }}
+      {{ odometer_hint() }}
       <div class="grid2">
         {{ field('Coverage start', 'coverage_start', f.coverage_start, type='date') }}
         {{ field('Coverage end', 'coverage_end', f.coverage_end, type='date') }}

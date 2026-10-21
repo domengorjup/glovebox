@@ -14,6 +14,7 @@
     if (first && !overlay.querySelector(".chooser, .confirm")) { first.focus(); }
     bindCalc(overlay);
     bindStationSelect(overlay);
+    bindOdometerHint(overlay);
   }
 
   function openDialog(href) {
@@ -304,6 +305,36 @@
     });
   }
 
+  /* ---------- expense form: last recorded odometer follows vehicle and date ---------- */
+  var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+  function bindOdometerHint(root) {
+    var hint = root.querySelector("[data-odo-hint]");
+    var vehicle = root.querySelector("#i-vehicle_id");
+    var day = root.querySelector("#i-date");
+    if (!hint || !vehicle || !day || hint.dataset.bound) { return; }
+    hint.dataset.bound = "1";
+    var steps = {};
+    try { steps = JSON.parse(hint.dataset.steps || "{}"); } catch (e) { return; }
+    var text = hint.querySelector("[data-odo-text]");
+    function update() {
+      if (!vehicle.value) { text.textContent = "Choose a vehicle to see its last recorded odometer."; return; }
+      var last = null;
+      (steps[vehicle.value] || []).forEach(function (s) {
+        if (s[0] === "" || (day.value && s[0] <= day.value)) { last = s; }
+      });
+      if (!last) { text.textContent = "No earlier reading for this vehicle. Entering the odometer is recommended."; return; }
+      var km = last[1].toLocaleString("en-US", { maximumFractionDigits: 1 }) + "\u00a0km";
+      var when = last[0] === "" ? "initial"
+        : parseInt(last[0].slice(8), 10) + "\u00a0" + MONTHS[parseInt(last[0].slice(5, 7), 10) - 1];
+      text.textContent = "Last recorded: " + km + " (" + when + "). Left empty, this is used and marked as estimated.";
+    }
+    vehicle.addEventListener("change", update);
+    day.addEventListener("change", update);
+    day.addEventListener("input", update);
+  }
+
+  bindOdometerHint(document);
   bindCalc(document);
   bindStationSelect(document);
   drawCharts();

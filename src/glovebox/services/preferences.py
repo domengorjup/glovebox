@@ -13,6 +13,8 @@ LAST_VEHICLE = "last_vehicle"
 SUMMARY_CARDS = "summary_cards"
 HIDDEN_SUMMARIES = "hidden_summaries"
 
+FLASH = "flash"
+
 ALL_VEHICLES = "all"
 
 # Display order of the Timeline summary cards; also the set of valid names.
@@ -41,6 +43,25 @@ def set_setting(session: Session, key: str, value: str) -> None:
     else:
         row.value = value
     session.flush()
+
+
+def set_flash(session: Session, kind: str, km: float | None = None) -> None:
+    """Remember a one-time notice for the next Timeline page."""
+    set_setting(session, FLASH, json.dumps({"kind": kind, "km": km}))
+
+
+def pop_flash(session: Session) -> dict | None:
+    """Return and clear the one-time notice, or ``None``."""
+    row = session.get(Setting, FLASH)
+    if row is None:
+        return None
+    session.delete(row)
+    session.flush()
+    try:
+        notice = json.loads(row.value)
+    except ValueError:
+        return None
+    return notice if isinstance(notice, dict) else None
 
 
 def get_summary_cards(session: Session) -> list[str]:
