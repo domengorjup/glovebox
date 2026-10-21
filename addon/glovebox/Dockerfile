@@ -8,7 +8,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
 ARG SOURCE_REPO=https://github.com/domengorjup/glovebox.git
 # Must match `version` in config.yaml; each release is a git tag v<version>.
-ARG SOURCE_REF=v0.1.1
+ARG SOURCE_REF=v0.1.2
 RUN git clone --depth 1 --branch "${SOURCE_REF}" "${SOURCE_REPO}" /app
 WORKDIR /app
 RUN uv sync --frozen --no-dev --no-editable \
