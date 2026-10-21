@@ -127,14 +127,20 @@ def fake_services(monkeypatch, calls):
     record("update_expense", make_expense())
     record("delete_expense")
 
+    monkeypatch.setattr(
+        stats, "vehicle_summary",
+        lambda session, vehicle_id, today=None: SimpleNamespace(
+            cost_this_month_cents=6000, last_refuel=None, last_odometer_km=98000.0),
+    )
     monkeypatch.setattr(stats, "segments", lambda refuels: [make_segment(1, 6.67)])
     monkeypatch.setattr(stats, "avg_consumption", lambda segs: 6.67 if segs else None)
+    by_category = {c: 0 for c in ExpenseCategory} | {ExpenseCategory.INSURANCE: 3100}
     breakdown = CostBreakdown(
         allocation=Allocation.SPREAD,
         fuel_cents=6000,
-        by_category={ExpenseCategory.INSURANCE: 3100},
-        monthly=[PeriodCost("2026-05", 6000, {ExpenseCategory.INSURANCE: 3100})],
-        yearly=[PeriodCost("2026", 6000, {ExpenseCategory.INSURANCE: 3100})],
+        by_category=by_category,
+        monthly=[PeriodCost("2026-05", 6000, by_category)],
+        yearly=[PeriodCost("2026", 6000, by_category)],
     )
 
     def fake_breakdown(session, flt, allocation=Allocation.SPREAD):
@@ -162,14 +168,31 @@ def fake_services(monkeypatch, calls):
                     refuels_imported=10, expenses_imported=2, duplicates_skipped=1)])
 
 
+def use_vehicles(monkeypatch, *vehicles):
+    """Make the faked vehicle lookups consistent with this list (get raises if unknown)."""
+    def listing(session, include_archived=False):
+        return [v for v in vehicles if include_archived or not v.archived]
+
+    def get(session, vehicle_id):
+        for v in vehicles:
+            if v.id == vehicle_id:
+                return v
+        raise records.NotFoundError(f"Vehicle {vehicle_id} does not exist")
+
+    monkeypatch.setattr(records, "list_vehicles", listing)
+    monkeypatch.setattr(records, "get_vehicle", get)
+    return list(vehicles)
+
+
 def urls_in(html: str) -> list[str]:
     return URL_ATTRIBUTE.findall(html)
 
 
 PAGES = [
-    "/", "/vehicles", "/vehicles/new", "/vehicles/1/edit", "/vehicles/1/delete",
-    "/refuels", "/refuels/new", "/refuels/1/edit",
-    "/expenses", "/expenses/new", "/expenses/1/edit",
+    "/", "/?type=refuel", "/stats", "/manage", "/add",
+    "/vehicles", "/vehicles/new", "/vehicles/1/edit", "/vehicles/1/delete",
+    "/refuels/new", "/refuels/1/edit",
+    "/expenses/new", "/expenses/new?kind=service", "/expenses/1/edit",
     "/stations", "/stations/1/edit", "/import", "/export",
 ]
 
@@ -200,55 +223,237 @@ def test_pages_reference_no_external_hosts(client, path):
     assert not re.search(r"""(?:https?:)?//[\w.-]+\.\w+""", html)
 
 
-def test_vendored_assets_are_served(client):
-    for name in ("pico.min.css", "chart.umd.min.js", "app.js", "app.css"):
+def test_bundled_assets_are_served(client):
+    for name in ("app.js", "app.css", "theme.js", "icons.svg"):
         assert client.get(f"/static/{name}").status_code == 200, name
 
 
-def test_toggle_links_keep_prefix_and_filters(client):
-    html = client.get("/?vehicle=1&allocation=paid", headers=INGRESS).text
-    assert f'href="{PREFIX}/?vehicle=1&amp;allocation=spread"' in html
+def test_removed_libraries_are_gone(client):
+    for name in ("pico.min.css", "chart.umd.min.js", "color.min.js"):
+        assert client.get(f"/static/{name}").status_code == 404, name
 
 
-# --- 6.6 dashboard --------------------------------------------------------
+def test_icon_sprite_url_carries_prefix(client):
+    html = client.get("/", headers=INGRESS).text
+    assert f"{PREFIX}/static/icons.svg#" in html
 
 
-def test_bookmarked_filter_is_applied(client, calls):
-    url = "/?vehicle=1&date_from=2026-01-01&date_to=2026-12-31&allocation=paid"
+def test_pages_have_no_unreplaced_template_text(client):
+    for path in PAGES:
+        assert "{{" not in client.get(path).text and "{%" not in client.get(path).text
+
+
+# --- timeline -------------------------------------------------------------
+
+
+def test_timeline_lists_entries_grouped_by_month(client):
+    html = client.get("/").text
+    assert "May 2026" in html and "March 2026" in html
+    assert 'href="/refuels/1/edit"' in html and 'href="/expenses/1/edit"' in html
+    assert "Annual policy" in html and "Refuelling" in html
+
+
+def test_timeline_type_chip_filters(client):
+    html = client.get("/?type=expense").text
+    assert "Annual policy" in html and 'href="/refuels/1/edit"' not in html
+
+
+def test_timeline_unknown_type_is_rejected(client):
+    assert client.get("/?type=parking").status_code == 422
+
+
+def test_timeline_shows_consumption_or_dash_for_cards(client, monkeypatch):
+    assert "6.67" in client.get("/").text
+    monkeypatch.setattr(stats, "avg_consumption", lambda segs: None)
+    assert 'data-card="consumption"' in client.get("/").text
+
+
+def test_timeline_numbers_do_not_break_across_lines(client):
+    html = client.get("/").text
+    assert "420.00\u00a0EUR" in html
+
+
+def test_add_chooser_links_to_the_three_forms(client):
+    html = client.get("/add").text
+    assert 'href="/refuels/new"' in html
+    assert 'href="/expenses/new?kind=service"' in html
+    assert 'href="/expenses/new"' in html
+
+
+def test_dialog_request_returns_only_the_content(client):
+    page = client.get("/refuels/new").text
+    dialog = client.get("/refuels/new", headers={"X-Glovebox-Dialog": "1"}).text
+    assert "<html" in page and "<html" not in dialog and 'name="odometer_km"' in dialog
+
+
+def test_service_form_posts_maintenance(client):
+    html = client.get("/expenses/new?kind=service").text
+    assert 'name="category" value="maintenance"' in html
+
+
+def test_expense_form_offers_no_maintenance_category(client):
+    html = client.get("/expenses/new").text
+    assert 'value="insurance"' in html and 'value="maintenance"' not in html
+
+
+# --- stats ----------------------------------------------------------------
+
+
+def test_stats_filter_is_applied(client, calls):
+    url = ("/stats?what=all&when=custom&date_from=2026-01-01&date_to=2026-12-31"
+           "&allocation=paid")
     response = client.get(url)
     assert response.status_code == 200
     flt, allocation = calls["cost_breakdown"][0]
-    assert flt.vehicles == (1,)
     assert flt.date_from == date(2026, 1, 1) and flt.date_to == date(2026, 12, 31)
     assert allocation is Allocation.PAID
     assert 'value="2026-01-01"' in response.text
-    assert re.search(r'<a href="[^"]*allocation=paid" aria-current="true"', response.text)
 
 
-def test_default_allocation_is_spread(client, calls):
-    client.get("/")
+def test_stats_default_allocation_is_spread(client, calls):
+    client.get("/stats")
     assert calls["cost_breakdown"][0][1] is Allocation.SPREAD
 
 
-def test_invalid_allocation_is_rejected(client):
-    assert client.get("/?allocation=weekly").status_code == 422
+def test_stats_follow_the_selected_vehicle(client, calls):
+    client.get("/stats")
+    assert calls["cost_breakdown"][0][0].vehicles == ()
+    client.post("/preferences/vehicle", data={"vehicle": "1"})
+    client.get("/stats")
+    assert calls["cost_breakdown"][1][0].vehicles == (1,)
 
 
-def test_invalid_date_is_rejected(client):
-    assert client.get("/refuels?date_from=yesterday").status_code == 422
+def test_stats_choice_links_keep_prefix_and_filters(client):
+    html = client.get("/stats?allocation=paid&what=expense", headers=INGRESS).text
+    assert f'href="{PREFIX}/stats?' in html and "allocation=paid" in html
 
 
-def test_dashboard_embeds_chart_data_and_caveat(client):
-    html = client.get("/").text
+def test_stats_spread_choice_only_with_expenses(client):
+    assert "As paid" in client.get("/stats?what=all").text
+    assert "As paid" not in client.get("/stats?what=refuel").text
+
+
+def test_stats_invalid_values_are_rejected(client):
+    assert client.get("/stats?allocation=weekly").status_code == 422
+    assert client.get("/stats?what=parking").status_code == 422
+    assert client.get("/stats?date_from=yesterday").status_code == 422
+
+
+def test_stats_embeds_chart_data_and_caveat(client):
+    html = client.get("/stats").text
     assert 'id="chart-data"' in html
     assert "mixed-station tanks are left out" in html
     assert "6.67" in html
 
 
-def test_default_filter_hides_archived_vehicles(client, calls):
-    client.get("/")
-    flt, _ = calls["cost_breakdown"][0]
-    assert flt.vehicles == (1,)  # the one non-archived vehicle
+def test_stats_price_table_by_station_and_brand(client):
+    assert "data-price-table" in client.get("/stats").text
+    assert "Brand" in client.get("/stats?group=brand").text
+
+
+def test_all_vehicles_includes_archived_history(client, calls, monkeypatch):
+    use_vehicles(monkeypatch, make_vehicle(), make_vehicle(2, "Old", True))
+    client.get("/stats")
+    assert calls["cost_breakdown"][0][0].vehicles == ()
+
+
+# --- preferences ----------------------------------------------------------
+
+
+def test_selected_vehicle_is_remembered_across_clients(client, settings, engine):
+    from fastapi.testclient import TestClient
+
+    from glovebox.app import create_app
+
+    client.post("/preferences/vehicle", data={"vehicle": "1"})
+    with TestClient(create_app(settings, engine)) as other:
+        assert re.search(r'<option value="1"[^>]*selected', other.get("/").text)
+
+
+def test_all_vehicles_does_not_overwrite_last_vehicle(client):
+    client.post("/preferences/vehicle", data={"vehicle": "1"})
+    client.post("/preferences/vehicle", data={"vehicle": "all"})
+    html = client.get("/refuels/new").text
+    assert re.search(r'<option value="1"[^>]*selected', html)
+
+
+def test_vehicle_preference_validation(client, monkeypatch):
+    use_vehicles(monkeypatch, make_vehicle())
+    assert client.post("/preferences/vehicle", data={"vehicle": "abc"}).status_code == 422
+    assert client.post("/preferences/vehicle", data={"vehicle": "99"}).status_code == 404
+
+
+def test_vehicle_preference_redirects_under_prefix(client):
+    response = client.post("/preferences/vehicle", data={"vehicle": "1", "next": "/stats"},
+                           headers=INGRESS, follow_redirects=False)
+    assert response.headers["location"] == f"{PREFIX}/stats"
+
+
+def test_vehicle_preference_rejects_external_next(client):
+    response = client.post("/preferences/vehicle",
+                           data={"vehicle": "1", "next": "https://evil.example/x"},
+                           follow_redirects=False)
+    assert response.headers["location"] == "/"
+
+
+def test_summary_card_choice_is_stored_and_unknown_names_ignored(client):
+    client.post("/preferences/cards", data={"card": ["odometer", "bogus", "cost_km"]})
+    html = client.get("/").text
+    shown = {k for k in re.findall(r'data-card="(\w+)"\s*>', html)}
+    assert shown == {"odometer", "cost_km"}
+    hidden = re.findall(r'data-card="(\w+)"\s+hidden', html)
+    assert "cost_month" in hidden and "odometer" not in hidden
+
+
+def test_summary_cards_default_when_nothing_stored(client):
+    html = client.get("/").text
+    assert re.search(r'data-card="cost_month"\s*>', html)
+    assert re.search(r'data-card="odometer"\s+hidden', html)
+
+
+def test_summary_cards_can_all_be_switched_off(client):
+    client.post("/preferences/cards", data={})
+    assert not re.findall(r'data-card="\w+"\s*>', client.get("/").text)
+
+
+def test_form_vehicle_defaults_to_navbar_vehicle(client, monkeypatch):
+    use_vehicles(monkeypatch, make_vehicle(), make_vehicle(2, "Polo"))
+    client.post("/preferences/vehicle", data={"vehicle": "2"})
+    html = client.get("/refuels/new").text
+    assert re.search(r'<option value="2"[^>]*selected', html)
+
+
+def test_form_vehicle_with_all_vehicles_uses_last_specific(client, monkeypatch):
+    use_vehicles(monkeypatch, make_vehicle(), make_vehicle(2, "Polo"))
+    client.post("/preferences/vehicle", data={"vehicle": "2"})
+    client.post("/preferences/vehicle", data={"vehicle": "all"})
+    for path in ("/refuels/new", "/expenses/new"):
+        assert re.search(r'<option value="2"[^>]*selected', client.get(path).text), path
+
+
+def test_form_vehicle_ignores_archived_last_vehicle(client, monkeypatch):
+    use_vehicles(monkeypatch, make_vehicle(), make_vehicle(2, "Polo"))
+    client.post("/preferences/vehicle", data={"vehicle": "2"})
+    client.post("/preferences/vehicle", data={"vehicle": "all"})
+    use_vehicles(monkeypatch, make_vehicle(), make_vehicle(2, "Polo", archived=True))
+    html = client.get("/refuels/new").text
+    assert 'value="2"' not in html.split('name="vehicle_id"')[1].split("</select>")[0]
+
+
+def test_every_form_has_a_vehicle_dropdown(client):
+    for path in ("/refuels/new", "/refuels/1/edit", "/expenses/new",
+                 "/expenses/new?kind=service", "/expenses/1/edit"):
+        assert '<select id="i-vehicle_id" name="vehicle_id"' in client.get(path).text, path
+
+
+def test_app_bar_lists_vehicles_and_all_option(client):
+    html = client.get("/").text
+    assert 'value="all"' in html and "All vehicles" in html and "Golf" in html
+
+
+def test_app_bar_hides_archived_vehicles(client, monkeypatch):
+    use_vehicles(monkeypatch, make_vehicle(), make_vehicle(2, "Retired", True))
+    assert "Retired" not in client.get("/").text.split("</header>")[0]
 
 
 # --- 6.2 vehicles ---------------------------------------------------------
@@ -292,6 +497,17 @@ def test_vehicle_create_redirects_under_prefix(client, calls):
     assert data.name == "Polo" and data.initial_odometer == 1000.5 and data.make is None
 
 
+def test_vehicle_list_shows_secondary_text_and_stats(client):
+    html = client.get("/vehicles").text
+    assert "VW Golf" in html and "records" in html
+
+
+def test_archived_vehicles_sit_in_a_collapsible_section(client, monkeypatch):
+    use_vehicles(monkeypatch, make_vehicle(), make_vehicle(2, "Retired", True))
+    html = client.get("/vehicles").text
+    assert "<details" in html and "Archived (1)" in html and "Retired" in html
+
+
 def test_vehicle_archive_and_restore(client, calls):
     client.post("/vehicles/1/archive", data={"archived": "0"}, follow_redirects=False)
     assert calls["archive_vehicle"][0][0] == (1, False)
@@ -300,10 +516,12 @@ def test_vehicle_archive_and_restore(client, calls):
 # --- 6.3 refuels ----------------------------------------------------------
 
 
-def test_refuel_list_shows_consumption_and_na(client, monkeypatch):
-    assert "6.67" in client.get("/refuels").text
+def test_timeline_refuel_shows_consumption_and_hides_na(client, monkeypatch):
+    assert "6.67 L/100 km" in client.get("/").text.replace("\u00a0", " ")
     monkeypatch.setattr(stats, "segments", lambda r: [make_segment(1, None)])
-    assert "n/a" in client.get("/refuels").text
+    monkeypatch.setattr(stats, "avg_consumption", lambda segs: None)
+    html = client.get("/").text.replace("\u00a0", " ")
+    assert "6.67" not in html and "\u2013" in html
 
 
 def test_refuel_two_of_three_entry(client, calls):
@@ -369,11 +587,12 @@ def test_refuel_edit_prefills_form(client):
 # --- 6.4 expenses ---------------------------------------------------------
 
 
-def test_expense_list_shows_filtered_total(client, calls):
-    html = client.get("/expenses?category=insurance&date_from=2026-01-01").text
-    assert "Total: 420.00 EUR" in html
-    flt = calls["list_expenses"][0][0][0]
-    assert flt.categories == (ExpenseCategory.INSURANCE,)
+def test_expense_create_redirects_to_timeline_under_prefix(client):
+    form = {"vehicle_id": "1", "date": "2026-03-01", "category": "insurance",
+            "title": "Annual policy", "amount": "420.00"}
+    response = client.post("/expenses/new", data=form, headers=INGRESS,
+                           follow_redirects=False)
+    assert response.headers["location"] == f"{PREFIX}/"
 
 
 def test_expense_create_with_coverage(client, calls):

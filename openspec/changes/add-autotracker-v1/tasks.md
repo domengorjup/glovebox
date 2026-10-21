@@ -125,6 +125,7 @@
   - all filters encoded in the URL query.
 - [x] 6.7 Build the import page (upload, format override, preview showing vehicle mapping, the date-order question and duplicates, confirm, batch list with undo) and the export page (native and Fuelly, with the expenses-omitted note).
 - [x] 6.8 Write template tests: every page renders under the root path and under an `X-Ingress-Path` prefix with all URLs prefixed; a bookmarked filter URL renders with its filters applied.
+- [x] 6.9 Redesign the web UI (HA-native look, app bar vehicle selector, Timeline/Stats/Manage, floating add button) and store UI preferences server-side in a settings table (migration 0002).
 
 ## 7. Stats API and access control (needs 1; uses 2's service signatures)
 

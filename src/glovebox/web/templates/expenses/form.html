@@ -1,39 +1,62 @@
-{% extends "base.html" %}
-{% from "_macros.html" import messages %}
-{% block title %}{{ 'Edit' if expense_id else 'New' }} expense - Glovebox{% endblock %}
+{% extends layout %}
+{% from "_macros.html" import messages, field, textarea, dialog_head with context %}
+{% set dialog_page = true %}
+{% set noun = 'service' if is_service else 'expense' %}
+{% set heading = ('Edit ' if expense_id else 'New ') ~ noun %}
+{% block title %}{{ heading }} - Glovebox{% endblock %}
 {% block content %}
-<h1>{{ 'Edit expense' if expense_id else 'New expense' }}</h1>
-{{ messages(errors) }}
-<form method="post" action="{{ url(request, ('/expenses/%d/edit' % expense_id) if expense_id else '/expenses/new') }}">
-  <label>Vehicle
-    <select name="vehicle_id" required>
-      <option value="">Choose...</option>
-      {% for v in vehicles %}
-      <option value="{{ v.id }}" {{ 'selected' if f.vehicle_id == v.id | string }}>{{ v.name }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label>Date (paid) <input type="date" name="date" value="{{ f.date }}" required></label>
-  <label>Category
-    <select name="category">
-      {% for c in categories %}
-      <option value="{{ c.value }}" {{ 'selected' if f.category == c.value }}>{{ c.value }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label>Title <input name="title" value="{{ f.title }}" placeholder="e.g. Oil change, Annual policy" required></label>
-  <label>Amount (full price paid) <input name="amount" inputmode="decimal" value="{{ f.amount }}" required></label>
-  <label>Odometer (km, optional) <input name="odometer_km" inputmode="decimal" value="{{ f.odometer_km }}"></label>
-  <fieldset>
-    <legend>Coverage period (optional, both dates or none)</legend>
-    <div class="grid">
-      <label>From <input type="date" name="coverage_start" value="{{ f.coverage_start }}"></label>
-      <label>To (inclusive) <input type="date" name="coverage_end" value="{{ f.coverage_end }}"></label>
+<div class="scrim" data-scrim>
+<form class="dialog form" method="post" role="dialog" aria-label="{{ heading }}"
+      action="{{ url(request, ('/expenses/%d/edit' % expense_id) if expense_id else '/expenses/new') }}">
+  {{ dialog_head(request, heading) }}
+  <div class="dialog-body">
+    {{ messages(errors) }}
+    <div class="field">
+      <label for="i-vehicle_id">Vehicle</label>
+      <select id="i-vehicle_id" name="vehicle_id" required>
+        <option value="">Choose...</option>
+        {% for v in vehicles %}
+        <option value="{{ v.id }}" {{ 'selected' if f.vehicle_id == v.id | string }}>{{ v.name }}</option>
+        {% endfor %}
+      </select>
     </div>
-    <p class="muted">Used to spread the cost over the covered days in statistics. The stored amount stays the full price.</p>
-  </fieldset>
-  <label>Notes <textarea name="notes">{{ f.notes }}</textarea></label>
-  <button type="submit">Save</button>
-  <a href="{{ url(request, '/expenses') }}">Cancel</a>
+    {% if is_service %}
+      <input type="hidden" name="category" value="maintenance">
+      <div class="grid2">
+        {{ field('Date', 'date', f.date, type='date', required=True) }}
+        {{ field('Odometer', 'odometer_km', f.odometer_km, suffix='km', inputmode='decimal') }}
+      </div>
+      {{ field('Title', 'title', f.title, required=True, placeholder='e.g. Oil and filter change') }}
+      {{ field('Amount', 'amount', f.amount, suffix=currency, inputmode='decimal', required=True) }}
+      {# Keep coverage dates a service may already have; this form does not edit them. #}
+      <input type="hidden" name="coverage_start" value="{{ f.coverage_start }}">
+      <input type="hidden" name="coverage_end" value="{{ f.coverage_end }}">
+    {% else %}
+      <div class="seg type-seg" role="radiogroup" aria-label="Type">
+        {% for c in categories %}
+        <label><input type="radio" name="category" value="{{ c.value }}" {{ 'checked' if f.category == c.value }}><span>{{ c.value | capitalize }}</span></label>
+        {% endfor %}
+      </div>
+      {{ field('Date (paid)', 'date', f.date, type='date', required=True) }}
+      {{ field('Title', 'title', f.title, required=True, placeholder='e.g. Insurance 2026') }}
+      {{ field('Amount (full price paid)', 'amount', f.amount, suffix=currency, inputmode='decimal', required=True) }}
+      {{ field('Odometer (optional)', 'odometer_km', f.odometer_km, suffix='km', inputmode='decimal') }}
+      <div class="grid2">
+        {{ field('Coverage start', 'coverage_start', f.coverage_start, type='date') }}
+        {{ field('Coverage end', 'coverage_end', f.coverage_end, type='date') }}
+      </div>
+      <div class="help">Coverage is optional (both dates or none). It lets Stats spread the cost over the days it covers; the stored amount stays the full price.</div>
+    {% endif %}
+    {{ textarea('Notes', 'notes', f.notes) }}
+  </div>
+  <div class="dialog-foot">
+    {% if expense_id %}
+    <button type="submit" class="btn danger" formaction="{{ url(request, '/expenses/%d/delete' % expense_id) }}"
+            formnovalidate data-confirm="Delete this {{ noun }}?">Delete</button>
+    {% endif %}
+    <a class="btn" href="{{ url(request, '/') }}" data-close>Cancel</a>
+    <button type="submit" class="btn primary">Save</button>
+  </div>
 </form>
+</div>
 {% endblock %}

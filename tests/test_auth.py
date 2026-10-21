@@ -24,7 +24,7 @@ def test_addon_rejects_other_addresses(engine, tmp_path):
     c = make_client(engine, tmp_path, mode=Mode.ADDON, host="192.168.1.5")
     assert c.get("/").status_code == 403
     assert c.get("/api/v1/vehicles").status_code == 403
-    assert c.get("/static/pico.min.css").status_code == 403
+    assert c.get("/static/app.css").status_code == 403
 
 
 def test_addon_accepts_ingress_proxy_without_login(engine, tmp_path):
@@ -56,7 +56,7 @@ def test_login_required_redirects(engine, tmp_path):
     r = c.get("/")
     assert r.status_code == 303 and r.headers["location"] == "/login"
     assert c.get("/login").status_code == 200
-    assert c.get("/static/pico.min.css").status_code == 200
+    assert c.get("/static/app.css").status_code == 200
 
 
 def test_redirect_honours_ingress_prefix(engine, tmp_path):
@@ -172,7 +172,7 @@ def test_api_listener_valid_token_from_any_address(engine, tmp_path):
     assert c.get("/api/v1/vehicles", headers=bearer()).status_code == 200
 
 
-@pytest.mark.parametrize("path", ["/", "/static/pico.min.css", "/docs", "/login"])
+@pytest.mark.parametrize("path", ["/", "/static/app.css", "/docs", "/login"])
 def test_api_listener_serves_nothing_else(engine, tmp_path, path):
     c = make_api_client(engine, tmp_path)
     assert c.get(path).status_code == 404

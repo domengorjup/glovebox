@@ -1,30 +1,29 @@
-{% extends "base.html" %}
+{% extends layout %}
+{% from "_macros.html" import back with context %}
 {% block title %}Export - Glovebox{% endblock %}
-{% block content %}
-<h1>Export</h1>
-{% macro vehicle_select() %}
-  <label>Vehicle
-    <select name="vehicle">
+{% macro vehicle_select(caller_id) %}
+  <div class="field">
+    <label for="i-vehicle-{{ caller_id }}">Vehicle</label>
+    <select id="i-vehicle-{{ caller_id }}" name="vehicle">
       <option value="">All vehicles</option>
       {% for v in vehicles %}<option value="{{ v.id }}">{{ v.name }}{{ ' (archived)' if v.archived }}</option>{% endfor %}
     </select>
-  </label>
+  </div>
 {% endmacro %}
-<article>
-  <header>Full backup (native format)</header>
-  <p>ZIP with vehicles, stations, refuels and expenses. It can be imported back into Glovebox.</p>
-  <form method="get" action="{{ url(request, '/export/native') }}">
-    {{ vehicle_select() }}
-    <button type="submit">Download native export</button>
-  </form>
-</article>
-<article>
-  <header>Fuelly-compatible CSV</header>
-  <p>Refuels only, one CSV per vehicle (zipped if more than one). <strong>Expenses are not included</strong>
-  because the Fuelly format has no place for them.</p>
-  <form method="get" action="{{ url(request, '/export/fuelly') }}">
-    {{ vehicle_select() }}
-    <button type="submit">Download Fuelly export</button>
-  </form>
-</article>
+{% block content %}
+{{ back(request) }}
+<div class="page-title"><h1>Export</h1></div>
+<form class="card card-pad stack" method="get" action="{{ url(request, '/export/native') }}">
+  <div><div class="card-title">Full backup (native format)</div>
+  <p class="card-sub">ZIP with vehicles, stations, refuels and expenses. It can be imported back into Glovebox.</p></div>
+  {{ vehicle_select('native') }}
+  <div><button type="submit" class="btn primary">{{ icon('download', 18) }}Download native export</button></div>
+</form>
+<form class="card card-pad stack gap-top" method="get" action="{{ url(request, '/export/fuelly') }}">
+  <div><div class="card-title">Fuelly-compatible CSV</div>
+  <p class="card-sub">Refuels only, one CSV per vehicle (zipped if more than one). <strong>Expenses are not included</strong>
+  because the Fuelly format has no place for them.</p></div>
+  {{ vehicle_select('fuelly') }}
+  <div><button type="submit" class="btn primary">{{ icon('download', 18) }}Download Fuelly export</button></div>
+</form>
 {% endblock %}

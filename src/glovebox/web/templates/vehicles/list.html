@@ -1,32 +1,35 @@
-{% extends "base.html" %}
-{% from "_macros.html" import messages, post_button %}
+{% extends layout %}
+{% from "_macros.html" import messages, back with context %}
 {% block title %}Vehicles - Glovebox{% endblock %}
+{% macro vehicle_row(r) %}
+{% set v = r.vehicle %}
+<a class="row" href="{{ url(request, '/vehicles/%d/edit' % v.id) }}" data-dialog>
+  <span class="badge">{{ icon('car', 22) }}</span>
+  <span class="body">
+    <span class="title">{{ v.name }}</span>
+    <span class="detail">{{ ([v.make, v.model] | select | join(' ') , v.plate, v.fuel_type) | select | join(' · ') or 'No details' }}</span>
+    <span class="detail">{{ r.records }} {{ 'record' if r.records == 1 else 'records' }}{% if r.odometer is not none %} · {{ 'last' if r.records else 'initial' }} odometer {{ '{:,.0f}'.format(r.odometer) }}&nbsp;km{% endif %}</span>
+  </span>
+  <span class="chev">{{ icon('chevron-right', 24) }}</span>
+</a>
+{% endmacro %}
 {% block content %}
-<h1>Vehicles</h1>
+{{ back(request) }}
+<div class="page-title"><h1>Vehicles</h1></div>
 {{ messages(errors) }}
-<p><a role="button" href="{{ url(request, '/vehicles/new') }}">Add vehicle</a></p>
-<div class="table-scroll">
-<table>
-  <thead><tr><th>Name</th><th>Make / model</th><th>Plate</th><th>Status</th><th></th></tr></thead>
-  <tbody>
-  {% for v in vehicles %}
-  <tr>
-    <td>{{ v.name }}</td>
-    <td>{{ [v.make, v.model] | select | join(' ') }}</td>
-    <td>{{ v.plate or '' }}</td>
-    <td>{{ 'archived' if v.archived else 'active' }}</td>
-    <td class="row-actions">
-      <a href="{{ url(request, '/vehicles/%d/edit' % v.id) }}">Edit</a>
-      {{ post_button(request, '/vehicles/%d/archive' % v.id,
-                     'Restore' if v.archived else 'Archive',
-                     fields={'archived': '0' if v.archived else '1'}) }}
-      <a href="{{ url(request, '/vehicles/%d/delete' % v.id) }}">Delete</a>
-    </td>
-  </tr>
-  {% else %}
-  <tr><td colspan="5">No vehicles yet.</td></tr>
-  {% endfor %}
-  </tbody>
-</table>
+<div class="page-actions">
+  <a class="btn primary" href="{{ url(request, '/vehicles/new') }}" data-dialog>{{ icon('plus', 18) }}Add vehicle</a>
 </div>
+{% if active %}
+<div class="card list-card">{% for r in active %}{{ vehicle_row(r) }}{% endfor %}</div>
+{% else %}
+<div class="empty">No active vehicles</div>
+{% endif %}
+{% if archived %}
+<details class="archived">
+  <summary>Archived ({{ archived | length }})</summary>
+  <div class="help">Hidden from the vehicle menu and the add forms. History is kept.</div>
+  <div class="card list-card">{% for r in archived %}{{ vehicle_row(r) }}{% endfor %}</div>
+</details>
+{% endif %}
 {% endblock %}

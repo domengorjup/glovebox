@@ -23,31 +23,48 @@ from sqlalchemy.orm import Session
 from glovebox.app import create_app
 from glovebox.config import Settings
 from glovebox.db import make_engine, run_migrations
-from glovebox.models import Expense, ImportBatch, Refuel, Station, Vehicle
+from glovebox.models import Expense, ImportBatch, Refuel, Setting, Station, Vehicle
 
 PREFIX = "/api/hassio_ingress/e2etoken"
 
 # --- HTML helpers -----------------------------------------------------------
 
 
-def _tile(html: str, header: str) -> str:
-    """Text of the dashboard tile with the given header."""
+def _text(fragment: str) -> str:
+    """Visible text of an HTML fragment (tags dropped, no-break spaces as spaces)."""
+    plain = re.sub(r"<[^>]+>", " ", fragment).replace("\u00a0", " ")
+    return re.sub(r"\s+", " ", plain).strip()
+
+
+def _kpi(html: str, label: str) -> str:
+    """Text of the Stats KPI card with the given label, e.g. ``0.375 EUR/km``."""
     match = re.search(
-        rf"<header>{re.escape(header)}</header>\s*<strong>(.*?)</strong>", html, re.S
+        rf'data-kpi="{re.escape(label)}".*?<div class="value">(.*?)</div>', html, re.S
     )
-    assert match, f"tile {header!r} not found"
-    return match.group(1).strip()
+    assert match, f"KPI {label!r} not found"
+    return _text(match.group(1))
 
 
-def _table_rows(html: str, heading: str) -> list[list[str]]:
-    """Cell texts of each body row of the table following ``<h2>heading</h2>``."""
-    section = html.split(f"<h2>{heading}</h2>", 1)[1]
-    table = re.search(r"<tbody>(.*?)</tbody>", section, re.S).group(1)
-    rows = re.findall(r"<tr>(.*?)</tr>", table, re.S)
-    return [
-        [re.sub(r"\s+", " ", c).strip() for c in re.findall(r"<td[^>]*>(.*?)</td>", r, re.S)]
-        for r in rows
-    ]
+def _legend(html: str) -> dict[str, str]:
+    """Cost total per type from the legend under the monthly cost chart."""
+    return {
+        key: _text(total)
+        for key, total in re.findall(
+            r'<span data-key="(\w+)">.*?<b>(.*?)</b>', html, re.S
+        )
+    }
+
+
+def _price_rows(html: str) -> list[list[str]]:
+    """Cell texts of each row of the price per litre table (station/brand + stats)."""
+    table = html.split("data-price-table", 1)[1]
+    body = re.search(r"<tbody>(.*?)</tbody>", table, re.S).group(1)
+    rows = []
+    for row in re.findall(r"<tr>(.*?)</tr>", body, re.S):
+        cells = re.findall(r"<td[^>]*>(.*?)</td>", row, re.S)
+        first = re.sub(r'<div class="sub">.*?</div>', "", cells[0], flags=re.S)
+        rows.append([_text(first)] + [_text(c) for c in cells[1:]])
+    return rows
 
 
 class _Form(HTMLParser):
@@ -166,7 +183,8 @@ def _build_scenario(client: TestClient) -> int:
     return vid
 
 
-JAN_MAY = {"date_from": "2025-01-01", "date_to": "2025-05-31"}
+ALL_TIME = {"when": "all"}
+JAN_MAY = {"when": "custom", "date_from": "2025-01-01", "date_to": "2025-05-31"}
 
 
 # --- Fixtures ---------------------------------------------------------------
@@ -191,20 +209,29 @@ def second_app(tmp_path: Path) -> Iterator[tuple[TestClient, Engine]]:
     engine.dispose()
 
 
-# --- Dashboard numbers ------------------------------------------------------
+# --- Stats numbers ------------------------------------------------------------
 
 
-def test_dashboard_numbers_match_hand_computation(client: TestClient) -> None:
+def test_stats_numbers_match_hand_computation(client: TestClient) -> None:
     _build_scenario(client)
-    html = client.get("/").text
+    html = client.get("/stats", params=ALL_TIME).text
 
     # fuel 209.50 + insurance 365 + service 100 (full year = same in both modes)
-    assert _tile(html, "Total cost") == "674.50 EUR"
+    assert _kpi(html, "Total cost") == "674.50 EUR"
     # segments: 500 km/30 L, 500 km/35 L, 800 km/(15+20) L -> 100 L / 1800 km
-    assert _tile(html, "Average consumption").startswith("5.56 L/100 km")
-    assert "3 valid segments" in html
+    assert _kpi(html, "Avg consumption").startswith("5.56 L/100 km")
     # 674.50 EUR over 11800 - 10000 km
-    assert _tile(html, "Cost per km").startswith("0.375 EUR/km")
+    assert _kpi(html, "Cost per km").startswith("0.375 EUR/km")
+    assert _kpi(html, "Distance") == "1,800 km"
+
+
+def test_timeline_summary_matches_hand_computation(client: TestClient) -> None:
+    _build_scenario(client)
+    html = client.get("/").text
+    assert 'data-card="consumption"' in html and 'data-card="cost_km"' in html
+    # all five refuels and both expenses are listed, newest first
+    assert html.count('class="row"') == 7
+    assert html.index("May 2025") < html.index("January 2025")
 
 
 def test_two_of_three_price_entry_stored(client: TestClient, engine: Engine) -> None:
@@ -221,43 +248,61 @@ def test_spread_versus_paid_toggle(client: TestClient, engine: Engine) -> None:
     with Session(engine) as session:
         before = session.scalar(select(func.sum(Expense.amount_cents)))
 
-    spread = client.get("/", params=JAN_MAY).text
-    paid = client.get("/", params={**JAN_MAY, "allocation": "paid"}).text
+    spread = client.get("/stats", params=JAN_MAY).text
+    paid = client.get("/stats", params={**JAN_MAY, "allocation": "paid"}).text
 
     # Jan-May is 151 of 365 days: 151.00 of the policy, plus 209.50 fuel + 100
-    assert _tile(spread, "Total cost") == "460.50 EUR"
-    assert _tile(spread, "Cost per km").startswith("0.256 EUR/km")  # 460.5 / 1800
+    assert _kpi(spread, "Total cost") == "460.50 EUR"
+    assert _kpi(spread, "Cost per km").startswith("0.256 EUR/km")  # 460.5 / 1800
     # as paid: the whole 365.00 sits on 2025-01-01
-    assert _tile(paid, "Total cost") == "674.50 EUR"
-    assert _tile(paid, "Cost per km").startswith("0.375 EUR/km")
+    assert _kpi(paid, "Total cost") == "674.50 EUR"
+    assert _kpi(paid, "Cost per km").startswith("0.375 EUR/km")
     # the toggle is view-only
     with Session(engine) as session:
         assert session.scalar(select(func.sum(Expense.amount_cents))) == before
-    insurance = _table_rows(spread, "Cost by category")
-    assert ["insurance", "151.00 EUR"] in insurance
-    assert ["insurance", "365.00 EUR"] in _table_rows(paid, "Cost by category")
+    assert _legend(spread)["insurance"] == "151.00 EUR"
+    assert _legend(paid)["insurance"] == "365.00 EUR"
+    assert _legend(paid)["fuel"] == "209.50 EUR" and _legend(paid)["service"] == "100.00 EUR"
 
 
-def test_toggle_links_keep_filters(client: TestClient) -> None:
+def test_choice_links_keep_filters(client: TestClient) -> None:
     _build_scenario(client)
-    html = client.get("/", params=JAN_MAY).text
+    html = client.get("/stats", params=JAN_MAY).text
     assert "allocation=paid" in html and "date_from=2025-01-01" in html
+    assert "when=custom" in html
+
+
+def test_spread_choice_is_only_offered_with_expenses(client: TestClient) -> None:
+    _build_scenario(client)
+    assert "As paid" in client.get("/stats", params={**ALL_TIME, "what": "expense"}).text
+    assert "As paid" not in client.get("/stats", params={**ALL_TIME, "what": "refuel"}).text
+
+
+def test_what_choice_narrows_the_numbers(client: TestClient) -> None:
+    _build_scenario(client)
+    fuel = client.get("/stats", params={**ALL_TIME, "what": "refuel"}).text
+    assert _kpi(fuel, "Fuel cost") == "209.50 EUR"
+    service = client.get("/stats", params={**ALL_TIME, "what": "service"}).text
+    assert _kpi(service, "Total cost") == "100.00 EUR"
+    expense = client.get("/stats", params={**ALL_TIME, "what": "expense"}).text
+    assert _kpi(expense, "Total cost") == "365.00 EUR"
 
 
 def test_station_table_by_station_and_brand(client: TestClient) -> None:
     _build_scenario(client)
-    rows = {r[0]: r for r in _table_rows(client.get("/").text, "Stations and brands")}
+    rows = {r[0]: r for r in _price_rows(client.get("/stats", params=ALL_TIME).text)}
     # Alpha: 4 fills, 110 L, 161.50 / 110 L = 1.468, min 1.400, max 1.500;
     # single-source segments: 500 km/35 L and 800 km/35 L -> 70 L / 1300 km
-    assert rows["Alpha"][1:] == ["4", "110.00", "1.468", "1.400", "1.500", "5.38 (2)"]
+    assert rows["Alpha"][1:4] == ["4", "110.00", "1.468"]
+    assert rows["Alpha"][4:6] == ["1.400", "1.500"]
+    assert rows["Alpha"][7] == "5.38 (2)"
     # Beta: one fill, one segment only, so consumption is n/a below 2
     assert rows["Beta"][1:6] == ["1", "30.00", "1.600", "1.600", "1.600"]
-    assert rows["Beta"][6].startswith("n/a")
+    assert rows["Beta"][7].startswith("n/a")
 
     alpha = _station_id(client, "Alpha")
     _post(client, "/stations/brand", {"station_ids": str(alpha), "brand": "Shell"})
-    by_brand = _table_rows(client.get("/", params={"group": "brand"}).text,
-                           "Stations and brands")  # fmt: skip
+    by_brand = _price_rows(client.get("/stats", params={**ALL_TIME, "group": "brand"}).text)
     labels = [r[0] for r in by_brand]
     assert "Shell" in labels and len(by_brand) == 2
     shell = next(r for r in by_brand if r[0] == "Shell")
@@ -277,7 +322,7 @@ def test_expense_title_is_required(client: TestClient) -> None:
 # --- API equals dashboard ---------------------------------------------------
 
 
-def test_api_summary_equals_dashboard(client: TestClient) -> None:
+def test_api_summary_equals_stats_page(client: TestClient) -> None:
     today = date.today()
     _post(client, "/vehicles/new", {"name": "Golf"})
     vid = _vehicle_id(client, "Golf")
@@ -290,23 +335,24 @@ def test_api_summary_equals_dashboard(client: TestClient) -> None:
                  coverage_start=(today - timedelta(days=20)).isoformat(),
                  coverage_end=(today + timedelta(days=219)).isoformat())  # fmt: skip
 
+    client.post("/preferences/vehicle", data={"vehicle": str(vid)})
     for allocation in ("spread", "paid"):
         summary = client.get(
             f"/api/v1/vehicles/{vid}/summary", params={"allocation": allocation}
         ).json()
         assert summary["allocation"] == allocation
-        window = {"vehicle": vid, "allocation": allocation,
+        window = {"when": "custom", "allocation": allocation,
                   "date_from": (today.replace(year=today.year - 1) + timedelta(days=1)).isoformat(),
                   "date_to": today.isoformat()}  # fmt: skip
-        page = client.get("/", params=window).text
-        per_km = _tile(page, "Cost per km").split()[0]
+        page = client.get("/stats", params=window).text
+        per_km = _kpi(page, "Cost per km").split()[0]
         assert per_km == f"{summary['cost_per_km_12m']:.3f}"
-        consumption = _tile(page, "Average consumption").split()[0]
+        consumption = _kpi(page, "Avg consumption").split()[0]
         assert consumption == f"{summary['avg_consumption_12m']:.2f}"
 
-        year = {"vehicle": vid, "allocation": allocation,
+        year = {"when": "custom", "allocation": allocation,
                 "date_from": f"{today.year}-01-01", "date_to": f"{today.year}-12-31"}  # fmt: skip
-        total = _tile(client.get("/", params=year).text, "Total cost")
+        total = _kpi(client.get("/stats", params=year).text, "Total cost")
         assert total == f"{summary['cost_this_year']:.2f} EUR"
 
     # hand check of the consumption: 3 valid segments, 1650 km, 104 L
@@ -315,10 +361,10 @@ def test_api_summary_equals_dashboard(client: TestClient) -> None:
     assert summary["last_odometer_km"] == 21700
 
 
-def test_api_station_stats_equal_dashboard_table(client: TestClient) -> None:
+def test_api_station_stats_equal_stats_table(client: TestClient) -> None:
     _build_scenario(client)
     api = {s["label"]: s for s in client.get("/api/v1/stations/stats").json()["stations"]}
-    rows = {r[0]: r for r in _table_rows(client.get("/").text, "Stations and brands")}
+    rows = {r[0]: r for r in _price_rows(client.get("/stats", params=ALL_TIME).text)}
     for label, row in rows.items():
         assert f"{api[label]['avg_price_per_litre']:.3f}" == row[3]
         assert str(api[label]["fills"]) == row[1]
@@ -427,7 +473,7 @@ def test_vehicle_question_is_not_shown_as_failure(
     html = client.get(_upload(client, "f.csv", data)).text
     assert "Which vehicle do these records belong to?" in html
     assert "Choose a target vehicle" not in html
-    assert 'class="error"' not in html and "Import now" not in html
+    assert 'class="alert error' not in html and "Import now" not in html
 
 
 def test_unknown_headers_show_found_and_expected(
@@ -460,13 +506,13 @@ def test_undo_unknown_batch_is_404(client: TestClient) -> None:
 # --- Exports and re-import --------------------------------------------------
 
 
-def _dashboard_numbers(client: TestClient) -> dict:
-    html = client.get("/").text
+def _stats_numbers(client: TestClient) -> dict:
+    html = client.get("/stats", params=ALL_TIME).text
     return {
-        "total": _tile(html, "Total cost"),
-        "per_km": _tile(html, "Cost per km"),
-        "consumption": _tile(html, "Average consumption"),
-        "stations": _table_rows(html, "Stations and brands"),
+        "total": _kpi(html, "Total cost"),
+        "per_km": _kpi(html, "Cost per km"),
+        "consumption": _kpi(html, "Avg consumption"),
+        "stations": _price_rows(html),
     }
 
 
@@ -485,7 +531,7 @@ def test_native_export_reimports_identically(
     other, other_engine = second_app
     _import_file(other, "export.zip", exported.content)
     assert _counts(other_engine) == (5, 2, 1)
-    assert _dashboard_numbers(other) == _dashboard_numbers(client)
+    assert _stats_numbers(other) == _stats_numbers(client)
     # exporting again gives the same tables
     again = other.get("/export/native").content
     assert _tables(again) == _tables(exported.content)
@@ -522,15 +568,16 @@ def test_fuelly_export_reimports_with_stations(
     _post(other, "/vehicles/new", {"name": "Golf"})
     _import_file(other, "fuelly.csv", exported.content, {"default_vehicle": "1"})
     assert _counts(other_engine) == (5, 0, 1)  # expenses are not in this format
-    mine, theirs = _dashboard_numbers(client), _dashboard_numbers(other)
+    mine, theirs = _stats_numbers(client), _stats_numbers(other)
     assert theirs["stations"] == mine["stations"]  # station survived via tags
     assert theirs["consumption"] == mine["consumption"]
 
 
 # --- Everything under an Ingress prefix ------------------------------------
 
-PAGES = ["/", "/vehicles", "/vehicles/new", "/refuels", "/refuels/new", "/expenses",
-         "/expenses/new", "/stations", "/import", "/export"]  # fmt: skip
+PAGES = ["/", "/?type=service", "/stats", "/manage", "/add", "/vehicles", "/vehicles/new",
+         "/refuels/new", "/expenses/new", "/expenses/new?kind=service", "/stations",
+         "/import", "/export"]  # fmt: skip
 _URL_ATTR = re.compile(r'(?:href|src|action)="(/[^"]*)"')
 
 
@@ -553,10 +600,17 @@ def test_whole_flow_under_ingress_prefix(
     redirect = client.post("/vehicles/new", data={"name": "Second"}, follow_redirects=False)
     assert redirect.headers["location"] == f"{PREFIX}/vehicles"
 
-    dashboard = client.get("/", params=JAN_MAY).text
-    assert _tile(dashboard, "Total cost") == "460.50 EUR"
-    assert f'{PREFIX}/?' in dashboard or f'href="{PREFIX}/' in dashboard
-    assert f"{PREFIX}/static/chart.umd.min.js" in dashboard
+    stats_page = client.get("/stats", params=JAN_MAY).text
+    assert _kpi(stats_page, "Total cost") == "460.50 EUR"
+    assert f'href="{PREFIX}/stats?' in stats_page
+    assert f"{PREFIX}/static/icons.svg#" in stats_page
+    assert f"{PREFIX}/static/app.js" in stats_page
+
+    chosen = client.post("/preferences/vehicle", data={"vehicle": str(vid), "next": "/stats"},
+                         follow_redirects=False)
+    assert chosen.headers["location"] == f"{PREFIX}/stats"
+    cards = client.post("/preferences/cards", data={"card": "odometer"}, follow_redirects=False)
+    assert cards.headers["location"] == f"{PREFIX}/"
 
     data = (fixtures_dir / "fuelio_comma_km.csv").read_bytes()
     location = client.post(
@@ -581,3 +635,110 @@ def test_api_unaffected_by_ingress_prefix(ingress_client: TestClient) -> None:
     _build_scenario(ingress_client)
     summary = ingress_client.get("/api/v1/vehicles/1/summary").json()
     assert summary["name"] == "Golf" and summary["allocation"] == "spread"
+
+
+# --- UI preferences (stored in the database) --------------------------------
+
+
+def _two_vehicles(client: TestClient) -> tuple[int, int]:
+    _post(client, "/vehicles/new", {"name": "Golf"})
+    _post(client, "/vehicles/new", {"name": "Clio"})
+    return _vehicle_id(client, "Golf"), _vehicle_id(client, "Clio")
+
+
+def _selected_option(html: str, select_name: str) -> str | None:
+    """Value of the selected option of ``<select name=...>`` (None if no select)."""
+    block = re.search(rf'<select[^>]*name="{select_name}".*?</select>', html, re.S)
+    if not block:
+        return None
+    chosen = re.search(r'<option value="([^"]*)"[^>]*selected', block.group(0))
+    return chosen.group(1) if chosen else ""
+
+
+def test_preferences_survive_a_restart(
+    settings: Settings, engine: Engine, client: TestClient
+) -> None:
+    golf, clio = _two_vehicles(client)
+    _post(client, "/preferences/vehicle", {"vehicle": str(clio)})
+    _post(client, "/preferences/cards", {"card": ["odometer", "avg_price"]})
+    with Session(engine) as session:
+        keys = set(session.scalars(select(Setting.key)))
+    assert keys == {"selected_vehicle", "last_vehicle", "summary_cards"}
+
+    with TestClient(create_app(settings, engine)) as restarted:
+        page = restarted.get("/").text
+        assert _selected_option(page, "vehicle") == str(clio)
+        shown = re.findall(r'data-card="(\w+)"\s*>', page)
+        assert set(shown) == {"odometer", "avg_price"}
+
+
+def test_form_vehicle_default_follows_navbar_then_last_vehicle(client: TestClient) -> None:
+    golf, clio = _two_vehicles(client)
+    _post(client, "/preferences/vehicle", {"vehicle": str(golf)})
+    for path in ("/refuels/new", "/expenses/new", "/expenses/new?kind=service"):
+        assert _selected_option(client.get(path).text, "vehicle_id") == str(golf), path
+    _post(client, "/preferences/vehicle", {"vehicle": str(clio)})
+    _post(client, "/preferences/vehicle", {"vehicle": "all"})
+    assert _selected_option(client.get("/").text, "vehicle") == "all"
+    for path in ("/refuels/new", "/expenses/new", "/expenses/new?kind=service"):
+        assert _selected_option(client.get(path).text, "vehicle_id") == str(clio), path
+    # an explicit ?vehicle= still wins
+    assert _selected_option(client.get(f"/refuels/new?vehicle={golf}").text,
+                            "vehicle_id") == str(golf)  # fmt: skip
+
+
+def test_timeline_and_stats_follow_the_navbar_vehicle(client: TestClient) -> None:
+    golf, clio = _two_vehicles(client)
+    _add_expense(client, golf, date(2025, 3, 1), category="other", title="Golf thing", amount="10")
+    _add_expense(client, clio, date(2025, 3, 2), category="other", title="Clio thing", amount="20")
+    _post(client, "/preferences/vehicle", {"vehicle": str(clio)})
+    only = client.get("/").text
+    assert "Clio thing" in only and "Golf thing" not in only
+    assert _kpi(client.get("/stats", params=ALL_TIME).text, "Total cost") == "20.00 EUR"
+    _post(client, "/preferences/vehicle", {"vehicle": "all"})
+    both = client.get("/").text
+    assert "Clio thing" in both and "Golf thing" in both
+    assert _kpi(client.get("/stats", params=ALL_TIME).text, "Total cost") == "30.00 EUR"
+
+
+def test_all_vehicles_timeline_has_per_vehicle_summary(client: TestClient) -> None:
+    _two_vehicles(client)
+    html = client.get("/").text
+    assert 'data-vehicle-group' in html and "Golf" in html and "Clio" in html
+
+
+# --- Vehicle management -------------------------------------------------------
+
+
+def test_vehicle_full_lifecycle_through_the_forms(client: TestClient, engine: Engine) -> None:
+    _post(client, "/vehicles/new", {
+        "name": "Golf", "make": "VW", "model": "Golf VII", "plate": "LJ 1",
+        "fuel_type": "Petrol", "initial_odometer": "1200", "notes": "blue",
+    })  # fmt: skip
+    vid = _vehicle_id(client, "Golf")
+    form = client.get(f"/vehicles/{vid}/edit").text
+    for value in ("VW", "Golf VII", "LJ 1", "Petrol", "1200", "blue"):
+        assert value in form, value
+    _post(client, f"/vehicles/{vid}/edit", {"name": "Golf 7", "make": "VW"})
+    _add_refuel(client, vid, date(2025, 1, 10), 1500, litres="40", price_per_litre="1.5")
+    listing = _text(client.get("/vehicles").text)
+    assert "Golf 7" in listing and "1 record" in listing
+
+    _post(client, f"/vehicles/{vid}/archive", {"archived": "1"})
+    assert "Golf 7" not in client.get("/").text.split("</header>")[0]
+    assert "Golf 7" not in client.get("/refuels/new").text.split('name="vehicle_id"')[1].split("</select>")[0]
+    assert "Archived (1)" in _text(client.get("/vehicles").text)
+    _post(client, f"/vehicles/{vid}/archive", {"archived": "0"})
+    assert "Golf 7" in client.get("/").text.split("</header>")[0]
+
+    confirm = client.get(f"/vehicles/{vid}/delete").text
+    assert "<strong>1</strong> refuels" in confirm
+    gone = client.post(f"/vehicles/{vid}/delete", data={"confirm": "1"}, follow_redirects=False)
+    assert gone.status_code == 303 and _counts(engine) == (0, 0, 0)
+
+
+def test_selected_vehicle_that_gets_archived_falls_back_to_all(client: TestClient) -> None:
+    golf, _ = _two_vehicles(client)
+    _post(client, "/preferences/vehicle", {"vehicle": str(golf)})
+    _post(client, f"/vehicles/{golf}/archive", {"archived": "1"})
+    assert _selected_option(client.get("/").text, "vehicle") == "all"

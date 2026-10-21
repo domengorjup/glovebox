@@ -1,5 +1,6 @@
-{% extends "base.html" %}
-{% from "_macros.html" import messages %}
+{% extends layout %}
+{% from "_macros.html" import messages, field, textarea, dialog_head with context %}
+{% set dialog_page = true %}
 {% set v = entered if entered is defined else {
   'name': vehicle.name if vehicle else '',
   'make': (vehicle.make or '') if vehicle else '',
@@ -8,19 +9,40 @@
   'fuel_type': (vehicle.fuel_type or '') if vehicle else '',
   'initial_odometer': ((vehicle.initial_odometer | km) if vehicle and vehicle.initial_odometer is not none else ''),
   'notes': (vehicle.notes or '') if vehicle else '' } %}
-{% block title %}{{ 'Edit' if vehicle else 'New' }} vehicle - Glovebox{% endblock %}
+{% set heading = 'Edit vehicle' if vehicle else 'Add vehicle' %}
+{% block title %}{{ heading }} - Glovebox{% endblock %}
 {% block content %}
-<h1>{{ 'Edit vehicle' if vehicle else 'New vehicle' }}</h1>
-{{ messages(errors) }}
-<form method="post" action="{{ url(request, ('/vehicles/%d/edit' % vehicle.id) if vehicle else '/vehicles/new') }}">
-  <label>Name <input name="name" value="{{ v.name }}" required></label>
-  <label>Make <input name="make" value="{{ v.make }}"></label>
-  <label>Model <input name="model" value="{{ v.model }}"></label>
-  <label>Plate <input name="plate" value="{{ v.plate }}"></label>
-  <label>Fuel type <input name="fuel_type" value="{{ v.fuel_type }}"></label>
-  <label>Initial odometer (km) <input name="initial_odometer" inputmode="decimal" value="{{ v.initial_odometer }}"></label>
-  <label>Notes <textarea name="notes">{{ v.notes }}</textarea></label>
-  <button type="submit">Save</button>
-  <a href="{{ url(request, '/vehicles') }}">Cancel</a>
+<div class="scrim" data-scrim>
+<form class="dialog form" method="post" role="dialog" aria-label="{{ heading }}"
+      action="{{ url(request, ('/vehicles/%d/edit' % vehicle.id) if vehicle else '/vehicles/new') }}">
+  {{ dialog_head(request, heading, '/vehicles') }}
+  <div class="dialog-body">
+    {{ messages(errors) }}
+    {{ field('Name', 'name', v.name, required=True, placeholder='e.g. Golf') }}
+    <div class="grid2">
+      {{ field('Make', 'make', v.make) }}
+      {{ field('Model', 'model', v.model) }}
+    </div>
+    <div class="grid2">
+      {{ field('Plate', 'plate', v.plate) }}
+      {{ field('Fuel type', 'fuel_type', v.fuel_type, list='fuel-types') }}
+    </div>
+    <datalist id="fuel-types">{% for f in ['Petrol', 'Diesel', 'LPG', 'Hybrid', 'Electric'] %}<option value="{{ f }}">{% endfor %}</datalist>
+    {{ field('Initial odometer', 'initial_odometer', v.initial_odometer, suffix='km', inputmode='decimal') }}
+    {{ textarea('Notes', 'notes', v.notes) }}
+    {% if vehicle and vehicle.archived %}
+    <div class="help">This vehicle is archived. Unarchive it to use it in the vehicle menu and the add forms.</div>
+    {% endif %}
+  </div>
+  <div class="dialog-foot">
+    {% if vehicle %}
+    <a class="btn danger" href="{{ url(request, '/vehicles/%d/delete' % vehicle.id) }}" data-dialog>Delete</a>
+    <button type="submit" class="btn" formnovalidate name="archived" value="{{ '0' if vehicle.archived else '1' }}"
+            formaction="{{ url(request, '/vehicles/%d/archive' % vehicle.id) }}">{{ 'Unarchive' if vehicle.archived else 'Archive' }}</button>
+    {% endif %}
+    <a class="btn" href="{{ url(request, '/vehicles') }}" data-close>Cancel</a>
+    <button type="submit" class="btn primary">Save</button>
+  </div>
 </form>
+</div>
 {% endblock %}

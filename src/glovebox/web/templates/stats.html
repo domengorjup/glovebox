@@ -1,0 +1,142 @@
+{% extends layout %}
+{% block title %}Stats - Glovebox{% endblock %}
+{% set today_refine_label = 'Station or brand' if q.what == 'refuel' else 'Expense type' %}
+{% block content %}
+<div class="page-title"><h1>Stats · {{ title }}</h1></div>
+
+<div class="card filter-bar">
+  <div class="filter-line">
+    <span class="lbl">What</span>
+    <div class="seg">
+      {% for value, label in [('all', 'All'), ('refuel', 'Refuelling'), ('service', 'Service'), ('expense', 'Expense')] %}
+      <a class="{{ 'active' if q.what == value }}" href="{{ query_url(request, what=value, refine=None) }}">{{ label }}</a>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="filter-line">
+    <span class="lbl">When</span>
+    <div class="seg">
+      {% for value, label in [('3m', '3 M'), ('12m', '12 M'), ('ytd', 'This year'), ('all', 'All'), ('custom', 'Custom')] %}
+      <a class="{{ 'active' if q.when == value }}" href="{{ query_url(request, when=value) }}">{{ label }}</a>
+      {% endfor %}
+    </div>
+  </div>
+  {% if q.when == 'custom' or q.what in ('refuel', 'expense') %}
+  <form class="filter-line" method="get" action="{{ url(request, '/stats') }}">
+    <span class="lbl">{{ 'Refine' if q.what in ('refuel', 'expense') else '' }}</span>
+    {% for key, value in [('what', q.what), ('when', q.when), ('allocation', q.allocation.value), ('group', q.group.value)] %}
+    <input type="hidden" name="{{ key }}" value="{{ value }}">
+    {% endfor %}
+    {% if q.when == 'custom' %}
+    <div class="field"><label for="i-date_from">From</label><input id="i-date_from" type="date" name="date_from" value="{{ q.date_from or '' }}" data-autosubmit></div>
+    <div class="field"><label for="i-date_to">To</label><input id="i-date_to" type="date" name="date_to" value="{{ q.date_to or '' }}" data-autosubmit></div>
+    {% endif %}
+    {% if q.what == 'refuel' %}
+    <div class="field">
+      <label for="i-refine">Station or brand</label>
+      <select id="i-refine" name="refine" data-autosubmit>
+        <option value="">All stations and brands</option>
+        {% if brands %}<optgroup label="Brands">
+          {% for b in brands %}<option value="br:{{ b }}" {{ 'selected' if q.refine == 'br:' ~ b }}>{{ b }}</option>{% endfor %}
+        </optgroup>{% endif %}
+        <optgroup label="Stations">
+          {% for s in stations %}<option value="st:{{ s.id }}" {{ 'selected' if q.refine == 'st:' ~ s.id }}>{{ s.name }}</option>{% endfor %}
+        </optgroup>
+      </select>
+    </div>
+    {% elif q.what == 'expense' %}
+    <div class="field">
+      <label for="i-refine">Expense type</label>
+      <select id="i-refine" name="refine" data-autosubmit>
+        <option value="">All expense types</option>
+        {% for t in expense_types %}<option value="{{ t }}" {{ 'selected' if q.refine == t }}>{{ t | capitalize }}</option>{% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <button type="submit" class="btn no-js-only">Apply</button>
+  </form>
+  {% endif %}
+  {% if shows_expenses %}
+  <div class="filter-line">
+    <span class="lbl">Costs</span>
+    <div class="seg">
+      <a class="{{ 'active' if q.allocation.value == 'spread' }}" href="{{ query_url(request, allocation='spread') }}">Spread</a>
+      <a class="{{ 'active' if q.allocation.value == 'paid' }}" href="{{ query_url(request, allocation='paid') }}">As paid</a>
+    </div>
+    <span class="help inline">{{ 'Expenses with coverage dates are divided over the days they cover.' if q.allocation.value == 'spread' else 'Expenses count in the month they were paid.' }} View only, your data is not changed.</span>
+  </div>
+  {% endif %}
+</div>
+
+<div class="kpis">
+  {% for k in kpis %}
+  <div class="card stat" data-kpi="{{ k.label }}">
+    <div class="label">{{ k.label }}</div>
+    <div class="value">{{ k.value }}{% if k.unit %}<small>{{ k.unit }}</small>{% endif %}</div>
+  </div>
+  {% endfor %}
+</div>
+
+{% if shows_fuel_stats %}
+<h2>Consumption over time</h2>
+<div class="card chart-card">
+  {% if has_consumption %}
+  <div data-chart="consumption"></div>
+  <noscript><p class="help">Charts need JavaScript.</p></noscript>
+  {% else %}<div class="empty">No consumption data in this period</div>{% endif %}
+</div>
+{% endif %}
+
+<h2>Monthly cost by type · {{ 'spread' if q.allocation.value == 'spread' and shows_expenses else 'as paid' }}</h2>
+<div class="card chart-card">
+  {% if has_costs %}
+  <div data-chart="costs"></div>
+  <div class="legend" data-legend>
+    {% for item in legend %}
+    <span data-key="{{ item.key }}"><i class="swatch-{{ item.key }}"></i>{{ item.label }} · <b>{{ item.total }}</b></span>
+    {% endfor %}
+  </div>
+  {% else %}<div class="empty">No costs in this period</div>{% endif %}
+</div>
+
+{% if shows_fuel_stats %}
+<div class="summary-head table-head">
+  <h2>Price per litre</h2>
+  <div class="seg">
+    <a class="{{ 'active' if q.group.value == 'station' }}" href="{{ query_url(request, group='station') }}">By station</a>
+    <a class="{{ 'active' if q.group.value == 'brand' }}" href="{{ query_url(request, group='brand') }}">By brand</a>
+  </div>
+</div>
+<div class="card card-pad table-scroll">
+  <table class="tbl" data-price-table>
+    <thead><tr>
+      <th>{{ 'Brand' if q.group.value == 'brand' else 'Station' }}</th><th class="num">Fills</th>
+      <th class="num wide">Litres</th><th class="num">Avg price/L</th>
+      <th class="num wide">Min</th><th class="num wide">Max</th>
+      <th class="num">vs cheapest</th><th class="num wide">L/100 km (segments)</th>
+    </tr></thead>
+    <tbody>
+    {% for r in price_rows %}
+    <tr>
+      <td>{{ r.label }}{% if r.sub %}<div class="sub">{{ r.sub }}</div>{% endif %}<span class="pbar"><b style="width: {{ r.bar }}%"></b></span></td>
+      <td class="num">{{ r.fills }}</td>
+      <td class="num wide">{{ r.litres }}</td>
+      <td class="num">{{ r.average }}</td>
+      <td class="num wide">{{ r.lowest }}</td>
+      <td class="num wide">{{ r.highest }}</td>
+      <td class="num {{ 'best' if r.cheapest }}">{{ 'cheapest' if r.cheapest else r.difference }}</td>
+      <td class="num wide">{{ r.consumption }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="8">No refuels match.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="help">Prices use all fills. Consumption uses only segments whose fuel came
+  entirely from that {{ q.group.value }}, so mixed-station tanks are left out; it shows n/a
+  below 2 segments, and the number in brackets is the segment count.</p>
+</div>
+{% endif %}
+
+<script type="application/json" id="chart-data">{{ chart_data | tojson }}</script>
+{% endblock %}

@@ -1,17 +1,24 @@
-{% extends "base.html" %}
+{% extends layout %}
+{% from "_macros.html" import dialog_head with context %}
+{% set dialog_page = true %}
 {% block title %}Delete vehicle - Glovebox{% endblock %}
 {% block content %}
-<h1>Delete {{ vehicle.name }}</h1>
-{% if counts.refuels or counts.expenses %}
-<p class="warning">This also deletes <strong>{{ counts.refuels }}</strong> refuels and
-<strong>{{ counts.expenses }}</strong> expenses. This cannot be undone. Archive the
-vehicle instead to keep its records.</p>
-{% else %}
-<p>This vehicle has no records.</p>
-{% endif %}
-<form method="post" action="{{ url(request, '/vehicles/%d/delete' % vehicle.id) }}">
+<div class="scrim" data-scrim>
+<form class="dialog confirm" method="post" role="alertdialog" aria-label="Delete vehicle"
+      action="{{ url(request, '/vehicles/%d/delete' % vehicle.id) }}">
+  <h3>Delete {{ vehicle.name }}?</h3>
+  {% if counts.refuels or counts.expenses %}
+  <p class="warning">This permanently deletes the vehicle and also <strong>{{ counts.refuels }}</strong> refuels
+  and <strong>{{ counts.expenses }}</strong> expenses. This cannot be undone. To keep the history, archive the
+  vehicle instead.</p>
+  {% else %}
+  <p>This vehicle has no records. It will be deleted permanently.</p>
+  {% endif %}
   <input type="hidden" name="confirm" value="1">
-  <button type="submit" class="contrast">Delete permanently</button>
-  <a href="{{ url(request, '/vehicles') }}">Cancel</a>
+  <div class="dialog-foot">
+    <a class="btn" href="{{ url(request, '/vehicles') }}" data-close>Cancel</a>
+    <button type="submit" class="btn danger-fill">Delete permanently</button>
+  </div>
 </form>
+</div>
 {% endblock %}

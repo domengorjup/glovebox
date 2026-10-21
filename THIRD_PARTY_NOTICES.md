@@ -8,9 +8,7 @@ Located in `src/glovebox/web/static/`. Licence texts sit next to the files (see 
 
 | Asset | Version | Licence | Copyright |
 |---|---|---|---|
-| Pico.css (`pico.min.css`) | 2.1.1 | MIT (`LICENSE-pico.md`) | Copyright (c) 2019-2024 Pico |
-| Chart.js (`chart.umd.min.js`) | 4.5.1 | MIT (`LICENSE-chartjs.md`) | Copyright (c) 2014-2024 Chart.js Contributors |
-| @kurkle/color (bundled inside `chart.umd.min.js`) | 0.3.2 | MIT (`LICENSE-kurkle-color.md`) | Copyright (c) 2018-2021 Jukka Kurkela |
+| Material Design Icons (`icons.svg`, 18 icons from `@mdi/svg`, paths unmodified) | 7.4.47 | Apache-2.0 via the Pictogrammers Free License (`LICENSE-mdi.md`) | No per-icon copyright line in the package |
 
 ## Python dependencies
 

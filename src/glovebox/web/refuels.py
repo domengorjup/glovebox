@@ -1,4 +1,4 @@
-"""Refuel pages: filtered list, entry/edit form with warnings, delete."""
+"""Refuel pages: entry/edit form (a dialog) with warnings, delete."""
 
 from __future__ import annotations
 
@@ -14,14 +14,7 @@ from glovebox.models import Refuel
 from glovebox.services import records, stats
 from glovebox.services.records import RefuelInput, StationInput, ValidationError
 from glovebox.services.stats import StatsFilter
-from glovebox.web.common import (
-    SessionDep,
-    effective_filter,
-    filter_choices,
-    parse_filters,
-    redirect,
-    render,
-)
+from glovebox.web.common import SessionDep, load_chrome, redirect, render
 from glovebox.web.formatting import parse_decimal, to_scaled_int
 
 router = APIRouter(prefix="/refuels")
@@ -39,6 +32,7 @@ class RefuelForm(BaseModel):
     total: str = ""
     station_id: str = ""
     new_station_name: str = ""
+    new_station_brand: str = ""
     new_station_location: str = ""
     is_full: str = ""
     missed_previous: str = ""
@@ -61,24 +55,6 @@ def consumption_by_refuel(session: Session, vehicle_ids: set[int]) -> dict[int, 
     return result
 
 
-@router.get("")
-def refuel_list(request: Request, session: SessionDep):
-    """Refuels newest first, with per-row consumption (or n/a)."""
-    view = parse_filters(request)
-    rows = records.list_refuels(session, effective_filter(session, view.stats))
-    choices = filter_choices(session)
-    return render(
-        request,
-        "refuels/list.html",
-        rows=rows,
-        segments=consumption_by_refuel(session, {r.vehicle_id for r in rows}),
-        vehicle_names={v.id: v.name for v in choices["all_vehicles"]},
-        station_names={s.id: s.name for s in choices["all_stations"]},
-        f=view.stats,
-        choices=choices,
-    )
-
-
 def _form_from_refuel(refuel: Refuel) -> dict[str, str]:
     """Fill form fields from a stored refuel."""
     return RefuelForm(
@@ -98,18 +74,23 @@ def _form_from_refuel(refuel: Refuel) -> dict[str, str]:
 
 def _form_page(request, session, entered, refuel_id=None, status=200, **extra):
     """Render the refuel form."""
-    vehicles = records.list_vehicles(session)
+    chrome = load_chrome(session)
+    vehicles = list(chrome.vehicles)
     selected = entered.get("vehicle_id", "")
     if selected and not any(str(v.id) == selected for v in vehicles):
         vehicles.append(records.get_vehicle(session, int(selected)))
+    stations = records.list_stations(session)
     return render(
         request,
         "refuels/form.html",
         status,
+        chrome=chrome,
+        section="timeline",
         f=entered,
         refuel_id=refuel_id,
         vehicles=vehicles,
-        stations=records.list_stations(session),
+        stations=stations,
+        brands=sorted({s.brand for s in stations if s.brand}),
         errors=extra.pop("errors", []),
         warnings=extra.pop("warnings", []),
         **extra,
@@ -118,9 +99,10 @@ def _form_page(request, session, entered, refuel_id=None, status=200, **extra):
 
 @router.get("/new")
 def refuel_new(request: Request, session: SessionDep, vehicle: str = ""):
-    """Empty form; ``?vehicle=`` preselects a vehicle."""
+    """Empty form; the vehicle defaults to the app-bar choice (``?vehicle=`` wins)."""
+    default = vehicle or load_chrome(session).form_vehicle
     entered = RefuelForm(
-        vehicle_id=vehicle, date=date.today().isoformat(), is_full="1"
+        vehicle_id=default, date=date.today().isoformat(), is_full="1"
     ).model_dump()
     return _form_page(request, session, entered)
 
@@ -164,7 +146,7 @@ def _parse_form(form: RefuelForm) -> RefuelInput:
             parse_decimal(form.price_per_litre, "Price per litre"), 1000
         ),
         total_cents=to_scaled_int(parse_decimal(form.total, "Total"), 100),
-        station_id=int(form.station_id) if form.station_id else None,
+        station_id=int(form.station_id) if form.station_id.isdigit() else None,
         is_full=form.is_full == "1",
         missed_previous=form.missed_previous == "1",
         notes=form.notes.strip() or None,
@@ -184,6 +166,7 @@ def _save(request: Request, session: Session, form: RefuelForm, refuel_id: int |
         if form.new_station_name.strip():
             station = records.create_station(session, StationInput(
                 name=form.new_station_name.strip(),
+                brand=form.new_station_brand.strip() or None,
                 location=form.new_station_location.strip() or None,
             ))
             data = replace(data, station_id=station.id)
@@ -195,7 +178,7 @@ def _save(request: Request, session: Session, form: RefuelForm, refuel_id: int |
         session.rollback()
         messages = exc.messages if isinstance(exc, ValidationError) else [str(exc)]
         return _form_page(request, session, entered, refuel_id, 422, errors=messages)
-    return redirect(request, "/refuels")
+    return redirect(request, "/")
 
 
 @router.post("/new")
@@ -216,4 +199,4 @@ def refuel_update(request: Request, refuel_id: int, session: SessionDep,
 def refuel_delete(request: Request, refuel_id: int, session: SessionDep):
     """Delete a refuel."""
     records.delete_refuel(session, refuel_id)
-    return redirect(request, "/refuels")
+    return redirect(request, "/")

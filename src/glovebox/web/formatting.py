@@ -2,7 +2,36 @@
 
 from __future__ import annotations
 
+from datetime import date
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+
+# Numbers and their units must never wrap onto two lines.
+NBSP = "\u00a0"
+
+MONTH_NAMES = (
+    "January", "February", "March", "April", "May", "June", "July",
+    "August", "September", "October", "November", "December",
+)  # fmt: skip
+
+
+def money(cents: int | None, currency: str) -> str:
+    """Return cents as ``"123.45 EUR"`` (non-breaking space), or ``"n/a"``."""
+    return "n/a" if cents is None else f"{format_cents(cents)}{NBSP}{currency}"
+
+
+def with_unit(text: str, unit: str) -> str:
+    """Join a number and its unit with a non-breaking space."""
+    return f"{text}{NBSP}{unit}"
+
+
+def short_date(day: date) -> str:
+    """Return ``5 May`` (English month names regardless of the server locale)."""
+    return f"{day.day}{NBSP}{MONTH_NAMES[day.month - 1][:3]}"
+
+
+def month_label(year: int, month: int) -> str:
+    """Return ``May 2026``."""
+    return f"{MONTH_NAMES[month - 1]} {year}"
 
 
 def format_cents(cents: int) -> str:

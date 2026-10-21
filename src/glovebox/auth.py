@@ -165,16 +165,21 @@ def install_auth(app: FastAPI) -> None:
 
 
 def _login_page(request: Request, error: str = "", status_code: int = 200) -> HTMLResponse:
-    css = url(request, "/static/pico.min.css")
-    message = f"<p role='alert'>{escape(error)}</p>" if error else ""
+    css = escape(url(request, "/static/app.css"))
+    theme = escape(url(request, "/static/theme.js"))
+    action = escape(url(request, "/login"))
+    message = f"<p class='alert error' role='alert'>{escape(error)}</p>" if error else ""
     html = (
-        "<!doctype html><html><head><meta charset='utf-8'>"
-        "<title>Glovebox login</title>"
-        f"<link rel='stylesheet' href='{escape(css)}'></head><body><main class='container'>"
-        f"<h1>Glovebox</h1>{message}"
-        f"<form method='post' action='{escape(url(request, '/login'))}'>"
-        "<label>Password <input type='password' name='password' required autofocus>"
-        "</label><button type='submit'>Log in</button></form></main></body></html>"
+        "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
+        "<meta name='viewport' content='width=device-width, initial-scale=1'>"
+        f"<title>Glovebox login</title><script src='{theme}'></script>"
+        f"<link rel='stylesheet' href='{css}'></head><body>"
+        "<main class='login'><h1>Glovebox</h1>"
+        f"<form class='card card-pad stack' method='post' action='{action}'>{message}"
+        "<div class='field'><label for='i-password'>Password</label>"
+        "<input id='i-password' type='password' name='password' required autofocus></div>"
+        "<div><button type='submit' class='btn primary'>Log in</button></div>"
+        "</form></main></body></html>"
     )
     return HTMLResponse(html, status_code=status_code)
 

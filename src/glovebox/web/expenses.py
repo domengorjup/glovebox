@@ -1,4 +1,4 @@
-"""Expense pages: filtered list with total, entry/edit form, delete."""
+"""Service and expense pages: entry/edit form (a dialog), delete."""
 
 from __future__ import annotations
 
@@ -12,14 +12,7 @@ from sqlalchemy.orm import Session
 from glovebox.models import Expense, ExpenseCategory
 from glovebox.services import records
 from glovebox.services.records import ExpenseInput, ValidationError
-from glovebox.web.common import (
-    SessionDep,
-    effective_filter,
-    filter_choices,
-    parse_filters,
-    redirect,
-    render,
-)
+from glovebox.web.common import SessionDep, load_chrome, redirect, render
 from glovebox.web.formatting import parse_decimal, to_scaled_int
 
 router = APIRouter(prefix="/expenses")
@@ -37,23 +30,6 @@ class ExpenseForm(BaseModel):
     coverage_start: str = ""
     coverage_end: str = ""
     notes: str = ""
-
-
-@router.get("")
-def expense_list(request: Request, session: SessionDep):
-    """Expenses newest first, with the total of the filtered rows."""
-    view = parse_filters(request)
-    rows = records.list_expenses(session, effective_filter(session, view.stats))
-    choices = filter_choices(session)
-    return render(
-        request,
-        "expenses/list.html",
-        rows=rows,
-        total_cents=sum(r.amount_cents for r in rows),
-        vehicle_names={v.id: v.name for v in choices["all_vehicles"]},
-        f=view.stats,
-        choices=choices,
-    )
 
 
 def _form_from_expense(expense: Expense) -> dict[str, str]:
@@ -76,8 +52,9 @@ def _form_from_expense(expense: Expense) -> dict[str, str]:
 def _form_page(request: Request, session: Session, entered: dict[str, str],
                expense_id: int | None = None, status: int = 200,
                errors: list[str] | None = None):
-    """Render the expense form."""
-    vehicles = records.list_vehicles(session)
+    """Render the service form (category maintenance) or the expense form."""
+    chrome = load_chrome(session)
+    vehicles = list(chrome.vehicles)
     selected = entered.get("vehicle_id", "")
     if selected and not any(str(v.id) == selected for v in vehicles):
         vehicles.append(records.get_vehicle(session, int(selected)))
@@ -85,19 +62,31 @@ def _form_page(request: Request, session: Session, entered: dict[str, str],
         request,
         "expenses/form.html",
         status,
+        chrome=chrome,
+        section="timeline",
+        is_service=entered.get("category") == ExpenseCategory.MAINTENANCE.value,
         f=entered,
         expense_id=expense_id,
         vehicles=vehicles,
-        categories=list(ExpenseCategory),
+        categories=[c for c in ExpenseCategory if c is not ExpenseCategory.MAINTENANCE],
         errors=errors or [],
     )
 
 
 @router.get("/new")
-def expense_new(request: Request, session: SessionDep, vehicle: str = ""):
-    """Empty form; ``?vehicle=`` preselects a vehicle."""
+def expense_new(
+    request: Request, session: SessionDep, vehicle: str = "", kind: str = "expense"
+):
+    """
+    Empty form. ``?kind=service`` gives the service form (category
+    maintenance), anything else the expense form (insurance by default).
+    The vehicle defaults to the app-bar choice (``?vehicle=`` wins).
+    """
+    category = "maintenance" if kind == "service" else "insurance"
     entered = ExpenseForm(
-        vehicle_id=vehicle, date=date.today().isoformat(), category="maintenance"
+        vehicle_id=vehicle or load_chrome(session).form_vehicle,
+        date=date.today().isoformat(),
+        category=category,
     ).model_dump()
     return _form_page(request, session, entered)
 
@@ -165,7 +154,7 @@ def _save(request: Request, session: Session, form: ExpenseForm, expense_id: int
         session.rollback()
         messages = exc.messages if isinstance(exc, ValidationError) else [str(exc)]
         return _form_page(request, session, form.model_dump(), expense_id, 422, messages)
-    return redirect(request, "/expenses")
+    return redirect(request, "/")
 
 
 @router.post("/new")
@@ -186,4 +175,4 @@ def expense_update(request: Request, expense_id: int, session: SessionDep,
 def expense_delete(request: Request, expense_id: int, session: SessionDep):
     """Delete an expense."""
     records.delete_expense(session, expense_id)
-    return redirect(request, "/expenses")
+    return redirect(request, "/")

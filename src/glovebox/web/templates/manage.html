@@ -1,0 +1,27 @@
+{% extends layout %}
+{% block title %}Manage - Glovebox{% endblock %}
+{% macro item(path, icon_name, title, detail) %}
+<a class="row" href="{{ url(request, path) }}">
+  <span class="badge">{{ icon(icon_name, 22) }}</span>
+  <span class="body"><span class="title">{{ title }}</span><span class="detail">{{ detail }}</span></span>
+  <span class="chev">{{ icon('chevron-right', 24) }}</span>
+</a>
+{% endmacro %}
+{% block content %}
+<div class="page-title"><h1>Manage</h1></div>
+<h2>Garage</h2>
+<div class="card list-card">
+  {{ item('/vehicles', 'car-multiple', 'Vehicles',
+          (chrome.vehicles | length) ~ (' vehicle' if chrome.vehicles | length == 1 else ' vehicles')
+          ~ (' · ' ~ vehicle_names if vehicle_names else '')
+          ~ (' · ' ~ (chrome.archived | length) ~ ' archived' if chrome.archived else '')) }}
+  {{ item('/stations', 'map-marker-outline', 'Gas stations',
+          station_count ~ (' station' if station_count == 1 else ' stations') ~ ' · ' ~ brand_count
+          ~ (' brand' if brand_count == 1 else ' brands') ~ ' · merge duplicates') }}
+</div>
+<h2>Data</h2>
+<div class="card list-card">
+  {{ item('/import', 'upload', 'Import', 'Drivvo, Fuelio, Fuelly or Glovebox files') }}
+  {{ item('/export', 'download', 'Export', 'Full backup or Fuelly-compatible CSV') }}
+</div>
+{% endblock %}

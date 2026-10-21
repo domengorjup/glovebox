@@ -205,3 +205,12 @@ class Expense(Base):
         ForeignKey("import_batch.id", ondelete="SET NULL"), index=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
+
+
+class Setting(Base):
+    """A UI preference (key/value text), shared by every device using the app."""
+
+    __tablename__ = "setting"
+
+    key: Mapped[str] = mapped_column(String(50), primary_key=True)
+    value: Mapped[str] = mapped_column(Text)

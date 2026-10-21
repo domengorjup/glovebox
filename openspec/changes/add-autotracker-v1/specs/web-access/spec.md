@@ -34,7 +34,7 @@ In add-on mode, the system SHALL run a second listener on the API port (containe
 - **THEN** the response is 200 with the same JSON as on the Ingress listener
 
 #### Scenario: Only the API is served
-- **WHEN** a request for `/`, `/static/pico.min.css` or `/docs` arrives on the API listener, with or without a valid token
+- **WHEN** a request for `/`, `/static/app.css` or `/docs` arrives on the API listener, with or without a valid token
 - **THEN** the response is 404
 
 #### Scenario: Ingress listener unchanged

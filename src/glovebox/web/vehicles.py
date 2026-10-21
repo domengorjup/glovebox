@@ -1,17 +1,21 @@
-"""Vehicle pages: list, create/edit, archive, delete with confirmation."""
+"""Vehicle pages: list, create/edit (dialogs), archive, delete with confirmation."""
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Annotated
 
 from fastapi import APIRouter, Form, Request
+from sqlalchemy.orm import Session
 
 from glovebox.services import records
+from glovebox.services.stats import StatsFilter
 from glovebox.services.records import (
     ConfirmationRequired,
     ValidationError,
     VehicleInput,
 )
+from glovebox.models import Vehicle
 from glovebox.web.formatting import parse_decimal
 from glovebox.web.common import SessionDep, redirect, render
 
@@ -40,15 +44,48 @@ def _vehicle_input(
     )
 
 
+@dataclass(frozen=True)
+class VehicleRow:
+    """A vehicle with the small stat line shown in the list."""
+
+    vehicle: Vehicle
+    records: int
+    odometer: float | None
+
+
+def _rows(session: Session, vehicles: list[Vehicle]) -> list[VehicleRow]:
+    """Record count and last odometer reading for each vehicle."""
+    rows = []
+    for vehicle in vehicles:
+        only = StatsFilter(vehicles=(vehicle.id,))
+        refuels = records.list_refuels(session, only)
+        expenses = records.list_expenses(session, only)
+        readings = [r.odometer_km for r in refuels]
+        readings += [e.odometer_km for e in expenses if e.odometer_km is not None]
+        last = max(readings) if readings else vehicle.initial_odometer
+        rows.append(VehicleRow(vehicle, len(refuels) + len(expenses), last))
+    return rows
+
+
+def _list_page(request: Request, session: Session, status: int = 200,
+               errors: list[str] | None = None):
+    every = records.list_vehicles(session, include_archived=True)
+    return render(
+        request, "vehicles/list.html", status,
+        active=_rows(session, [v for v in every if not v.archived]),
+        archived=_rows(session, [v for v in every if v.archived]),
+        errors=errors or [],
+    )
+
+
 @router.get("")
 def vehicle_list(request: Request, session: SessionDep):
-    """List all vehicles, archived ones included."""
-    vehicles = records.list_vehicles(session, include_archived=True)
-    return render(request, "vehicles/list.html", vehicles=vehicles)
+    """List all vehicles; archived ones sit in a collapsible section."""
+    return _list_page(request, session)
 
 
 @router.get("/new")
-def vehicle_new(request: Request):
+def vehicle_new(request: Request, session: SessionDep):
     """Empty vehicle form."""
     return render(request, "vehicles/form.html", vehicle=None, errors=[])
 
@@ -124,9 +161,7 @@ def vehicle_archive(
         records.archive_vehicle(session, vehicle_id, archived == "1")
     except ValidationError as exc:
         session.rollback()
-        vehicles = records.list_vehicles(session, include_archived=True)
-        return render(request, "vehicles/list.html", 422,
-                      vehicles=vehicles, errors=exc.messages)
+        return _list_page(request, session, 422, exc.messages)
     return redirect(request, "/vehicles")
 
 

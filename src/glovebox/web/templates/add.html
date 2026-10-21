@@ -1,0 +1,22 @@
+{% extends layout %}
+{% set dialog_page = true %}
+{% block title %}Add entry - Glovebox{% endblock %}
+{% block content %}
+<div class="scrim" data-scrim>
+  <div class="dialog chooser" role="dialog" aria-label="Add entry">
+    <h3>Add entry</h3>
+    <a class="choice" href="{{ url(request, '/refuels/new') }}" data-dialog>
+      <span class="badge t-refuel">{{ icon('gas-station', 22) }}</span>
+      <span><span class="t">Refuelling</span><span class="s">Litres, price and station</span></span>
+    </a>
+    <a class="choice" href="{{ url(request, '/expenses/new?kind=service') }}" data-dialog>
+      <span class="badge t-service">{{ icon('wrench', 22) }}</span>
+      <span><span class="t">Service</span><span class="s">Maintenance and repairs</span></span>
+    </a>
+    <a class="choice" href="{{ url(request, '/expenses/new') }}" data-dialog>
+      <span class="badge t-expense">{{ icon('file-document-outline', 22) }}</span>
+      <span><span class="t">Expense</span><span class="s">Insurance, registration, other</span></span>
+    </a>
+  </div>
+</div>
+{% endblock %}

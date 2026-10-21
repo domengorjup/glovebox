@@ -1,0 +1,66 @@
+"""UI preferences kept in the ``setting`` table, shared by all devices."""
+
+from __future__ import annotations
+
+import json
+
+from sqlalchemy.orm import Session
+
+from glovebox.models import Setting
+
+SELECTED_VEHICLE = "selected_vehicle"
+LAST_VEHICLE = "last_vehicle"
+SUMMARY_CARDS = "summary_cards"
+
+ALL_VEHICLES = "all"
+
+# Display order of the Timeline summary cards; also the set of valid names.
+CARD_KEYS = (
+    "cost_month",
+    "consumption",
+    "last_refuel",
+    "cost_km",
+    "avg_price",
+    "odometer",
+)
+DEFAULT_CARDS = ("cost_month", "consumption", "last_refuel", "cost_km")
+
+
+def get_setting(session: Session, key: str) -> str | None:
+    """Return the stored text for ``key``, or ``None`` if never set."""
+    row = session.get(Setting, key)
+    return None if row is None else row.value
+
+
+def set_setting(session: Session, key: str, value: str) -> None:
+    """Store ``value`` under ``key`` (insert or overwrite)."""
+    row = session.get(Setting, key)
+    if row is None:
+        session.add(Setting(key=key, value=value))
+    else:
+        row.value = value
+    session.flush()
+
+
+def get_summary_cards(session: Session) -> list[str]:
+    """
+    Card names to show on the Timeline, in display order.
+
+    Unknown names are ignored. Without a (readable) stored choice the
+    default set is returned; an explicitly empty choice stays empty.
+    """
+    raw = get_setting(session, SUMMARY_CARDS)
+    if raw is None:
+        return list(DEFAULT_CARDS)
+    try:
+        chosen = set(json.loads(raw))
+    except (TypeError, ValueError):
+        return list(DEFAULT_CARDS)
+    return [key for key in CARD_KEYS if key in chosen]
+
+
+def set_summary_cards(session: Session, names: list[str]) -> list[str]:
+    """Store the chosen cards (unknown names dropped); return what was kept."""
+    kept = [key for key in CARD_KEYS if key in set(names)]
+    set_setting(session, SUMMARY_CARDS, json.dumps(kept))
+    return kept

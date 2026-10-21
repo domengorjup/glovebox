@@ -95,3 +95,13 @@ def test_unsafe_ingress_header_ignored(client: TestClient) -> None:
     response = client.get("/", headers={"X-Ingress-Path": '/"><script>'})
     assert "<script>" not in response.text
     assert 'href="/"' in response.text
+
+
+def test_settings_table_exists_after_migration(engine) -> None:
+    from sqlalchemy import inspect
+
+    inspector = inspect(engine)
+    assert "setting" in inspector.get_table_names()
+    columns = {c["name"]: c for c in inspector.get_columns("setting")}
+    assert set(columns) == {"key", "value"}
+    assert inspector.get_pk_constraint("setting")["constrained_columns"] == ["key"]

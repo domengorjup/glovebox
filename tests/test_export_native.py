@@ -91,7 +91,7 @@ def test_export_contents(session: Session) -> None:
 def test_manifest(session: Session) -> None:
     manifest = json.loads(_read(export_native(session, Settings()))["manifest.json"])
     assert manifest["app_version"] == __version__
-    assert manifest["schema_version"] == "0001"
+    assert manifest["schema_version"] == "0002"
     assert manifest["currency"] == "EUR"
     assert manifest["exported_at"]
 

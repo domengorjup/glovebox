@@ -2,30 +2,47 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block title %}Glovebox{% endblock %}</title>
-  {# Vendored assets only (no CDN); see static/VENDORED.md. #}
-  <link rel="stylesheet" href="{{ url(request, '/static/pico.min.css') }}">
+  {# Own assets only (no CDN); see static/VENDORED.md. theme.js runs first so the page never flashes the wrong theme. #}
+  <script src="{{ url(request, '/static/theme.js') }}"></script>
   <link rel="stylesheet" href="{{ url(request, '/static/app.css') }}">
-  {% block head %}{% endblock %}
 </head>
 <body>
-  <header class="container">
-    <nav class="main-nav">
-      <ul><li><strong><a href="{{ url(request, '/') }}">Glovebox</a></strong></li></ul>
-      <ul class="nav-links">
-        <li><a href="{{ url(request, '/refuels') }}">Refuels</a></li>
-        <li><a href="{{ url(request, '/expenses') }}">Expenses</a></li>
-        <li><a href="{{ url(request, '/stations') }}">Stations</a></li>
-        <li><a href="{{ url(request, '/vehicles') }}">Vehicles</a></li>
-        <li><a href="{{ url(request, '/import') }}">Import</a></li>
-        <li><a href="{{ url(request, '/export') }}">Export</a></li>
-      </ul>
+  <header class="app-header">
+    <a class="brand" href="{{ url(request, '/') }}">{{ icon('gas-station-outline', 26) }}<span>Glovebox</span></a>
+    <form class="vehicle-select" method="post" action="{{ url(request, '/preferences/vehicle') }}">
+      <input type="hidden" name="next" value="{{ location }}">
+      <span class="lead">{{ icon('car', 20) }}</span>
+      <select name="vehicle" aria-label="Vehicle" data-autosubmit>
+        {% for v in chrome.vehicles %}
+        <option value="{{ v.id }}" {{ 'selected' if chrome.selected == v.id | string }}>{{ v.name }}</option>
+        {% endfor %}
+        <option value="all" {{ 'selected' if chrome.selected == 'all' }}>All vehicles</option>
+      </select>
+      <span class="tail">{{ icon('menu-down', 20) }}</span>
+      <noscript><button type="submit" class="btn">Show</button></noscript>
+    </form>
+    <nav class="tabs" aria-label="Sections">
+      <a class="tab {{ 'active' if section == 'timeline' }}" href="{{ url(request, '/') }}">Timeline</a>
+      <a class="tab {{ 'active' if section == 'stats' }}" href="{{ url(request, '/stats') }}">Stats</a>
+      <a class="tab {{ 'active' if section == 'manage' }}" href="{{ url(request, '/manage') }}">Manage</a>
     </nav>
   </header>
-  <main class="container">
+
+  <main>
     {% block content %}{% endblock %}
   </main>
-  {% block scripts %}{% endblock %}
+
+  {% if section == 'timeline' and not dialog_page %}
+  <a class="fab" href="{{ url(request, '/add') }}" data-dialog aria-label="Add entry">{{ icon('plus', 28) }}</a>
+  {% endif %}
+  <nav class="bottom-nav" aria-label="Sections">
+    <a class="{{ 'active' if section == 'timeline' }}" href="{{ url(request, '/') }}"><span class="pill">{{ icon('timeline-text-outline') }}</span>Timeline</a>
+    <a class="{{ 'active' if section == 'stats' }}" href="{{ url(request, '/stats') }}"><span class="pill">{{ icon('chart-box-outline') }}</span>Stats</a>
+    <a class="{{ 'active' if section == 'manage' }}" href="{{ url(request, '/manage') }}"><span class="pill">{{ icon('cog-outline') }}</span>Manage</a>
+  </nav>
+  <div id="overlay"></div>
+  <script src="{{ url(request, '/static/app.js') }}" defer></script>
 </body>
 </html>

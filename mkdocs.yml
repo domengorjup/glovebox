@@ -1,0 +1,63 @@
+site_name: Glovebox
+site_description: Self-hosted tracker for car running costs
+repo_url: https://github.com/domengorjup/glovebox
+repo_name: domengorjup/glovebox
+docs_dir: docs
+strict: true
+exclude_docs: |
+  assets/screenshots/NEEDED.md
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.top
+    - search.highlight
+    - content.code.copy
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - tables
+  - attr_list
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - User guide:
+      - Overview: user/overview.md
+      - Install: user/install.md
+      - First steps: user/first-steps.md
+      - Timeline: user/timeline.md
+      - Adding and editing records: user/records.md
+      - Statistics: user/statistics.md
+      - Gas stations: user/stations.md
+      - Import: user/import.md
+      - Export and backup: user/export.md
+      - Stats API: user/api.md
+      - Troubleshooting and FAQ: user/faq.md
+  - Developer guide:
+      - Architecture: dev/architecture.md
+      - Project layout: dev/layout.md
+      - Local development: dev/development.md
+      - Testing: dev/testing.md
+      - Importers: dev/importers.md
+      - API reference: dev/api-reference.md
+      - Add-on and releases: dev/release.md
+      - Licence and notices: dev/licence.md

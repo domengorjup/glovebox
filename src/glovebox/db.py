@@ -74,6 +74,8 @@ def get_session(request: Request) -> Iterator[Session]:
     Rolls back and re-raises on any exception.
     """
     with request.app.state.session_factory() as session:
+        # Pages read UI preferences and vehicles through this same session.
+        request.state.session = session
         try:
             yield session
             session.commit()
