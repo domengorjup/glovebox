@@ -165,7 +165,7 @@ Constraints:
 - **Standalone mode** (default):
   - If `GLOVEBOX_PASSWORD` is set, a single-password login with a signed session cookie (itsdangerous) protects HTML routes.
   - If unset, there is no login, and a startup log warning recommends a reverse proxy.
-  - The stats API also accepts `Authorization: Bearer <GLOVEBOX_API_TOKEN>` when that variable is set. This is what the future integration will use.
+  - In standalone mode `/api/v1` is locked when either `GLOVEBOX_API_TOKEN` or `GLOVEBOX_PASSWORD` is set; it accepts `Authorization: Bearer <GLOVEBOX_API_TOKEN>` or a valid login session. This is what the future integration will use.
 - **Alternatives considered:**
   - Full user accounts: out of scope for single-household use.
   - Relying only on a reverse proxy: a password is cheap and safer by default.
@@ -192,8 +192,8 @@ Constraints:
 - **Shared code:** HTML pages and the API call the same stats service functions, so numbers cannot diverge.
 
 ### D11. HA add-on packaging
-- **Repository layout:** `repository.yaml` at the repo root and an add-on folder `glovebox/` containing:
-  - `config.yaml` (name, slug, version, arch `[amd64, aarch64]`, `ingress: true`, `ingress_port`, `panel_icon: mdi:car-wrench`, `panel_title`, `init: false`);
+- **Repository layout:** `repository.yaml` at the repo root and an add-on folder `addon/glovebox/` containing:
+  - `config.yaml` (name, slug, version, arch `[amd64, aarch64]`, `ingress: true`, `ingress_port`, `panel_icon: mdi:car-wrench`, `panel_title`, `init: true` (the image uses tini as init, no s6 overlay));
   - `Dockerfile` (FROM the add-on base Python image, or `python:3.12-slim`);
   - `DOCS.md`, `CHANGELOG.md`, icon and logo.
 - **Data:** the database lives at `/data/glovebox.db`, which HA includes in its add-on backups.

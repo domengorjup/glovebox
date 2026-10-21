@@ -52,8 +52,8 @@ In add-on mode, the system SHALL run a second listener on the API port (containe
 - **THEN** startup fails with an error message and no listener starts
 
 #### Scenario: Standalone unchanged
-- **WHEN** the app starts in standalone mode with `GLOVEBOX_API_TOKEN` set
-- **THEN** only the single listener is started and `/api/v1` keeps its Bearer-or-session check
+- **WHEN** the app starts in standalone mode with `GLOVEBOX_API_TOKEN` or `GLOVEBOX_PASSWORD` set
+- **THEN** only the single listener is started and `/api/v1` is locked behind its Bearer-or-session check
 
 ### Requirement: Optional standalone login
 In standalone mode, when `GLOVEBOX_PASSWORD` is set, the system SHALL require a login with that password before serving any HTML page, and SHALL keep the session in a signed cookie. When no password is set, the system SHALL serve without login and SHALL log a warning at startup.

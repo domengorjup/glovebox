@@ -31,9 +31,9 @@ An expense of any category MAY have a coverage start date and a coverage end dat
 - **THEN** the system rejects it
 
 ### Requirement: List and filter expenses
-The system SHALL list expenses newest first, filterable by vehicle, date range and category, and SHALL show the filtered total.
+The Timeline SHALL list expenses newest first, filtered by the vehicle selected in the app bar and by the type chips, grouped by month with a total per month. Category and date-range filters SHALL be available on the Stats page, which SHALL show the filtered total.
 
 #### Scenario: Filtered total
-- **WHEN** the user filters by category maintenance for 2026
-- **THEN** the list shows only 2026 maintenance expenses
-- **AND** it shows their summed amount
+- **WHEN** the user filters the Stats page by category maintenance for 2026
+- **THEN** the statistics cover only 2026 maintenance expenses
+- **AND** the page shows their summed amount

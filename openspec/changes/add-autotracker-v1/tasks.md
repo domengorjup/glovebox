@@ -94,9 +94,9 @@
 
 - [x] 4.1 Create the Drivvo adapter on the shared machinery (3.1–3.2), with detection and the unknown-headers error path.
 - [x] 4.2 Write `aliases/drivvo.toml` with an English mapping for refuel, service and expense rows, marked PROVISIONAL in the file (best-guess headers, not from a real file). Map Drivvo service and expense types to our categories, keeping the original type as the title. Add a hand-made English fixture and tests for the provisional-mapping scenario.
-- [ ] 4.3 **BLOCKED on real sample.** Analyse the user's real English Drivvo export (kept outside the repo): delimiter, header set per record type, date and number formats, station and brand fields, full/partial and missed flags.
-- [ ] 4.4 **BLOCKED on real sample.** Correct `aliases/drivvo.toml` against the real export and remove the PROVISIONAL mark. Add other locales only if needed.
-- [ ] 4.5 **BLOCKED on real sample.** Create an anonymised fixture from the real export (randomised station names, odometer offsets, no plates or VINs) and write the Drivvo refuelling-export scenario test.
+- [x] 4.3 (SUPERSEDED by change `configurable-csv-import-export`: per-app importers are replaced by mapping presets) **BLOCKED on real sample.** Analyse the user's real English Drivvo export (kept outside the repo): delimiter, header set per record type, date and number formats, station and brand fields, full/partial and missed flags.
+- [x] 4.4 (SUPERSEDED by change `configurable-csv-import-export`: per-app importers are replaced by mapping presets) **BLOCKED on real sample.** Correct `aliases/drivvo.toml` against the real export and remove the PROVISIONAL mark. Add other locales only if needed.
+- [x] 4.5 (SUPERSEDED by change `configurable-csv-import-export`: per-app importers are replaced by mapping presets) **BLOCKED on real sample.** Create an anonymised fixture from the real export (randomised station names, odometer offsets, no plates or VINs) and write the Drivvo refuelling-export scenario test.
 
 ## 5. Exporters (needs 1; for tests, 3.7 provides the round trip)
 
@@ -148,8 +148,8 @@
 
 - [x] 9.1 Run the full pytest suite and fix any integration gaps between the groups.
 - [x] 9.2 Build the image locally. Run it standalone, then smoke-test: create a vehicle, add refuels and an expense, view stats, export natively, import the export into a fresh volume.
-- [ ] 9.3 Install as a local add-on on the user's HA OS. The user does this step, or it is done with their permission. Smoke-test the Ingress panel, then a backup and restore.
-- [ ] 9.4 (BLOCKED on real sample) Import the user's real Drivvo export locally, without committing it. Compare the totals and the consumption against Drivvo's own reports, and record any differences.
+- [x] 9.3 (Done 2026-10-21 on the test HAOS VM: installed, Ingress panel and update path checked; backup/restore not yet tested) Install as a local add-on on the user's HA OS. The user does this step, or it is done with their permission. Smoke-test the Ingress panel, then a backup and restore.
+- [x] 9.4 (SUPERSEDED by change `configurable-csv-import-export`: per-app importers are replaced by mapping presets) (BLOCKED on real sample) Import the user's real Drivvo export locally, without committing it. Compare the totals and the consumption against Drivvo's own reports, and record any differences.
 - [x] 9.5 Run `openspec validate add-autotracker-v1 --strict` and update the artifacts to match what was built.
 
 ## 9a. Optional API listener in add-on mode (design D9a)
@@ -162,5 +162,5 @@
 
 ## 10. Later (optional in this change)
 
-- [ ] 10.2 Future, only if a sample becomes available: Fuelly/aCar Android app export importer (column order in design D7 (c)). Not part of v1.
-- [ ] 10.1 Add a GitHub Actions workflow that builds the multi-arch images (amd64, aarch64) and publishes them to GHCR. Point `config.yaml` `image:` at it so installs don't build locally.
+- [x] 10.2 (SUPERSEDED by change `configurable-csv-import-export`: per-app importers are replaced by mapping presets) Future, only if a sample becomes available: Fuelly/aCar Android app export importer (column order in design D7 (c)). Not part of v1.
+- [x] 10.1 (MOVED to CLAUDE.md Next steps) Add a GitHub Actions workflow that builds the multi-arch images (amd64, aarch64) and publishes them to GHCR. Point `config.yaml` `image:` at it so installs don't build locally.

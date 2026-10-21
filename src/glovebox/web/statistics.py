@@ -199,8 +199,22 @@ def consumption_segments(
     return result
 
 
+def monthly_consumption(segs: Sequence[Segment]) -> list[dict]:
+    """Distance-weighted L/100 km per month, over the segments ending in it."""
+    by_month: dict[str, list[Segment]] = {}
+    for seg in segs:
+        by_month.setdefault(seg.end_date.strftime("%Y-%m"), []).append(seg)
+    result = []
+    for month in sorted(by_month):
+        value = stats.avg_consumption(by_month[month])
+        if value is not None:
+            # Dated mid-month so the chart can place it on the same time axis.
+            result.append({"date": f"{month}-15", "value": round(value, 2)})
+    return result
+
+
 def consumption_points(per_vehicle: dict[str, list[Segment]]) -> list[dict]:
-    """Chart payload: one series of dated L/100 km values per vehicle."""
+    """Chart payload per vehicle: per-segment values and the monthly average."""
     return [
         {
             "name": name,
@@ -208,6 +222,7 @@ def consumption_points(per_vehicle: dict[str, list[Segment]]) -> list[dict]:
                 {"date": s.end_date.isoformat(), "value": round(s.consumption, 2)}
                 for s in sorted(segs, key=lambda s: s.end_date)
             ],
+            "monthly": monthly_consumption(segs),
         }
         for name, segs in per_vehicle.items()
         if segs

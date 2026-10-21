@@ -8,7 +8,7 @@ The system SHALL store UI preferences server-side in a small key/value settings 
 - **THEN** the same preference is in effect when the app is opened on another device
 
 ### Requirement: Remember the selected vehicle
-The system SHALL remember the vehicle selected in the app bar, either a specific vehicle or "All vehicles", and SHALL also remember the last specific vehicle. Selecting "All vehicles" SHALL NOT overwrite the last specific vehicle. A remembered vehicle that no longer exists SHALL fall back to "All vehicles".
+The system SHALL remember the vehicle selected in the app bar, either a specific vehicle or "All vehicles", and SHALL also remember the last specific vehicle. Selecting "All vehicles" SHALL NOT overwrite the last specific vehicle. A remembered vehicle that no longer exists or has been archived SHALL fall back to "All vehicles".
 
 #### Scenario: Selection is remembered
 - **WHEN** the user selects the vehicle "Golf" in the app bar and reopens the app
@@ -21,6 +21,10 @@ The system SHALL remember the vehicle selected in the app bar, either a specific
 
 #### Scenario: Remembered vehicle was deleted
 - **WHEN** the remembered vehicle no longer exists
+- **THEN** the app bar shows "All vehicles"
+
+#### Scenario: Remembered vehicle was archived
+- **WHEN** the remembered vehicle has been archived
 - **THEN** the app bar shows "All vehicles"
 
 ### Requirement: Configurable Timeline summary cards

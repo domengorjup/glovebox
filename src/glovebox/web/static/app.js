@@ -201,7 +201,7 @@
   function consumptionChart(host, series) {
     var W = isPhone() ? 340 : 760, H = isPhone() ? 200 : 240, L = 38, R = 8, T = 10, B = 26;
     var all = [];
-    series.forEach(function (s) { s.points.forEach(function (p) { all.push(p); }); });
+    series.forEach(function (s) { s.points.concat(s.monthly || []).forEach(function (p) { all.push(p); }); });
     var times = all.map(function (p) { return dayMs(p.date); });
     var t0 = Math.min.apply(null, times), t1 = Math.max.apply(null, times);
     var values = all.map(function (p) { return p.value; });
@@ -224,20 +224,32 @@
     legend.className = "legend";
     series.forEach(function (s, index) {
       var colour = SERIES[index % SERIES.length];
-      svg.appendChild(el("polyline", {
-        fill: "none", stroke: colour, "stroke-width": 2, "stroke-linejoin": "round",
-        points: s.points.map(function (p) { return x(dayMs(p.date)).toFixed(1) + "," + y(p.value).toFixed(1); }).join(" ")
-      }));
+      function line(list, width, opacity) {
+        return el("polyline", {
+          fill: "none", stroke: colour, "stroke-width": width, "stroke-linejoin": "round",
+          "stroke-linecap": "round", opacity: opacity,
+          points: list.map(function (p) { return x(dayMs(p.date)).toFixed(1) + "," + y(p.value).toFixed(1); }).join(" ")
+        });
+      }
+      svg.appendChild(line(s.points, 1, 0.35));
       s.points.forEach(function (p) {
         svg.appendChild(tip(el("circle", {
-          cx: x(dayMs(p.date)).toFixed(1), cy: y(p.value).toFixed(1), r: 3,
-          fill: "var(--card-background-color)", stroke: colour, "stroke-width": 1.5
-        }), s.name + " · " + p.date + " · " + fmt(p.value) + " L/100 km"));
+          cx: x(dayMs(p.date)).toFixed(1), cy: y(p.value).toFixed(1), r: 2.5,
+          fill: colour, "fill-opacity": 0.3, stroke: colour, "stroke-opacity": 0.5, "stroke-width": 1
+        }), s.name + " · " + p.date + " · " + fmt(p.value) + " L/100 km"));
+      });
+      var monthly = s.monthly || [];
+      svg.appendChild(line(monthly, 3, 1));
+      monthly.forEach(function (p) {
+        svg.appendChild(tip(el("circle", {
+          cx: x(dayMs(p.date)).toFixed(1), cy: y(p.value).toFixed(1), r: 3.5,
+          fill: colour, stroke: "var(--card-background-color)", "stroke-width": 1.5
+        }), s.name + " · " + p.date.slice(0, 7) + " average · " + fmt(p.value) + " L/100 km"));
       });
       legend.insertAdjacentHTML("beforeend", '<span><i style="background:' + colour + '"></i></span>');
       legend.lastChild.appendChild(document.createTextNode(s.name));
     });
-    legend.insertAdjacentHTML("beforeend", "<span>L/100 km per full tank</span>");
+    legend.insertAdjacentHTML("beforeend", "<span>L/100 km · line: monthly average · dots: single full tanks</span>");
     host.appendChild(svg);
     host.appendChild(legend);
   }

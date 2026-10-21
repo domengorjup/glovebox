@@ -355,3 +355,36 @@ def test_summary_values(session, vid):
     # the 2025 fill is outside the 12-month window; two segments inside
     assert summary.avg_consumption_12m == pytest.approx(66 / 1200 * 100)
     assert summary.cost_this_month_cents == 5400 + 100
+
+
+# --- monthly consumption series (web payload) ---------------------------------
+
+
+def _month_seg(end: date, km: float, litres: float):
+    from glovebox.services.stats import Segment
+
+    return Segment(1, 1, 2, end, 1, True, km, int(litres * 1000), litres / km * 100, True)
+
+
+def test_monthly_consumption_is_distance_weighted():
+    from glovebox.web.statistics import monthly_consumption
+
+    segs = [
+        _month_seg(date(2026, 3, 5), 400, 24),   # 6.0
+        _month_seg(date(2026, 3, 20), 600, 42),  # 7.0
+        _month_seg(date(2026, 4, 2), 500, 30),   # 6.0
+    ]
+    assert monthly_consumption(segs) == [
+        {"date": "2026-03-15", "value": 6.6},
+        {"date": "2026-04-15", "value": 6.0},
+    ]
+
+
+def test_consumption_points_has_segments_and_monthly():
+    from glovebox.web.statistics import consumption_points
+
+    segs = [_month_seg(date(2026, 3, 20), 600, 42), _month_seg(date(2026, 3, 5), 400, 24)]
+    (series,) = consumption_points({"Golf": segs, "Empty": []})
+    assert series["name"] == "Golf"
+    assert [p["date"] for p in series["points"]] == ["2026-03-05", "2026-03-20"]
+    assert series["monthly"] == [{"date": "2026-03-15", "value": 6.6}]

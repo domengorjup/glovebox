@@ -41,8 +41,12 @@ The system SHALL store gas stations as separate entities with a name, an optiona
 - **THEN** all three stations have brand "OMV"
 
 ### Requirement: List and filter refuellings
-The system SHALL list refuellings newest first, filterable by vehicle, date range and station or brand. Each row SHALL show the computed consumption for segments ending at that fill, or "n/a" when the segment is invalid.
+The Timeline SHALL list refuellings newest first, filtered by the vehicle selected in the app bar and by the type chips, grouped by month with a total per month. Station, brand, category and date-range filters SHALL be available on the Stats page. Each row SHALL show the computed consumption for segments ending at that fill, or "n/a" when the segment is invalid.
 
-#### Scenario: Filter by brand
-- **WHEN** the user filters refuellings by brand "MOL"
-- **THEN** only refuels at stations with brand "MOL" are listed
+#### Scenario: Filter by vehicle and type
+- **WHEN** the user selects the vehicle "Golf" in the app bar and the refuelling chip on the Timeline
+- **THEN** only refuels of "Golf" are listed, grouped by month with month totals
+
+#### Scenario: Filter by brand on the Stats page
+- **WHEN** the user filters the Stats page by brand "MOL"
+- **THEN** the statistics cover only refuels at stations with brand "MOL"

@@ -34,13 +34,17 @@ The system SHALL show a chart of per-segment consumption over time for the selec
 - **WHEN** the user selects 2025-01-01 to 2025-12-31
 - **THEN** the chart shows only segments whose ending fill falls in 2025
 
+#### Scenario: Monthly average
+- **WHEN** two valid segments end in March 2026, 400 km using 24 L and 600 km using 42 L
+- **THEN** the monthly series shows 6.6 L/100 km for March 2026 (66 L over 1000 km), not the mean of 6.0 and 7.0
+
 ### Requirement: Cost statistics
 The system SHALL compute, for the active filter:
 - total cost per category (fuel, maintenance, insurance, registration, other);
 - monthly and yearly cost series by category;
 - cost per km.
 
-Cost per km SHALL be total cost divided by the distance driven in the period. Distance driven SHALL be the maximum odometer minus the minimum odometer over all records in the period that have an odometer value.
+Cost per km SHALL be total cost divided by the distance driven in the period. Distance driven SHALL be the sum, over the vehicles in the filter, of each vehicle's odometer span: the maximum minus the minimum odometer over that vehicle's records in the period that have an odometer value.
 
 #### Scenario: Cost per km
 - **WHEN** a period contains 300 € fuel and 200 € maintenance, and odometer readings span 10000 to 15000 km
@@ -96,8 +100,8 @@ Average consumption SHALL use only valid segments in which every fill came from 
 - **THEN** that segment counts toward neither A's nor B's consumption
 
 ### Requirement: Common filters
-All statistics views SHALL support filtering by vehicle (one, several or all), date range, expense category and station or brand. Filters SHALL be reflected in the URL so a view can be bookmarked.
+All statistics views SHALL support filtering by vehicle (one or all), date range, expense category and station or brand. The vehicle SHALL come from the remembered app-bar selection (a server-side preference) and SHALL NOT be in the URL. The other filters SHALL be reflected in the URL so a view can be bookmarked.
 
 #### Scenario: Bookmarked filter
-- **WHEN** the user opens a statistics URL containing vehicle and date-range parameters
-- **THEN** the view renders with those filters applied
+- **WHEN** the user opens a statistics URL containing date-range parameters
+- **THEN** the view renders with those filters applied to the vehicle selected in the app bar
