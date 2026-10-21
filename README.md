@@ -9,7 +9,7 @@
 [![Licence: MIT](https://img.shields.io/github/license/domengorjup/glovebox)](LICENSE)
 [![Latest release](https://img.shields.io/github/v/tag/domengorjup/glovebox?label=release)](https://github.com/domengorjup/glovebox/tags)
 
-Documentation: **<https://domengorjup.github.io/glovebox/>**
+<p align="center"><a href="https://domengorjup.github.io/glovebox/"><img src="https://img.shields.io/badge/Read_the_documentation-03a9f4?style=for-the-badge&logo=materialformkdocs&logoColor=white" alt="Read the documentation"></a></p>
 
 ![Timeline](docs/assets/screenshots/timeline-all-desktop-light.png)
 *Costs, consumption and every entry at a glance.*
