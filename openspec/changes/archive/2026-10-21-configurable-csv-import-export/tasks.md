@@ -115,7 +115,7 @@
   - Key constraints: import is presets plus the standard format; export is standard, Fuelly-compatible, custom, and full backup;
   - Structure;
   - Next steps: Drivvo is now a preset, no longer blocked.
-- [ ] 7.5 Add a CHANGELOG entry: v1 native backups cannot be imported; make a new full backup after upgrading; Fuelio imports run once per section.
+- [x] 7.5 (Done via the 0.1.3 and 0.2.0 release entries) Add a CHANGELOG entry: v1 native backups cannot be imported; make a new full backup after upgrading; Fuelio imports run once per section.
   (Not written to `addon/glovebox/CHANGELOG.md`: the release script inserts the version heading above the first `## ` heading, so an `## Unreleased` section would end up below it. The text goes into the release message instead.)
 - [x] 7.6 Run the full test suite, `mkdocs build --strict` and `uv run python -m glovebox.formatdocs --check`. Check that no file names other projects as inspiration and that no fixture holds personal data.
-- [ ] 7.7 Release and deploy to the test HA per the project loop. Run an import through the mapping step and a backup round trip inside HA, and take screenshots.
+- [x] 7.7 (Done 2026-10-21: 0.1.3 deployed, end-to-end import, backup round trip and add-on backup/restore checked in HA) Release and deploy to the test HA per the project loop. Run an import through the mapping step and a backup round trip inside HA, and take screenshots.
