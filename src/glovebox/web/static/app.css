@@ -260,7 +260,8 @@ h2 { font-size: 14px; font-weight: 500; color: var(--secondary-text-color); marg
 .field label { font-size: 12px; color: var(--secondary-text-color); }
 .field:focus-within label { color: var(--primary-color); }
 .field input, .field select, .field textarea { background: none; border: 0; outline: 0; padding: 2px 0; font-size: 16px; width: 100%; resize: vertical; }
-.field select { appearance: none; -webkit-appearance: none; padding-right: 24px; }
+.field input::placeholder { color: var(--primary-text-color); opacity: .6; }
+.field select { text-overflow: ellipsis; appearance: none; -webkit-appearance: none; padding-right: 24px; }
 .field select option { background: var(--card-background-color); }
 .field .suffix { position: absolute; right: 16px; bottom: 8px; color: var(--secondary-text-color); font-size: 14px; pointer-events: none; }
 .field.has-suffix input { padding-right: 36px; }
@@ -322,7 +323,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
   .brand span, .tabs { display: none; }
   .vehicle-select { flex: 1; }
   .vehicle-select select { width: 100%; font-size: 15px; padding-top: 9px; padding-bottom: 9px; }
-  main { padding: var(--ha-space-4) var(--ha-space-3) 150px; }
+  main { padding: var(--ha-space-4) var(--ha-space-3) calc(160px + env(safe-area-inset-bottom)); }
   .summary-grid { grid-template-columns: 1fr 1fr; gap: var(--ha-space-2); }
   .stat { padding: 14px; } .stat .value { font-size: 22px; }
   .bottom-nav {
@@ -372,6 +373,7 @@ a.row, a.row-link { text-decoration: none; color: inherit; }
 .chip { text-decoration: none; }
 .alert { padding: 12px 16px; border-radius: var(--ha-border-radius-lg); margin: 0 0 var(--ha-space-3); border: 1px solid var(--divider-color); }
 .alert.error { color: var(--error-color); border-color: var(--error-color); }
+.alert.success { border-color: var(--success-color, #4caf50); display: flex; align-items: center; justify-content: space-between; gap: var(--ha-space-3); flex-wrap: wrap; }
 .alert.warning { border-color: var(--warning-color, #ff9800); }
 .stack { display: flex; flex-direction: column; gap: var(--ha-space-4); }
 .gap-top { margin-top: var(--ha-space-3); }

@@ -12,6 +12,7 @@ import re
 from datetime import date
 from html import unescape
 from html.parser import HTMLParser
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -906,7 +907,7 @@ def test_commit_uses_preset_answers_mapping_and_removes_upload(
                                   "ans_date_order": "dmy"}
     response = client.post("/import/commit", data=form, headers=INGRESS,
                            follow_redirects=False)
-    assert response.headers["location"] == f"{PREFIX}/import"
+    assert response.headers["location"] == f"{PREFIX}/import?done=9"
     assert committed["data"] == PLAIN_CSV and committed["filename"] == "log.csv"
     assert committed["mapping"].by_name == {"My Golf": 1, "Polo": None}
     assert committed["answers"].date_order == "dmy"
@@ -945,7 +946,7 @@ def test_commit_of_a_file_with_more_sections_says_so(client, monkeypatch):
     form = state(html)
     form["base_toml"] = form["base_toml"].replace("[format]", '[file]\nsection = "Log"\n\n[format]', 1)
     response = client.post("/import/commit", data=form, follow_redirects=False)
-    assert response.headers["location"].endswith("/import?more=Costs")
+    assert response.headers["location"].endswith("/import?done=1&more=Costs")
     assert "Costs" in client.get(response.headers["location"]).text
 
 
@@ -1289,3 +1290,18 @@ def test_hidden_combined_summary_and_new_vehicle_defaults_to_shown(client, monke
     html = client.get("/").text
     assert not re.search(r'data-summary="3"\s+hidden', html)
     assert 'name="summary" value="3" checked' in html
+
+
+def test_phone_page_end_clears_fab_and_bottom_nav():
+    """Bottom padding of main on phones exceeds the FAB's top edge (80 + 56 px)."""
+    css = (Path(__file__).parents[1] / "src/glovebox/web/static/app.css").read_text()
+    phone = css.split("@media (max-width: 699px)", 1)[1]
+    padding = re.search(r"main \{ padding: [^;]*calc\((\d+)px", phone)
+    assert padding and int(padding.group(1)) >= 80 + 56
+
+
+def test_autosubmit_is_attached_before_the_page_script_loads():
+    """The deferred app.js can load late; theme.js (in head) must own the handler."""
+    static = Path(__file__).parents[1] / "src/glovebox/web/static"
+    assert "data-autosubmit" in (static / "theme.js").read_text()
+    assert "data-autosubmit" not in (static / "app.js").read_text()

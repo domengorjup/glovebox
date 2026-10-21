@@ -5,7 +5,7 @@ Go to **Manage → Export**.
 | Export | Content |
 |---|---|
 | **Standard CSV** | One `records.csv`-style file with all refuellings and expenses, in the documented [standard format](standard-format.md). |
-| **Fuelly-compatible CSV** | Refuellings only, one CSV per vehicle (zipped if there is more than one). Expenses are left out. The station goes into the `tags` column. |
+| **Fuelly-compatible CSV** | Refuellings only, one CSV per vehicle (zipped if more than one has records; a vehicle without refuellings gets no file). Expenses are left out. The station goes into the `tags` column. |
 | **Custom CSV** | Your own layout: pick the columns and their headers, the delimiter, the decimal separator, the date pattern and the units. Save it as a preset to reuse it (and to import files in that layout). |
 | **Full backup** | A ZIP with `records.csv`, `vehicles.csv`, `stations.csv` and `datapackage.json`. Everything, including stations without refuellings. |
 

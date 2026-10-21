@@ -482,10 +482,13 @@ def test_import_each_fixture_then_undo(
 
     page = client.get("/import").text
     batch_id = int(re.search(r"/import/(\d+)/undo", page).group(1))
-    # importing the same file again adds nothing
-    again = _import_file(client, name, (fixtures_dir / name).read_bytes(), answers)
-    assert _counts(engine)[:2] == (refuels, expenses)
+    # importing the same file again adds nothing, offers no import and writes no batch
+    again = _preview_of(client, name, (fixtures_dir / name).read_bytes(), answers)
     assert "New refuels: <strong>0</strong>" in again
+    assert "Nothing new to import" in again and "Import now" not in again
+    forced = client.post("/import/commit", data=_merged(_form_fields(again), answers))
+    assert forced.status_code == 422 and "Nothing new to import" in forced.text
+    assert _counts(engine)[:2] == (refuels, expenses)
 
     batches = [int(b) for b in re.findall(r"/import/(\d+)/undo", client.get("/import").text)]
     for undo_id in batches:
@@ -495,6 +498,30 @@ def test_import_each_fixture_then_undo(
         assert session.scalar(select(func.count(Station.id))) == 0
         assert session.scalar(select(func.count(ImportBatch.id))) == 0
     assert batch_id in batches
+
+
+def test_commit_shows_the_result_with_undo(client: TestClient, fixtures_dir: Path) -> None:
+    _post(client, "/vehicles/new", {"name": "Existing"})
+    name = "fuelly_import_metric.csv"
+    preview = _preview_of(client, name, (fixtures_dir / name).read_bytes(), {"default_vehicle": "1"})
+    done = client.post(
+        "/import/commit", data=_merged(_form_fields(preview), {"default_vehicle": "1"}),
+        follow_redirects=True,
+    )
+    assert done.status_code == 200
+    notice = re.search(r'<div class="alert success".*?</div>', done.text, re.S).group(0)
+    assert "Imported 3 refuels and 0 expenses" in _text(notice)
+    assert re.search(r'action="/import/\d+/undo"', notice)
+
+
+def test_mapping_page_labels_fit_and_header_row_is_enabled(
+    client: TestClient, fixtures_dir: Path
+) -> None:
+    name = "fuelly_import_metric.csv"
+    page = client.get(_upload(client, name, (fixtures_dir / name).read_bytes())).text
+    assert "Auto (UTF-8)" in page and "Detected" not in page
+    header_row = re.search(r'<input id="i-header_row"[^>]*>', page).group(0)
+    assert "disabled" not in header_row and "readonly" not in header_row
 
 
 def test_mapping_and_preview_write_nothing(
@@ -708,6 +735,24 @@ def test_fuelly_export_reimports_with_stations(
     mine, theirs = _stats_numbers(client), _stats_numbers(other)
     assert theirs["stations"] == mine["stations"]  # station survived via tags
     assert theirs["consumption"] == mine["consumption"]
+
+
+def test_export_vehicle_rows_have_no_line_break(client: TestClient) -> None:
+    _post(client, "/vehicles/new", {"name": "Golf"})
+    rows = client.get("/export").text.split("Nothing ticked", 1)[0]
+    assert "<br" not in rows.split("<h2>Vehicles</h2>", 1)[1]
+
+
+def test_split_export_skips_vehicles_without_rows(client: TestClient) -> None:
+    _post(client, "/vehicles/new", {"name": "Golf"})
+    _post(client, "/vehicles/new", {"name": "Empty"})
+    empty = _download(client, "fuelly-metric")  # nothing to export at all
+    assert empty.status_code == 422 and "Nothing to export" in empty.text
+    _add_refuel(client, _vehicle_id(client, "Golf"), date(2026, 1, 5), 1000, litres="40",
+                price_per_litre="1.5")
+    exported = _download(client, "fuelly-metric")  # one file left: plain CSV, no empty one
+    assert exported.headers["content-type"].startswith("text/csv")
+    assert len(exported.text.splitlines()) == 2
 
 
 # --- Everything under an Ingress prefix ------------------------------------

@@ -62,6 +62,10 @@ class _Units:
     date_format: str | None  # None: ISO 8601
 
 
+class NothingToExport(Exception):
+    """No selected vehicle has any record the preset exports."""
+
+
 def unique_vehicle_names(vehicles: Sequence[Vehicle]) -> dict[int, str]:
     """
     Name to write for each vehicle (design D7).
@@ -124,6 +128,8 @@ def export_csv(
     ------
     PresetError
         The preset is not exportable.
+    NothingToExport
+        The preset splits by vehicle and no selected vehicle has a row to write.
     """
     if not preset.export or preset.skip_rows:
         raise PresetError(
@@ -149,14 +155,19 @@ def export_csv(
         for v in vehicles
     }
 
-    if not preset.split_by_vehicle or len(vehicles) <= 1:
+    # A vehicle without exported rows gets no file of its own.
+    filled = [v for v in vehicles if per_vehicle[v.id]]
+    if preset.split_by_vehicle and not filled:
+        raise NothingToExport("Nothing to export: the selected vehicles have no records of this kind.")
+
+    if not preset.split_by_vehicle or len(filled) <= 1:
         rows = [row for v in vehicles for row in per_vehicle[v.id]]
         return _csv_bytes(header, rows, delimiter), "text/csv"
 
     buffer = io.BytesIO()
     used: set[str] = set()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
-        for v in vehicles:
+        for v in filled:
             archive.writestr(
                 _file_name(names[v.id], v.id, used),
                 _csv_bytes(header, per_vehicle[v.id], delimiter),

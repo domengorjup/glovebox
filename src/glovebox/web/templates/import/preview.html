@@ -97,7 +97,7 @@
     <a class="btn" href="{{ url(request, '/import') }}">Cancel</a>
     <button type="submit" class="btn outline">Update preview</button>
     <button type="submit" class="btn outline" formaction="{{ url(request, '/import/mapping') }}">Edit mapping</button>
-    {% if not blocked %}
+    {% if not blocked and not nothing_new %}
     <button type="submit" class="btn primary" formaction="{{ url(request, '/import/commit') }}">Import now</button>
     {% endif %}
   </div>

@@ -345,9 +345,10 @@ class TestDuplicates:
         second = preview_import(session, standard_file, STANDARD)
         assert (second.new_refuels, second.new_expenses) == (0, 0)
         assert (second.duplicate_refuels, second.duplicate_expenses) == (3, 2)
-        batch = commit_import(session, standard_file, "f.csv", VehicleMapping(), STANDARD)
-        assert (batch.refuels_imported, batch.expenses_imported) == (0, 0)
-        assert batch.duplicates_skipped == 5
+        assert second.nothing_new
+        with pytest.raises(ValidationError, match="Nothing new"):
+            commit_import(session, standard_file, "f.csv", VehicleMapping(), STANDARD)
+        assert len(list_batches(session)) == 1  # no empty batch
         assert count(session, Refuel) == 3 and count(session, Expense) == 2
         assert count(session, Vehicle) == 2
 
@@ -417,7 +418,8 @@ class TestUndo:
     def test_batches_newest_first(self, session) -> None:
         mapping = _mapping(session)
         a = commit_import(session, FUELLY, "a", mapping, REFUELS)
-        b = commit_import(session, FUELLY, "b", mapping, REFUELS)
+        more = FUELLY + b"2024-03-01,2800,30.000,1.400,,0,Alpha Fuel\n"
+        b = commit_import(session, more, "b", mapping, REFUELS)
         assert [x.id for x in list_batches(session)] == [b.id, a.id]
 
 
@@ -494,8 +496,9 @@ class TestBackupRestore:
 
     def test_restore_twice_is_a_noop(self, session) -> None:
         commit_import(session, _backup(), "b.zip", VehicleMapping(), STANDARD)
-        again = commit_import(session, _backup(), "b.zip", VehicleMapping(), STANDARD)
-        assert (again.refuels_imported, again.expenses_imported) == (0, 0)
+        with pytest.raises(ValidationError, match="Nothing new"):
+            commit_import(session, _backup(), "b.zip", VehicleMapping(), STANDARD)
+        assert len(list_batches(session)) == 1
         assert count(session, Vehicle) == 2 and count(session, Station) == 2
 
     def test_vehicle_mapping_applies(self, session) -> None:

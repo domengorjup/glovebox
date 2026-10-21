@@ -63,5 +63,6 @@ nav:
       - Design language: dev/design.md
       - Importers: dev/importers.md
       - API reference: dev/api-reference.md
+      - Offline use (draft): dev/offline.md
       - Add-on and releases: dev/release.md
       - Licence and notices: dev/licence.md

@@ -3,6 +3,13 @@
 {% block title %}Import - Glovebox{% endblock %}
 {% block content %}
 {{ page_head(request, 'Import') }}
+{% if done %}
+<div class="alert success" role="status">
+  <span><strong>Imported {{ done.refuels_imported }} refuels and {{ done.expenses_imported }} expenses</strong> from {{ done.filename }}.
+  {{ done.duplicates_skipped }} duplicates skipped.</span>
+  {{ post_button(request, '/import/%d/undo' % done.id, 'Undo', 'Remove all records of this import?') }}
+</div>
+{% endif %}
 {% if more_sections %}
 {{ messages(None, ['The file has more sections: ' ~ (more_sections | join(', ')) ~ '. Upload it again and pick the preset for each one. Records that are already imported are skipped.']) }}
 {% endif %}

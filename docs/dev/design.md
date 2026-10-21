@@ -44,7 +44,7 @@ Section headings are plain `<h2>`; a heading with an action on the right uses `.
 
 ### App bar with vehicle select
 
-Always visible. Brand, a vehicle dropdown (active vehicles plus "All vehicles"), and on desktop the tabs. The select posts to `/preferences/vehicle` and submits on change (`data-autosubmit`); a "Show" button appears without JavaScript. Archived vehicles are never listed. It lives in `base.html`; do not copy it.
+Always visible. Brand, a vehicle dropdown (active vehicles plus "All vehicles"), and on desktop the tabs. The select posts to `/preferences/vehicle` and submits on change (`data-autosubmit`); a "Show" button appears without JavaScript. The `data-autosubmit` handler lives in `theme.js` (loaded in the head), not in the deferred `app.js`, so a choice made while the page script is still loading is not lost. Archived vehicles are never listed. It lives in `base.html`; do not copy it.
 
 ### Tabs and bottom nav
 
@@ -91,7 +91,7 @@ A card containing rows. A row is a whole-row link or button with a round badge, 
 </div>
 ```
 
-Badge colours: `t-refuel`, `t-service`, `t-expense`. A row that also needs a checkbox (stations) is a `.row` containing `label.pick` and `a.row-link`; do not add other row variants.
+Badge colours: `t-refuel`, `t-service`, `t-expense`. A row that also needs a checkbox (stations, export vehicles) is a `.row` containing `label.pick` and `a.row-link`; do not add other row variants.
 
 ### Filter chips
 
@@ -154,7 +154,7 @@ Dialog pages set `{% set dialog_page = true %}` so the page behind them gets no 
 
 ### Messages
 
-`{{ messages(errors, warnings) }}` renders `.alert.error` and `.alert.warning` blocks at the top of a form or page. A field-level hint is `.help` (`.help.err` for an error).
+`{{ messages(errors, warnings) }}` renders `.alert.error` and `.alert.warning` blocks at the top of a form or page. `.alert.success` reports the result of a finished action on the page it returns to (the import result: counts plus an outlined Undo button on the right, via `post_button`). Use it instead of a toast when the user needs to see what happened or reverse it. A field-level hint is `.help` (`.help.err` for an error).
 
 ### Form fields, select and switch
 

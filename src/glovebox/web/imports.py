@@ -26,7 +26,8 @@ from starlette.datastructures import FormData
 from glovebox.importers import engine, pipeline
 from glovebox.importers.engine import find_column, match_header
 from glovebox.importers.base import Answers
-from glovebox.importers.pipeline import CHOOSE_VEHICLE_MESSAGE, VehicleMapping
+from glovebox.importers.pipeline import CHOOSE_VEHICLE_MESSAGE, NOTHING_NEW_MESSAGE, VehicleMapping
+from glovebox.models import ImportBatch
 from glovebox.importers.presets import (
     STANDARD_ID,
     FieldMapping,
@@ -268,14 +269,18 @@ def _preset_names(session: Session) -> dict[str, str]:
 
 
 @router.get("")
-def import_home(request: Request, session: SessionDep, more: Annotated[list[str], Query()] = []):
-    """Upload form and the list of past import batches."""
+def import_home(
+    request: Request, session: SessionDep, more: Annotated[list[str], Query()] = [],
+    done: int | None = None,
+):
+    """Upload form, the list of past import batches and, after a commit, its result."""
     return render(
         request,
         "import/index.html",
         batches=pipeline.list_batches(session),
         preset_names=_preset_names(session),
         more_sections=[m for m in more if m.strip()],
+        done=session.get(ImportBatch, done) if done is not None else None,
         errors=[],
     )
 
@@ -462,6 +467,9 @@ def _preview_page(
         e for e in [*(errors or []), *preview.errors] if e != CHOOSE_VEHICLE_MESSAGE
     ]
     warnings = list(preview.warnings)
+    nothing_new = preview.nothing_new and not shown_errors and not questions
+    if nothing_new:
+        warnings.insert(0, NOTHING_NEW_MESSAGE)
     notes = list(notes or [])
     if preview.preset_note and not preview.is_backup:
         (notes if sub.preset.verified else warnings).insert(0, preview.preset_note)
@@ -477,6 +485,7 @@ def _preview_page(
         vehicles=vehicles,
         selection=selection,
         blocked=bool(preview.errors or questions),
+        nothing_new=nothing_new,
         questions=_question_rows(questions, answers),
         row_errors=row_errors[:PREVIEW_ERROR_LIMIT],
         row_error_total=len(row_errors),
@@ -556,7 +565,7 @@ async def import_commit(request: Request, session: SessionDep):
     path = _upload_path(request, sub.token)
     data = path.read_bytes()
     try:
-        pipeline.commit_import(
+        batch = pipeline.commit_import(
             session, data, sub.filename, sub.mapping, preset=sub.preset, answers=sub.answers
         )
     except (ValueError, RecordsError) as exc:
@@ -564,8 +573,8 @@ async def import_commit(request: Request, session: SessionDep):
         return _preview_page(request, session, sub, 422, [str(exc)])
     other = _other_sections(data, sub.preset)
     path.unlink(missing_ok=True)
-    query = urlencode([("more", s) for s in other])
-    return redirect(request, "/import" + (f"?{query}" if query else ""))
+    query = urlencode([("done", batch.id), *[("more", s) for s in other]])
+    return redirect(request, f"/import?{query}")
 
 
 def _other_sections(data: bytes, preset: Preset) -> list[str]:

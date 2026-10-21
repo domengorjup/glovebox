@@ -85,4 +85,15 @@
       document.addEventListener("visibilitychange", again);
     }
   } catch (e) { /* no live updates */ }
+
+  // Auto-submitting controls ([data-autosubmit], e.g. the app-bar vehicle select).
+  // Kept here, not in the deferred app.js: that file can still be loading when the
+  // user picks a vehicle on a fresh session, and the choice would be lost. A
+  // delegated listener on document works before any element exists. Without
+  // JavaScript the form's own button (<noscript>) submits.
+  document.addEventListener("change", function (event) {
+    var control = event.target;
+    if (!control.matches || !control.matches("[data-autosubmit]") || !control.form) { return; }
+    if (control.form.requestSubmit) { control.form.requestSubmit(); } else { control.form.submit(); }
+  });
 })();

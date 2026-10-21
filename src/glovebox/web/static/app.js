@@ -78,10 +78,10 @@
     }
   });
 
-  /* ---------- auto-submitting selects and inputs ---------- */
+  /* ---------- summary-card choice ---------- */
+  /* Auto-submitting controls are handled by theme.js, which runs before the page is parsed. */
   document.addEventListener("change", function (event) {
     var control = event.target;
-    if (control.matches("[data-autosubmit]") && control.form) { control.form.requestSubmit(); }
     if (control.closest("[data-cards-form]")) { saveCards(control.form); }
   });
 

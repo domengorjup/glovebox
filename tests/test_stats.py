@@ -388,3 +388,15 @@ def test_consumption_points_has_segments_and_monthly():
     assert series["name"] == "Golf"
     assert [p["date"] for p in series["points"]] == ["2026-03-05", "2026-03-20"]
     assert series["monthly"] == [{"date": "2026-03-15", "value": 6.6}]
+
+
+def test_consumption_with_partial_fill_is_exact(session, vid):
+    # Tank full at 1000 km. 400 km at 6.5 L/100 km use 26 L, 300 km more use 19.5 L.
+    # The partial fill (10 L) plus the next full fill (35.5 L) put back all 45.5 L.
+    fill(session, vid, 1000, 40)
+    fill(session, vid, 1400, 10, full=False)
+    fill(session, vid, 1700, 35.5)
+    segment = segments(session.query(Refuel).all())[-1]
+    assert segment.valid
+    assert (segment.distance_km, segment.litres_milli) == (700, 45500)
+    assert segment.consumption == pytest.approx(6.5, abs=1e-9)

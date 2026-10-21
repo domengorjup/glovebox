@@ -14,7 +14,7 @@
     {% for v in vehicles %}
     <div class="row">
       <label class="pick"><input id="i-vehicle-{{ v.id }}" type="checkbox" name="vehicle" value="{{ v.id }}" {{ 'checked' if v.id | string in ticked }} aria-label="Export {{ v.name }}"></label>
-      <label class="body" for="i-vehicle-{{ v.id }}"><span class="title">{{ v.name }}</span><br>
+      <label class="body" for="i-vehicle-{{ v.id }}"><span class="title">{{ v.name }}</span>
         <span class="detail">{{ 'Archived' if v.archived else (([v.make, v.model] | select | join(' ')) or 'Active') }}</span></label>
     </div>
     {% else %}

@@ -11,7 +11,7 @@ Every import works the same way: a **preset** says which column of your file fee
 1. **Upload** a CSV file, or a ZIP of CSV files. Glovebox reads it and selects the best-fitting preset. It changes nothing yet.
 2. **Map columns.** Check the preset, the file settings (encoding, delimiter, header row, section) and the value formats (date pattern, decimal and thousands separators, units). Each Glovebox field takes a column of your file, a constant value, or nothing. Rarely used fields are under **More fields**. A file that no preset fits starts as a custom mapping; the required fields (`type`, `date`, and `odometer_km` for refuels, `total` and `title` for expenses) must be mapped before you can go on.
 3. **Preview.** It shows the preset and its note, record counts, the vehicles found, duplicates, rows that are left out and why, and warnings. Nothing is written yet.
-4. **Answer questions** if there are any (see below), then press **Import now**. All records are added together as one **import batch**.
+4. **Answer questions** if there are any (see below), then press **Import now**. All records are added together as one **import batch**. The Import page then shows how many were added, with an **Undo** button. If every row is already present, the preview says so and offers no **Import now**; no empty batch is created.
 
 Standard files and full backups: a file in the standard format picks the **Glovebox** preset; a full backup goes straight to the preview.
 

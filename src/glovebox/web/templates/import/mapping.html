@@ -34,20 +34,20 @@
       <div class="field">
         <label for="i-encoding">Encoding</label>
         <select id="i-encoding" name="encoding">
-          <option value="">Detected{{ ' (' ~ table.encoding ~ ')' if table }}</option>
+          <option value="">Auto{{ ' (' ~ table.encoding | upper ~ ')' if table }}</option>
           {% for value, text in encodings %}<option value="{{ value }}" {{ 'selected' if preset.file.encoding == value }}>{{ text }}</option>{% endfor %}
         </select>
       </div>
       <div class="field">
         <label for="i-delimiter">Delimiter</label>
         <select id="i-delimiter" name="delimiter">
-          <option value="">Detected{{ ' (' ~ ('tab' if table.delimiter == '\t' else table.delimiter) ~ ')' if table }}</option>
+          <option value="">Auto{{ ' (' ~ ('tab' if table.delimiter == '\t' else table.delimiter) ~ ')' if table }}</option>
           {% for value, text in delimiters %}<option value="{{ value }}" {{ 'selected' if preset.file.delimiter == value }}>{{ text }}</option>{% endfor %}
         </select>
       </div>
     </div>
     <div class="grid2">
-      {{ field('Header row', 'header_row', preset.file.header_row or '', inputmode='numeric', placeholder=('Detected: ' ~ table.header_row) if table else '') }}
+      {{ field('Header row', 'header_row', preset.file.header_row or '', inputmode='numeric', placeholder=('Auto (' ~ table.header_row ~ ')') if table else 'Auto') }}
       {% if sections or preset.file.section %}
       <div class="field">
         <label for="i-section">Section</label>

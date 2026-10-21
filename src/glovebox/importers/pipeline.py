@@ -44,6 +44,7 @@ from glovebox.services.records import (
 )
 
 CHOOSE_VEHICLE_MESSAGE = "Choose a target vehicle for this file."
+NOTHING_NEW_MESSAGE = "Nothing new to import: every row is already present."
 CUSTOM_FORMAT = "custom"  # batch format of a preset that was never saved
 DETECT_THRESHOLD = 0.5
 # A Fuelio backup holds both sections and scores 1.0 for both Fuelio presets;
@@ -94,6 +95,11 @@ class ImportPreview:
     is_backup: bool = False
     companion_changes: list[CompanionChange] = field(default_factory=list)
     needs_vehicle_choice: bool = False  # question for the user, not a file fault
+
+    @property
+    def nothing_new(self) -> bool:
+        """True if a commit would create no record, vehicle or station."""
+        return not (self.new_refuels or self.new_expenses or self.companion_changes)
 
 
 @dataclass(frozen=True)
@@ -211,11 +217,14 @@ def commit_import(
     Raises
     ------
     ValidationError
-        If the preview has errors or unanswered questions.
+        If the preview has errors or unanswered questions, or if nothing
+        would be created (no batch is written then).
     """
     plan = _plan(session, data, preset, answers, mapping)
     if plan.blocked:
         raise ValidationError(plan.preview.errors or ["Unanswered import questions"])
+    if plan.preview.nothing_new:
+        raise ValidationError([NOTHING_NEW_MESSAGE])
     try:
         batch = _write(session, plan, filename)
         session.commit()

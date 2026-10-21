@@ -173,7 +173,7 @@ async def export_download(request: Request, session: SessionDep) -> Response:
         content, media_type = csv_export.export_csv(
             session, request.app.state.settings, preset, _vehicle_ids(form)
         )
-    except PresetError as exc:
+    except (PresetError, csv_export.NothingToExport) as exc:
         return _page(request, session, base, _vehicle_ids(form), 422, [str(exc)])
     extension = "zip" if media_type == "application/zip" else "csv"
     return _attachment(content, media_type, f"glovebox-export-{date.today().isoformat()}.{extension}")
