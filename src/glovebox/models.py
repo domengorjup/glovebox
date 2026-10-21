@@ -84,7 +84,7 @@ class ImportBatch(Base):
     __tablename__ = "import_batch"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    format: Mapped[str] = mapped_column(String(20))
+    format: Mapped[str] = mapped_column(String(50))
     filename: Mapped[str] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
     refuels_imported: Mapped[int] = mapped_column(Integer, default=0)
@@ -165,7 +165,7 @@ class Refuel(Base):
     is_full: Mapped[bool] = mapped_column(Boolean, default=True)
     missed_previous: Mapped[bool] = mapped_column(Boolean, default=False)
     notes: Mapped[str | None] = mapped_column(Text)
-    source: Mapped[str] = mapped_column(String(20), default="manual")
+    source: Mapped[str] = mapped_column(String(50), default="manual")
     source_ref: Mapped[str | None] = mapped_column(String(100))
     import_batch_id: Mapped[int | None] = mapped_column(
         ForeignKey("import_batch.id", ondelete="SET NULL"), index=True
@@ -199,7 +199,7 @@ class Expense(Base):
     coverage_start: Mapped[date | None] = mapped_column(Date)
     coverage_end: Mapped[date | None] = mapped_column(Date)
     notes: Mapped[str | None] = mapped_column(Text)
-    source: Mapped[str] = mapped_column(String(20), default="manual")
+    source: Mapped[str] = mapped_column(String(50), default="manual")
     source_ref: Mapped[str | None] = mapped_column(String(100))
     import_batch_id: Mapped[int | None] = mapped_column(
         ForeignKey("import_batch.id", ondelete="SET NULL"), index=True
@@ -214,3 +214,23 @@ class Setting(Base):
 
     key: Mapped[str] = mapped_column(String(50), primary_key=True)
     value: Mapped[str] = mapped_column(Text)
+
+
+class Preset(Base):
+    """
+    A user-defined import/export preset, stored as TOML text.
+
+    The preset id used elsewhere is ``user-<slug>``; ``body`` is exactly the
+    file format, so a download returns what the user can hand-edit.
+    """
+
+    __tablename__ = "preset"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    slug: Mapped[str] = mapped_column(String(100), unique=True)
+    name: Mapped[str] = mapped_column(String(100))
+    body: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utc_now, onupdate=_utc_now
+    )

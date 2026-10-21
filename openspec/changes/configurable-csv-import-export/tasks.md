@@ -14,21 +14,21 @@
 
 ## 1. Foundation (sequential; owns `standard.py`, `importers/presets.py`, `importers/base.py`, `models.py`, `migrations/versions/0003_presets.py`)
 
-- [ ] 1.1 Write `src/glovebox/standard.py` per design D1/D2: `StandardField`, `RECORD_FIELDS`, `VEHICLE_FIELDS`, `STATION_FIELDS`, `EXAMPLE_RECORDS`, with descriptions and examples for every field.
-- [ ] 1.2 Implement `datapackage(meta=None)` in `standard.py` (design D3). Check the property names and the custom-property rule against the current published Table Schema / Data Package standard, and pin the profile. Add `tests/test_standard.py` (field order, required flags, the descriptor's structure).
-- [ ] 1.3 Write `importers/presets.py`:
+- [x] 1.1 Write `src/glovebox/standard.py` per design D1/D2: `StandardField`, `RECORD_FIELDS`, `VEHICLE_FIELDS`, `STATION_FIELDS`, `EXAMPLE_RECORDS`, with descriptions and examples for every field.
+- [x] 1.2 Implement `datapackage(meta=None)` in `standard.py` (design D3). Check the property names and the custom-property rule against the current published Table Schema / Data Package standard, and pin the profile. Add `tests/test_standard.py` (field order, required flags, the descriptor's structure).
+- [x] 1.3 Write `importers/presets.py`:
   - the `Preset` dataclasses and the key table (key, type, allowed values, description);
   - `load_preset(text)` with validation that names the key path;
   - the TOML writer for the fixed shape;
   - `shipped_presets()` (from `src/glovebox/presets/*.toml`) and user preset CRUD (`list_presets(session)`, `save_user_preset`, `delete_user_preset`, `get_preset(session, id)`).
   Add `tests/test_presets.py`: validation errors, write→read round trip, name clash, shipped presets not writable.
-- [ ] 1.4 Add the `Preset` model to `models.py` and migration `0003_presets.py`: the `preset` table, and widen `import_batch.format`, `refuel.source` and `expense.source` to 50 characters, with a downgrade.
-- [ ] 1.5 Change `importers/base.py`:
+- [x] 1.4 Add the `Preset` model to `models.py` and migration `0003_presets.py`: the `preset` table, and widen `import_batch.format`, `refuel.source` and `expense.source` to 50 characters, with a downgrade.
+- [x] 1.5 Change `importers/base.py`:
   - keep the canonical records and the locale helpers;
   - add `RowError`, `Question`, `Answers`, and the optional `station_location`, `derived` and `source` fields on the canonical records;
   - add `row_errors`, `questions` and `skipped` to `ImportResult`;
   - keep `ImporterAdapter`, `AliasTable`, `load_aliases`, `HeaderMismatch` and `ImportOptions` for now, marked deprecated, so the old adapters and their tests stay green until task 7.1 deletes them.
-- [ ] 1.6 Write the stub signatures with docstrings:
+- [x] 1.6 Write the stub signatures with docstrings:
   - `importers/engine.py`: `read_file`, `score`, `apply`, `SourceFile`;
   - `importers/pipeline.py`: `detect_preset`, plus `preview_import` and `commit_import` taking `preset` and `answers`;
   - `exporters/csv_export.py`: `export_csv`;

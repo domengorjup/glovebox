@@ -39,6 +39,7 @@ Standing permissions for this loop: anything on the test VM `haos-test` (start/s
   - `glovebox.log_refuel` HA action, backed by a new token-protected write endpoint; pre-select the nearest known station from the phone's location.
   - Phone-friendly "quick add refuelling" page (could come earlier).
   - Optional "next service due" sensor (reminders were deliberately left out of v1).
+- **Path to the first real release** (agreed 2026-10-21): finish configurable CSV import/export → full test on the HAOS VM with fictional demo data → housekeeping (README with screenshots, icon, docs link, badges; real-app screenshots in the docs site on GitHub Pages) → release.
 - **README polish (low priority):** add the icon, screenshots from the real app, a link to the docs site and badges (CI, licence, version).
 - **More vehicle details (low priority, needs an OpenSpec change):** optional fields worth keeping at hand, e.g. VIN, year, engine/tyre sizes, insurance policy number and expiry, registration expiry. Keep the list short.
 - **Later:** GitHub Actions multi-arch image build to GHCR (group 10), then point `config.yaml` `image:` at it, which removes the git clone in the add-on Dockerfile.

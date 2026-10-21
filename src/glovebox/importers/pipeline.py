@@ -20,6 +20,8 @@ from glovebox.importers.base import (
     ImporterAdapter,
     ImportResult,
 )
+from glovebox.importers.base import Answers
+from glovebox.importers.presets import Preset
 from glovebox.importers.drivvo import DrivvoAdapter
 from glovebox.importers.fuelio import FuelioAdapter
 from glovebox.importers.fuelly import FuellyAdapter
@@ -129,6 +131,15 @@ def detect_format(data: bytes) -> str | None:
     return name if confidence > 0 else None
 
 
+def detect_preset(session: Session, data: bytes) -> Preset | None:
+    """
+    The best-matching preset for an upload (user presets first, then shipped),
+    or ``None`` if none finds at least half of its columns. Implemented by
+    task 2.2.
+    """
+    raise NotImplementedError("task 2.2")
+
+
 def preview_import(
     session: Session,
     data: bytes,
@@ -136,9 +147,16 @@ def preview_import(
     format: str | None = None,
     options: ImportOptions | None = None,
     mapping: VehicleMapping | None = None,
+    preset: Preset | None = None,
+    answers: Answers | None = None,
 ) -> ImportPreview:
     """
     Parse and count without writing. ``format`` overrides detection.
+
+    ``preset`` and ``answers`` are the new interface (design D6): task 2.4
+    makes them required (``preset`` positional after ``data``) and removes
+    ``format`` and ``options`` together with the v1 adapters. Until then
+    passing ``preset`` raises ``NotImplementedError``.
 
     A file vehicle name that is absent from the mapping is matched to the active vehicle
     of the same name, or else counted as a vehicle to create. Records of a
@@ -146,6 +164,8 @@ def preview_import(
     it the preview carries an error and ``needs_vehicle_choice`` is set, so
     a UI can ask for the vehicle instead of reporting a failed file.
     """
+    if preset is not None or answers is not None:
+        raise NotImplementedError("task 2.4")
     return _plan(session, data, format, options, mapping).preview
 
 
@@ -157,16 +177,21 @@ def commit_import(
     *,
     format: str | None = None,
     options: ImportOptions | None = None,
+    preset: Preset | None = None,
+    answers: Answers | None = None,
 ) -> ImportBatch:
     """
     Write all new records in one transaction under a new ``ImportBatch``;
-    duplicates are skipped and counted.
+    duplicates are skipped and counted. ``preset`` and ``answers`` as in
+    ``preview_import``; the batch records the preset id as its ``format``.
 
     Raises
     ------
     ValidationError
         If the preview has errors or unanswered questions.
     """
+    if preset is not None or answers is not None:
+        raise NotImplementedError("task 2.4")
     plan = _plan(session, data, format, options, mapping)
     if plan.blocked:
         raise ValidationError(plan.preview.errors or ["Unanswered import questions"])

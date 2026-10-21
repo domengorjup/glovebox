@@ -1,10 +1,11 @@
 """
-Importer interface (design D6). FROZEN; adapters implement ``ImporterAdapter``.
+Shared import types and locale helpers (design D6). FROZEN after task group 1.
 
-Adapters are pure: they turn bytes into canonical records in storage units and
-never touch the database. Group 3 adds the shared locale helpers (encoding,
-delimiter, decimal, date detection, alias loader) to this module; they must not
-change the names below.
+The preset engine (``importers/engine.py``) turns bytes into canonical records
+in storage units and never touches the database. ``ImporterAdapter``,
+``AliasTable``, ``load_aliases``, ``HeaderMismatch``, ``ImportOptions`` and
+``Ambiguity`` belong to the v1 per-app importers; they are DEPRECATED and are
+deleted together with those importers (task 7.1).
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from glovebox.models import ExpenseCategory
+from glovebox.models import DerivedField, ExpenseCategory
 
 
 @dataclass(frozen=True)
@@ -53,6 +54,9 @@ class CanonicalRefuel:
     missed_previous: bool = False
     notes: str | None = None
     source_ref: str | None = None
+    station_location: str | None = None
+    derived: DerivedField | None = None  # figure the file marks as derived
+    source: str | None = None  # file-provided source (backup restore)
 
 
 @dataclass(frozen=True)
@@ -69,10 +73,61 @@ class CanonicalExpense:
     coverage_end: date | None = None
     notes: str | None = None
     source_ref: str | None = None
+    source: str | None = None  # file-provided source (backup restore)
+
+
+@dataclass(frozen=True)
+class RowError:
+    """
+    A row that cannot be imported. The row is skipped; the rest stays
+    committable.
+
+    ``line`` is the 1-based line number in the file; ``field`` is the target
+    standard field (``""`` if the row as a whole is at fault).
+    """
+
+    line: int
+    field: str
+    value: str
+    message: str
+
+
+class QuestionKind(StrEnum):
+    """What the preview asks the user."""
+
+    DATE_ORDER = "date_order"  # answers: "dmy" | "mdy"
+    DISTANCE_UNIT = "distance_unit"  # answers: "km" | "mi"
+    VOLUME_UNIT = "volume_unit"  # answers: "l" | "gal_us" | "gal_uk"
+
+
+@dataclass(frozen=True)
+class Question:
+    """An unanswered question that blocks the preview (design D6)."""
+
+    kind: QuestionKind
+    message: str
+    options: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class Answers:
+    """
+    User choices passed to ``engine.apply`` and the pipeline. ``None`` means
+    "not answered / use the preset or detect".
+
+    The first three answer ``Question`` s; the rest override file reading.
+    """
+
+    date_order: str | None = None
+    distance_unit: str | None = None
+    volume_unit: str | None = None
+    encoding: str | None = None
+    delimiter: str | None = None
+    header_row: int | None = None  # over non-blank rows, 1 = first
 
 
 class Ambiguity(StrEnum):
-    """Questions the preview must ask the user."""
+    """DEPRECATED (v1 adapters). Questions the preview must ask the user."""
 
     DATE_ORDER = "date_order"  # day-first vs month-first
     UNITS = "units"  # metric vs imperial
@@ -81,7 +136,8 @@ class Ambiguity(StrEnum):
 @dataclass(frozen=True)
 class ImportOptions:
     """
-    User answers passed to ``parse``. ``None`` means "not answered / auto".
+    DEPRECATED (v1 adapters). User answers passed to ``parse``.
+    ``None`` means "not answered / auto".
 
     Attributes
     ----------
@@ -97,7 +153,7 @@ class ImportOptions:
 
 @dataclass(frozen=True)
 class HeaderMismatch:
-    """Reported when required headers are missing; nothing is imported."""
+    """DEPRECATED (v1 adapters). Required headers are missing; nothing is imported."""
 
     found: list[str]
     expected: list[str]
@@ -106,11 +162,14 @@ class HeaderMismatch:
 @dataclass
 class ImportResult:
     """
-    Output of ``ImporterAdapter.parse``.
+    Output of ``engine.apply`` (and of the v1 ``ImporterAdapter.parse``).
 
-    ``ambiguities`` lists unanswered questions; the pipeline re-parses with
-    ``ImportOptions`` once the user answers. ``errors`` non-empty means the
-    file cannot be imported.
+    ``questions`` lists unanswered questions; re-apply with ``Answers`` once
+    the user answers. ``errors`` non-empty means the file cannot be imported
+    (blocking). ``row_errors`` are rows skipped for a fault in the row;
+    ``skipped`` counts rows dropped by the preset's skip rules.
+    ``warnings``, ``ambiguities`` and ``header_mismatch`` are kept for the v1
+    adapters (DEPRECATED).
     """
 
     refuels: list[CanonicalRefuel] = field(default_factory=list)
@@ -120,12 +179,15 @@ class ImportResult:
     errors: list[str] = field(default_factory=list)
     ambiguities: list[Ambiguity] = field(default_factory=list)
     header_mismatch: HeaderMismatch | None = None
+    row_errors: list[RowError] = field(default_factory=list)
+    questions: list[Question] = field(default_factory=list)
+    skipped: int = 0
 
 
 @runtime_checkable
 class ImporterAdapter(Protocol):
     """
-    One file format. Register instances in ``importers.pipeline``.
+    DEPRECATED (v1 adapters). One file format.
 
     Attributes
     ----------
@@ -373,7 +435,7 @@ def normalize_header(header: str) -> str:
 @dataclass(frozen=True)
 class AliasTable:
     """
-    Alias data of one format: ``section -> canonical name -> [aliases]``.
+    DEPRECATED (v1 adapters). Alias data of one format: ``section -> canonical name -> [aliases]``.
 
     ``provisional`` mirrors ``[meta] provisional`` in the TOML file.
     """
@@ -408,7 +470,7 @@ class AliasTable:
 
 
 def load_aliases(name: str, directory: Path = ALIASES_DIR) -> AliasTable:
-    """Load ``aliases/<name>.toml``."""
+    """DEPRECATED (v1 adapters). Load ``aliases/<name>.toml``."""
     with (directory / f"{name}.toml").open("rb") as handle:
         raw = tomllib.load(handle)
     meta = raw.pop("meta", {})
