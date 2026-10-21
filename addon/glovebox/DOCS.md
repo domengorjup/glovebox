@@ -80,3 +80,7 @@ Import a CSV (or a ZIP of CSV files, such as a full backup) under Manage, Import
 ## Support
 
 Report problems in the project's issue tracker.
+
+## Disclaimer
+
+Glovebox was developed with the assistance of AI (large language models). It is provided "as is", without warranty of any kind, express or implied. The authors accept no responsibility or liability for any damage, data loss or other consequences arising from its use. See the MIT licence for the full terms.

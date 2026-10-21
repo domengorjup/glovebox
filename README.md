@@ -79,3 +79,7 @@ Use the full backup in the app (a ZIP of CSV files plus a `datapackage.json`) as
 Released under the MIT licence, see [LICENSE](LICENSE). Bundled and referenced third-party material is listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 Drivvo, Fuelio, Fuelly and Home Assistant are trademarks of their respective owners; this project is not affiliated with or endorsed by them.
+
+## Disclaimer
+
+Glovebox was developed with the assistance of AI (large language models). It is provided "as is", without warranty of any kind, express or implied. The authors accept no responsibility or liability for any damage, data loss or other consequences arising from its use. See the MIT licence for the full terms.

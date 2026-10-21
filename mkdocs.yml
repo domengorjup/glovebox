@@ -1,4 +1,7 @@
 site_name: Glovebox
+copyright: >-
+  MIT licence &middot; Made with AI assistance. Provided "as is", without warranty of any kind;
+  the authors accept no responsibility or liability for its use.
 site_url: https://domengorjup.github.io/glovebox/
 site_description: Self-hosted tracker for car running costs
 repo_url: https://github.com/domengorjup/glovebox
