@@ -8,7 +8,7 @@
       action="{{ url(request, '/vehicles/%d/delete' % vehicle.id) }}">
   <h3>Delete {{ vehicle.name }}?</h3>
   {% if counts.refuels or counts.expenses %}
-  <p class="warning">This permanently deletes the vehicle and also <strong>{{ counts.refuels }}</strong> refuels
+  <p>This permanently deletes the vehicle and also <strong>{{ counts.refuels }}</strong> refuels
   and <strong>{{ counts.expenses }}</strong> expenses. This cannot be undone. To keep the history, archive the
   vehicle instead.</p>
   {% else %}

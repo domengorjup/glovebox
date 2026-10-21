@@ -1,5 +1,5 @@
 {% extends layout %}
-{% from "_macros.html" import messages, back with context %}
+{% from "_macros.html" import messages, page_head with context %}
 {% block title %}Vehicles - Glovebox{% endblock %}
 {% macro vehicle_row(r) %}
 {% set v = r.vehicle %}
@@ -14,8 +14,7 @@
 </a>
 {% endmacro %}
 {% block content %}
-{{ back(request) }}
-<div class="page-title"><h1>Vehicles</h1></div>
+{{ page_head(request, 'Vehicles') }}
 {{ messages(errors) }}
 <div class="page-actions">
   <a class="btn primary" href="{{ url(request, '/vehicles/new') }}" data-dialog>{{ icon('plus', 18) }}Add vehicle</a>

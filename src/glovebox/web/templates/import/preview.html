@@ -1,9 +1,8 @@
 {% extends layout %}
-{% from "_macros.html" import messages, back with context %}
+{% from "_macros.html" import messages, page_head with context %}
 {% block title %}Import preview - Glovebox{% endblock %}
 {% block content %}
-{{ back(request) }}
-<div class="page-title"><h1>Import preview</h1></div>
+{{ page_head(request, 'Import preview', '/import', 'Import') }}
 <p class="help flush">File: <strong>{{ p.filename }}</strong> - detected format: <strong>{{ preview.format }}</strong></p>
 {{ messages(errors, preview.warnings) }}
 

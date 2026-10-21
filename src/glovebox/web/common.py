@@ -15,6 +15,7 @@ from glovebox.models import Vehicle
 from glovebox.services import preferences, records
 from glovebox.services.stats import StatsFilter
 from glovebox.urls import url
+from glovebox.web import formatting
 from glovebox.web.templating import templates
 
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -114,7 +115,9 @@ def render(
     page, or just the content block when the page script asks for a dialog.
     """
     context.setdefault("section", "manage")
-    context.setdefault("currency", request.app.state.settings.currency)
+    context.setdefault(
+        "currency", formatting.currency_symbol(request.app.state.settings.currency)
+    )
     if "chrome" not in context:
         context["chrome"] = load_chrome(request.state.session)
     context["location"] = current_location(request)

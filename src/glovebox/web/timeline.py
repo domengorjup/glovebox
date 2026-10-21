@@ -181,7 +181,7 @@ def build_cards(figures: list[_Figures], today: date, currency: str) -> dict[str
             CONSUMPTION_UNIT, no_fuel or "Last 12 months",
         ),
         "cost_km": card(
-            "cost_km", None if per_km is None else f"{per_km:.3f}",
+            "cost_km", None if per_km is None else f"{per_km:.2f}",
             f"{currency}/km", "All costs, last 12 months",
         ),
         "avg_price": card(
@@ -270,7 +270,7 @@ def timeline(request: Request, session: SessionDep, type: str = "all"):
         raise HTTPException(422, detail=f"type: '{type}' is not one of {', '.join(TYPES)}")
     chrome = load_chrome(session)
     today = date.today()
-    currency = request.app.state.settings.currency
+    currency = formatting.currency_symbol(request.app.state.settings.currency)
     everyone = chrome.vehicles + chrome.archived
     combined = not chrome.selected_ids
     shown = everyone if combined else [v for v in everyone if v.id == chrome.selected_ids[0]]
@@ -278,7 +278,7 @@ def timeline(request: Request, session: SessionDep, type: str = "all"):
     groups = []
     if combined and len(chrome.vehicles) > 1:
         groups = [
-            (f.vehicle.name, build_cards([f], today, currency))
+            (str(f.vehicle.id), f.vehicle.name, build_cards([f], today, currency))
             for f in figures if not f.vehicle.archived
         ]
     return render(
@@ -292,6 +292,12 @@ def timeline(request: Request, session: SessionDep, type: str = "all"):
         card_labels=CARD_LABELS,
         chosen_cards=preferences.get_summary_cards(session),
         vehicle_groups=groups,
+        summary_options=(
+            [(preferences.ALL_VEHICLES, "All vehicles (combined)")]
+            + [(key, name) for key, name, _ in groups]
+            if groups else []
+        ),
+        hidden_summaries=preferences.get_hidden_summaries(session),
         months=group_by_month(build_entries(session, chrome, type)),
         has_vehicles=bool(everyone),
         title="All vehicles" if combined else shown[0].name,

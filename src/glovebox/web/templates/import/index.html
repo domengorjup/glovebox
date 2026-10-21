@@ -1,9 +1,8 @@
 {% extends layout %}
-{% from "_macros.html" import messages, post_button, back with context %}
+{% from "_macros.html" import messages, post_button, page_head with context %}
 {% block title %}Import - Glovebox{% endblock %}
 {% block content %}
-{{ back(request) }}
-<div class="page-title"><h1>Import</h1></div>
+{{ page_head(request, 'Import') }}
 {{ messages(errors) }}
 <form class="card card-pad stack" method="post" action="{{ url(request, '/import/upload') }}" enctype="multipart/form-data">
   <div class="field">

@@ -109,7 +109,7 @@
 
 ## 6. Web UI (needs 1; uses 2's service signatures, can start against stubs)
 
-- [x] 6.1 Vendor Chart.js and a classless CSS (e.g. Pico.css) into `static/`, with their licence files. Add a test that asserts that rendered pages reference no external hosts.
+- [x] 6.1 Provide the project's own CSS and JavaScript (inline SVG charts) and vendor the used Material Design Icons into `static/`, with their licence file. Add a test that asserts that rendered pages reference no external hosts.
 - [x] 6.2 Build the vehicles pages: list, create/edit, archive, delete confirmation that shows record counts.
 - [x] 6.3 Build the refuel pages (brand is never auto-suggested):
   - list with filters (vehicle, date range, station/brand) and per-row consumption or n/a;

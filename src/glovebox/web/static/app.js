@@ -85,17 +85,37 @@
     if (control.closest("[data-cards-form]")) { saveCards(control.form); }
   });
 
+  /* ---------- toast ---------- */
+  function toast(message) {
+    var old = document.querySelector(".toast");
+    if (old) { old.remove(); }
+    var node = document.createElement("div");
+    node.className = "toast";
+    node.setAttribute("role", "status");
+    node.textContent = message;
+    document.body.appendChild(node);
+    setTimeout(function () { node.remove(); }, 3000);
+  }
+
   /* ---------- summary cards ---------- */
   function saveCards(form) {
-    var chosen = Array.prototype.map.call(
-      form.querySelectorAll("input[name=card]:checked"), function (i) { return i.value; });
+    function ticked(name) {
+      return Array.prototype.map.call(
+        form.querySelectorAll("input[name=" + name + "]:checked"), function (i) { return i.value; });
+    }
+    var cards = ticked("card"), groups = ticked("summary");
     document.querySelectorAll("[data-card]").forEach(function (card) {
-      card.hidden = chosen.indexOf(card.getAttribute("data-card")) < 0;
+      card.hidden = cards.indexOf(card.getAttribute("data-card")) < 0;
     });
-    var body = new URLSearchParams();
-    chosen.forEach(function (c) { body.append("card", c); });
-    body.append("next", form.querySelector("[name=next]").value);
-    fetch(form.action, { method: "POST", body: body, redirect: "manual", credentials: "same-origin" });
+    form.querySelectorAll("input[name=offered]").forEach(function (offer) {
+      document.querySelectorAll('[data-summary="' + offer.value + '"]').forEach(function (group) {
+        group.hidden = groups.indexOf(offer.value) < 0;
+      });
+    });
+    fetch(form.action, {
+      method: "POST", body: new URLSearchParams(new FormData(form)),
+      redirect: "manual", credentials: "same-origin"
+    }).catch(function () { toast("Could not save the choice"); });
   }
 
   /* ---------- refuelling form: two of three ---------- */

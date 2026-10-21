@@ -277,7 +277,7 @@ def build_kpis(
 
     def per(cents: int, label: str) -> Kpi:
         value = cents / 100 / distance if distance and distance > 0 else None
-        return Kpi(label, "n/a" if value is None else f"{value:.3f}",
+        return Kpi(label, "n/a" if value is None else f"{value:.2f}",
                    "" if value is None else f"{currency}/km")
 
     if query.what == "refuel":
@@ -292,7 +292,7 @@ def build_kpis(
         km = "n/a" if distance is None else f"{distance:,.0f}"
         return [
             Kpi("Total cost", money(total_cents, currency)),
-            Kpi("Cost per km", "n/a" if cost.per_km is None else f"{cost.per_km:.3f}",
+            Kpi("Cost per km", "n/a" if cost.per_km is None else f"{cost.per_km:.2f}",
                 "" if cost.per_km is None else f"{currency}/km"),
             avg,
             Kpi("Distance", km, "" if distance is None else "km"),
@@ -315,7 +315,7 @@ def stats_page(request: Request, session: SessionDep):
     chrome = load_chrome(session)
     today = date.today()
     flt = build_filter(query, chrome, today)
-    currency = request.app.state.settings.currency
+    currency = formatting.currency_symbol(request.app.state.settings.currency)
     fuel, cats = _included(query, flt)
 
     breakdown = stats.cost_breakdown(session, flt, query.allocation)

@@ -34,8 +34,17 @@ def set_cards(
     request: Request,
     session: SessionDep,
     card: Annotated[list[str] | None, Form()] = None,
+    offered: Annotated[list[str] | None, Form()] = None,
+    summary: Annotated[list[str] | None, Form()] = None,
     next: Annotated[str, Form()] = "/",
 ):
-    """Store which summary cards the Timeline shows (unknown names are dropped)."""
+    """
+    Store which summary cards the Timeline shows (unknown names are dropped).
+
+    When the form also listed summary groups (``offered``, "All vehicles"
+    only), the unticked ones are stored as hidden.
+    """
     preferences.set_summary_cards(session, card or [])
+    if offered:
+        preferences.update_hidden_summaries(session, offered, summary or [])
     return redirect(request, safe_next(next))

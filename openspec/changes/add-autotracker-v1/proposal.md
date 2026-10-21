@@ -48,5 +48,5 @@ The user tracks car running costs in Drivvo, a proprietary freemium app whose da
 
 - New codebase: Python package `glovebox` (FastAPI app, SQLAlchemy models, Alembic migrations, importers/exporters, Jinja2 templates, vendored static assets), plus `Dockerfile`, add-on folder and `repository.yaml`.
 - New dependencies (via `uv add`): fastapi, uvicorn, sqlalchemy, alembic, jinja2, python-multipart, itsdangerous. Dev dependencies: pytest, httpx.
-- Vendored front-end assets (no CDN, because Ingress and offline use must work): Chart.js and a small classless CSS framework.
+- Vendored front-end assets (no CDN, because Ingress and offline use must work): the project's own CSS and JavaScript (inline SVG charts) and the used Material Design Icons as an SVG sprite.
 - No external services. User data stays in the SQLite file. Real user export files are never committed; tests use anonymised fixtures.

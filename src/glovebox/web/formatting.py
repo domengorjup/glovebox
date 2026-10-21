@@ -14,9 +14,19 @@ MONTH_NAMES = (
 )  # fmt: skip
 
 
+CURRENCY_SYMBOLS = {"EUR": "\u20ac", "USD": "$", "GBP": "\u00a3"}
+
+
+def currency_symbol(code: str) -> str:
+    """Symbol for the common currency codes, else the code itself (CHF stays CHF)."""
+    return CURRENCY_SYMBOLS.get(code, code)
+
+
 def money(cents: int | None, currency: str) -> str:
     """Return cents as ``"123.45 EUR"`` (non-breaking space), or ``"n/a"``."""
-    return "n/a" if cents is None else f"{format_cents(cents)}{NBSP}{currency}"
+    if cents is None:
+        return "n/a"
+    return f"{format_cents(cents)}{NBSP}{currency_symbol(currency)}"
 
 
 def with_unit(text: str, unit: str) -> str:

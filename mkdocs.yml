@@ -1,4 +1,5 @@
 site_name: Glovebox
+site_url: https://domengorjup.github.io/glovebox/
 site_description: Self-hosted tracker for car running costs
 repo_url: https://github.com/domengorjup/glovebox
 repo_name: domengorjup/glovebox
@@ -57,6 +58,7 @@ nav:
       - Project layout: dev/layout.md
       - Local development: dev/development.md
       - Testing: dev/testing.md
+      - Design language: dev/design.md
       - Importers: dev/importers.md
       - API reference: dev/api-reference.md
       - Add-on and releases: dev/release.md

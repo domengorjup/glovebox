@@ -270,7 +270,7 @@ def test_timeline_shows_consumption_or_dash_for_cards(client, monkeypatch):
 
 def test_timeline_numbers_do_not_break_across_lines(client):
     html = client.get("/").text
-    assert "420.00\u00a0EUR" in html
+    assert "420.00\u00a0\u20ac" in html
 
 
 def test_add_chooser_links_to_the_three_forms(client):
@@ -809,3 +809,76 @@ def test_fuelly_download_all_vehicles(client, monkeypatch):
 def test_vehicle_edit_prefills_form(client):
     html = client.get("/vehicles/1/edit").text
     assert 'name="name" value="Golf"' in html and 'name="make" value="VW"' in html
+
+
+# --- round 2: sub-page header, links, currency, summary picker --------------
+
+
+@pytest.mark.parametrize("path", ["/vehicles", "/stations", "/import", "/export"])
+def test_manage_sub_pages_have_the_back_icon_button(client, path):
+    html = client.get(path, headers=INGRESS).text
+    assert 'aria-label="Back to Manage"' in html
+    assert f'href="{PREFIX}/manage"' in html
+    head = html.split('class="page-head"', 1)[1].split("</div>", 1)[0]
+    assert head.index("icon-btn") < head.index("<h1>")
+    assert "‹" not in html
+
+
+def test_import_preview_goes_back_to_import(client, monkeypatch):
+    monkeypatch.setattr(pipeline, "preview_import", lambda *a, **k: fake_preview())
+    html = client.get(upload(client)).text
+    assert 'aria-label="Back to Import"' in html and 'class="page-head"' in html
+
+
+@pytest.mark.parametrize("path", PAGES)
+def test_no_plain_text_links_for_navigation(client, path):
+    # Every in-app link is a styled element (button, icon button, row, tab, chip ...).
+    html = client.get(path).text
+    for tag in re.findall(r"<a\b[^>]*>", html):
+        assert 'class="' in tag, tag
+    assert "link-btn" not in html
+
+
+def test_currency_symbols():
+    from glovebox.web.formatting import currency_symbol, money
+
+    assert [currency_symbol(c) for c in ("EUR", "USD", "GBP", "CHF", "SEK")] == [
+        "€", "$", "£", "CHF", "SEK"]
+    assert money(12345, "EUR") == "123.45 €"
+    assert money(12345, "CHF") == "123.45 CHF"
+
+
+def test_currency_symbol_shows_in_forms_and_cards(client):
+    assert "€" in client.get("/refuels/new").text
+    assert "EUR" not in client.get("/").text
+
+
+def test_summary_picker_only_with_all_vehicles_and_several_vehicles(client, monkeypatch):
+    assert "Summaries" not in client.get("/").text  # a single vehicle
+    use_vehicles(monkeypatch, make_vehicle(), make_vehicle(2, "Polo"))
+    html = client.get("/").text
+    assert "All vehicles (combined)" in html and 'name="summary" value="2"' in html
+    client.post("/preferences/vehicle", data={"vehicle": "1"})
+    assert "Summaries" not in client.get("/").text
+
+
+def test_summary_picker_stores_only_unticked_groups(client, monkeypatch):
+    use_vehicles(monkeypatch, make_vehicle(), make_vehicle(2, "Polo"))
+    client.post("/preferences/cards", data={
+        "card": ["cost_month"], "offered": ["all", "1", "2"], "summary": ["all", "2"]})
+    html = client.get("/").text
+    assert re.search(r'data-summary="1"\s+hidden', html)
+    assert not re.search(r'data-summary="2"\s+hidden', html)
+    assert not re.search(r'data-summary="all"\s+hidden', html)
+    assert re.search(r'name="summary" value="1"\s*>', html)  # not ticked
+
+
+def test_hidden_combined_summary_and_new_vehicle_defaults_to_shown(client, monkeypatch):
+    use_vehicles(monkeypatch, make_vehicle(), make_vehicle(2, "Polo"))
+    client.post("/preferences/cards", data={
+        "offered": ["all", "1", "2"], "summary": ["1", "2"]})
+    assert re.search(r'data-summary="all"\s+hidden', client.get("/").text)
+    use_vehicles(monkeypatch, make_vehicle(), make_vehicle(2, "Polo"), make_vehicle(3, "Fiat"))
+    html = client.get("/").text
+    assert not re.search(r'data-summary="3"\s+hidden', html)
+    assert 'name="summary" value="3" checked' in html

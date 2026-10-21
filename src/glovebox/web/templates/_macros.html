@@ -49,6 +49,19 @@
   </div>
 {% endmacro %}
 
+{# Vehicle dropdown of the add/edit forms (active vehicles only; caller passes them). #}
+{% macro vehicle_select(vehicles, selected='') %}
+  <div class="field">
+    <label for="i-vehicle_id">Vehicle</label>
+    <select id="i-vehicle_id" name="vehicle_id" required>
+      <option value="">Choose...</option>
+      {% for v in vehicles %}
+      <option value="{{ v.id }}" {{ 'selected' if selected == v.id | string }}>{{ v.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+{% endmacro %}
+
 {# Head of a dialog: close link (works without the page script) and title. #}
 {% macro dialog_head(request, title, close_path='/') %}
   <div class="dialog-head">
@@ -57,9 +70,12 @@
   </div>
 {% endmacro %}
 
-{# Back link of a Manage sub-page. #}
-{% macro back(request) %}
-  <a class="link-btn back" href="{{ url(request, '/manage') }}">{{ icon('chevron-left', 18) }}Manage</a>
+{# HA sub-page header: round back button left of the title. #}
+{% macro page_head(request, title, parent_path='/manage', parent_label='Manage') %}
+  <div class="page-head">
+    <a class="icon-btn" href="{{ url(request, parent_path) }}" aria-label="Back to {{ parent_label }}">{{ icon('arrow-left', 24) }}</a>
+    <h1>{{ title }}</h1>
+  </div>
 {% endmacro %}
 
 {# A small form that posts to `path`, asking for confirmation first. #}

@@ -1,5 +1,5 @@
 {% extends layout %}
-{% from "_macros.html" import messages, field, textarea, dialog_head with context %}
+{% from "_macros.html" import messages, field, textarea, dialog_head, vehicle_select with context %}
 {% set dialog_page = true %}
 {% set noun = 'service' if is_service else 'expense' %}
 {% set heading = ('Edit ' if expense_id else 'New ') ~ noun %}
@@ -11,15 +11,7 @@
   {{ dialog_head(request, heading) }}
   <div class="dialog-body">
     {{ messages(errors) }}
-    <div class="field">
-      <label for="i-vehicle_id">Vehicle</label>
-      <select id="i-vehicle_id" name="vehicle_id" required>
-        <option value="">Choose...</option>
-        {% for v in vehicles %}
-        <option value="{{ v.id }}" {{ 'selected' if f.vehicle_id == v.id | string }}>{{ v.name }}</option>
-        {% endfor %}
-      </select>
-    </div>
+    {{ vehicle_select(vehicles, f.vehicle_id) }}
     {% if is_service %}
       <input type="hidden" name="category" value="maintenance">
       <div class="grid2">

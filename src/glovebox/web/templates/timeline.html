@@ -1,6 +1,13 @@
 {% extends layout %}
 {% block title %}Timeline - Glovebox{% endblock %}
 {% set kind_icons = {'refuel': 'gas-station', 'service': 'wrench', 'expense': 'file-document-outline'} %}
+{% macro stat_card(key, c) %}
+<div class="card stat" data-card="{{ key }}" {{ 'hidden' if key not in chosen_cards }}>
+  <div class="label">{{ c.label }}</div>
+  <div class="value">{{ c.value }}{% if c.unit %}<small>{{ c.unit }}</small>{% endif %}</div>
+  <div class="hint">{{ c.hint }}</div>
+</div>
+{% endmacro %}
 {% block content %}
 {% if not has_vehicles %}
 <div class="card empty">
@@ -11,7 +18,7 @@
 <div class="summary-head">
   <h2>{{ title }} · summary</h2>
   <details class="customise">
-    <summary class="link-btn">{{ icon('tune-variant', 18) }}Customise</summary>
+    <summary class="btn with-icon">{{ icon('tune-variant', 18) }}Customise</summary>
     <form class="popover" method="post" action="{{ url(request, '/preferences/cards') }}" data-cards-form>
       <input type="hidden" name="next" value="{{ location }}">
       <div class="pop-title">Show these cards</div>
@@ -20,31 +27,32 @@
         <input type="checkbox" name="card" value="{{ key }}" {{ 'checked' if key in chosen_cards }}>{{ card_labels[key] }}
       </label>
       {% endfor %}
+      {% if summary_options %}
+      <div class="pop-title">Summaries</div>
+      {% for key, name in summary_options %}
+      <input type="hidden" name="offered" value="{{ key }}">
+      <label class="check-row">
+        <input type="checkbox" name="summary" value="{{ key }}" {{ 'checked' if key not in hidden_summaries }}>{{ name }}
+      </label>
+      {% endfor %}
+      {% endif %}
       <button type="submit" class="btn primary no-js-only">Apply</button>
     </form>
   </details>
 </div>
-<div class="summary-grid">
+<div class="summary-grid" data-summary="all" {{ 'hidden' if 'all' in hidden_summaries and summary_options }}>
   {% for key in card_order %}
   {% set c = cards[key] %}
-  <div class="card stat" data-card="{{ key }}" {{ 'hidden' if key not in chosen_cards }}>
-    <div class="label">{{ c.label }}</div>
-    <div class="value">{{ c.value }}{% if c.unit %}<small>{{ c.unit }}</small>{% endif %}</div>
-    <div class="hint">{{ c.hint }}</div>
-  </div>
+  {{ stat_card(key, c) }}
   {% endfor %}
 </div>
 
-{% for name, group in vehicle_groups %}
-<h3 class="veh-head">{{ name }}</h3>
-<div class="summary-grid compact" data-vehicle-group>
+{% for id, name, group in vehicle_groups %}
+<h3 class="veh-head" data-summary="{{ id }}" {{ 'hidden' if id in hidden_summaries }}>{{ name }}</h3>
+<div class="summary-grid compact" data-vehicle-group data-summary="{{ id }}" {{ 'hidden' if id in hidden_summaries }}>
   {% for key in card_order %}
   {% set c = group[key] %}
-  <div class="card stat" data-card="{{ key }}" {{ 'hidden' if key not in chosen_cards }}>
-    <div class="label">{{ c.label }}</div>
-    <div class="value">{{ c.value }}{% if c.unit %}<small>{{ c.unit }}</small>{% endif %}</div>
-    <div class="hint">{{ c.hint }}</div>
-  </div>
+  {{ stat_card(key, c) }}
   {% endfor %}
 </div>
 {% endfor %}

@@ -1,9 +1,8 @@
 {% extends layout %}
-{% from "_macros.html" import messages, back with context %}
+{% from "_macros.html" import messages, page_head with context %}
 {% block title %}Gas stations - Glovebox{% endblock %}
 {% block content %}
-{{ back(request) }}
-<div class="page-title"><h1>Gas stations</h1></div>
+{{ page_head(request, 'Gas stations') }}
 {{ messages(errors) }}
 <p class="help flush">Brands are set by hand here; the app never guesses a brand from a name.
 Stations are created from the refuelling form or by imports.</p>

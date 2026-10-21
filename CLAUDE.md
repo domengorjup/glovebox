@@ -18,6 +18,7 @@ A self-hosted Home Assistant add-on for tracking car running costs across multip
 
 ## Workflow
 - OpenSpec (`openspec/`) is for behaviour, API and data-model changes (e.g. v2). UI/layout work is done as design iterations without OpenSpec: clickable mockup or the running app, screenshots via headless browser, user feedback, repeat. Mockups live in `.mockups/` (locally excluded from git). `.mockups/ui-v2/` is the living UI mockup the user checks at will (open `index.html` directly, no server): design changes land there first, are recorded in its `NOTES.md` changelog, then go into the app.
+- UI design language: `docs/dev/design.md` lists the tokens and standard elements (with class names and snippets). Reuse an element from there before making a new one; follow Home Assistant / Material conventions and only make our own element if it is significantly simpler than the standard one; add every new repeated element to that document. No plain text links for in-app navigation (use buttons, icon buttons, list rows, tabs or chips).
 - Test HA instance: HAOS VM `haos-test` in the user's restricted Incus project on `linux-turbo` (reach via SSH tunnel; HA UI is on VM port 80). Credentials for it live outside the repo in `~/.config/glovebox-test/ha.env`; never print or commit them.
 
 ## Autonomous implementation–review loop
@@ -32,7 +33,7 @@ Standing permissions for this loop: anything on the test VM `haos-test` (start/s
 
 ## Next steps
 - **Install and use v1** on Home Assistant OS (task 9.3); fix anything found. Then archive the OpenSpec change `add-autotracker-v1` via the `openspec-archive` skill.
-- **Drivvo import** (tasks 4.3–4.5, 9.4) is blocked on a real Drivvo CSV export (English app, needs the paid plan). The current English alias mapping is provisional.
+- **Configurable CSV import/export** (decided 2026-10-21; OpenSpec change `configurable-csv-import-export`): one generic, mapping-driven CSV importer and exporter with presets (Glovebox standard, Fuelly, Fuelio, Drivvo best-effort) instead of per-app importers. We do not track other apps' export formats. The standard format is documented mechanically from one code definition. This supersedes the blocked Drivvo tasks.
 - **v2 (new OpenSpec change, after v1 has been used for a while):**
   - HACS companion integration that reads the stats API (token-protected add-on port 8100): one HA device per vehicle, sensors with long-term statistics. The sensor set should roughly mirror the Timeline summary cards (cost this month, average consumption, last refuel, cost per km, ...). No MQTT (the user runs ZHA, no Mosquitto).
   - `glovebox.log_refuel` HA action, backed by a new token-protected write endpoint; pre-select the nearest known station from the phone's location.
@@ -47,4 +48,5 @@ Standing permissions for this loop: anything on the test VM `haos-test` (start/s
 - Task groups 1-9 are implemented; the change artifacts are in `openspec/changes/add-autotracker-v1/`.
 - `addon/glovebox/` (HA add-on files), `Dockerfile`, `docker/entrypoint.sh`, `repository.yaml`.
 - `tests/`: `test_e2e.py` (no monkeypatching, drives the real web forms), `conftest.py` (migrated in-memory `engine`, `session`, `client` fixtures), `fixtures/` (anonymised samples only).
+- UI rules and every reusable element: `docs/dev/design.md` (read before touching templates or `app.css`).
 - Run: `uv run glovebox` (env: `DATA_DIR`, `GLOVEBOX_PORT`, ...). Test: `uv run pytest`.

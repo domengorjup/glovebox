@@ -11,6 +11,7 @@ from glovebox.models import Setting
 SELECTED_VEHICLE = "selected_vehicle"
 LAST_VEHICLE = "last_vehicle"
 SUMMARY_CARDS = "summary_cards"
+HIDDEN_SUMMARIES = "hidden_summaries"
 
 ALL_VEHICLES = "all"
 
@@ -64,3 +65,38 @@ def set_summary_cards(session: Session, names: list[str]) -> list[str]:
     kept = [key for key in CARD_KEYS if key in set(names)]
     set_setting(session, SUMMARY_CARDS, json.dumps(kept))
     return kept
+
+
+def get_hidden_summaries(session: Session) -> list[str]:
+    """
+    Summary groups the user switched off in "All vehicles".
+
+    Entries are ``"all"`` (the combined group) or a vehicle id as text. Only
+    the hidden ones are stored, so a new vehicle shows up by default.
+    """
+    raw = get_setting(session, HIDDEN_SUMMARIES)
+    if raw is None:
+        return []
+    try:
+        names = json.loads(raw)
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(names, list):
+        return []
+    return [str(n) for n in names if str(n) == ALL_VEHICLES or str(n).isdigit()]
+
+
+def update_hidden_summaries(
+    session: Session, offered: list[str], shown: list[str]
+) -> list[str]:
+    """
+    Hide the offered groups that are not ticked; leave other stored entries alone.
+
+    ``offered`` are the groups the form listed, ``shown`` the ticked ones.
+    Returns the new hidden list.
+    """
+    others = [n for n in get_hidden_summaries(session) if n not in offered]
+    now_hidden = [n for n in offered if n not in shown]
+    valid = [n for n in others + now_hidden if n == ALL_VEHICLES or n.isdigit()]
+    set_setting(session, HIDDEN_SUMMARIES, json.dumps(valid))
+    return valid

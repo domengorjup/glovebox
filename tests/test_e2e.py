@@ -217,11 +217,11 @@ def test_stats_numbers_match_hand_computation(client: TestClient) -> None:
     html = client.get("/stats", params=ALL_TIME).text
 
     # fuel 209.50 + insurance 365 + service 100 (full year = same in both modes)
-    assert _kpi(html, "Total cost") == "674.50 EUR"
+    assert _kpi(html, "Total cost") == "674.50 €"
     # segments: 500 km/30 L, 500 km/35 L, 800 km/(15+20) L -> 100 L / 1800 km
     assert _kpi(html, "Avg consumption").startswith("5.56 L/100 km")
     # 674.50 EUR over 11800 - 10000 km
-    assert _kpi(html, "Cost per km").startswith("0.375 EUR/km")
+    assert _kpi(html, "Cost per km").startswith("0.37 €/km")
     assert _kpi(html, "Distance") == "1,800 km"
 
 
@@ -252,17 +252,17 @@ def test_spread_versus_paid_toggle(client: TestClient, engine: Engine) -> None:
     paid = client.get("/stats", params={**JAN_MAY, "allocation": "paid"}).text
 
     # Jan-May is 151 of 365 days: 151.00 of the policy, plus 209.50 fuel + 100
-    assert _kpi(spread, "Total cost") == "460.50 EUR"
-    assert _kpi(spread, "Cost per km").startswith("0.256 EUR/km")  # 460.5 / 1800
+    assert _kpi(spread, "Total cost") == "460.50 €"
+    assert _kpi(spread, "Cost per km").startswith("0.26 €/km")  # 460.5 / 1800
     # as paid: the whole 365.00 sits on 2025-01-01
-    assert _kpi(paid, "Total cost") == "674.50 EUR"
-    assert _kpi(paid, "Cost per km").startswith("0.375 EUR/km")
+    assert _kpi(paid, "Total cost") == "674.50 €"
+    assert _kpi(paid, "Cost per km").startswith("0.37 €/km")
     # the toggle is view-only
     with Session(engine) as session:
         assert session.scalar(select(func.sum(Expense.amount_cents))) == before
-    assert _legend(spread)["insurance"] == "151.00 EUR"
-    assert _legend(paid)["insurance"] == "365.00 EUR"
-    assert _legend(paid)["fuel"] == "209.50 EUR" and _legend(paid)["service"] == "100.00 EUR"
+    assert _legend(spread)["insurance"] == "151.00 €"
+    assert _legend(paid)["insurance"] == "365.00 €"
+    assert _legend(paid)["fuel"] == "209.50 €" and _legend(paid)["service"] == "100.00 €"
 
 
 def test_choice_links_keep_filters(client: TestClient) -> None:
@@ -281,11 +281,11 @@ def test_spread_choice_is_only_offered_with_expenses(client: TestClient) -> None
 def test_what_choice_narrows_the_numbers(client: TestClient) -> None:
     _build_scenario(client)
     fuel = client.get("/stats", params={**ALL_TIME, "what": "refuel"}).text
-    assert _kpi(fuel, "Fuel cost") == "209.50 EUR"
+    assert _kpi(fuel, "Fuel cost") == "209.50 €"
     service = client.get("/stats", params={**ALL_TIME, "what": "service"}).text
-    assert _kpi(service, "Total cost") == "100.00 EUR"
+    assert _kpi(service, "Total cost") == "100.00 €"
     expense = client.get("/stats", params={**ALL_TIME, "what": "expense"}).text
-    assert _kpi(expense, "Total cost") == "365.00 EUR"
+    assert _kpi(expense, "Total cost") == "365.00 €"
 
 
 def test_station_table_by_station_and_brand(client: TestClient) -> None:
@@ -346,14 +346,14 @@ def test_api_summary_equals_stats_page(client: TestClient) -> None:
                   "date_to": today.isoformat()}  # fmt: skip
         page = client.get("/stats", params=window).text
         per_km = _kpi(page, "Cost per km").split()[0]
-        assert per_km == f"{summary['cost_per_km_12m']:.3f}"
+        assert per_km == f"{summary['cost_per_km_12m']:.2f}"
         consumption = _kpi(page, "Avg consumption").split()[0]
         assert consumption == f"{summary['avg_consumption_12m']:.2f}"
 
         year = {"when": "custom", "allocation": allocation,
                 "date_from": f"{today.year}-01-01", "date_to": f"{today.year}-12-31"}  # fmt: skip
         total = _kpi(client.get("/stats", params=year).text, "Total cost")
-        assert total == f"{summary['cost_this_year']:.2f} EUR"
+        assert total == f"{summary['cost_this_year']:.2f} €"
 
     # hand check of the consumption: 3 valid segments, 1650 km, 104 L
     summary = client.get(f"/api/v1/vehicles/{vid}/summary").json()
@@ -601,7 +601,7 @@ def test_whole_flow_under_ingress_prefix(
     assert redirect.headers["location"] == f"{PREFIX}/vehicles"
 
     stats_page = client.get("/stats", params=JAN_MAY).text
-    assert _kpi(stats_page, "Total cost") == "460.50 EUR"
+    assert _kpi(stats_page, "Total cost") == "460.50 €"
     assert f'href="{PREFIX}/stats?' in stats_page
     assert f"{PREFIX}/static/icons.svg#" in stats_page
     assert f"{PREFIX}/static/app.js" in stats_page
@@ -694,11 +694,11 @@ def test_timeline_and_stats_follow_the_navbar_vehicle(client: TestClient) -> Non
     _post(client, "/preferences/vehicle", {"vehicle": str(clio)})
     only = client.get("/").text
     assert "Clio thing" in only and "Golf thing" not in only
-    assert _kpi(client.get("/stats", params=ALL_TIME).text, "Total cost") == "20.00 EUR"
+    assert _kpi(client.get("/stats", params=ALL_TIME).text, "Total cost") == "20.00 €"
     _post(client, "/preferences/vehicle", {"vehicle": "all"})
     both = client.get("/").text
     assert "Clio thing" in both and "Golf thing" in both
-    assert _kpi(client.get("/stats", params=ALL_TIME).text, "Total cost") == "30.00 EUR"
+    assert _kpi(client.get("/stats", params=ALL_TIME).text, "Total cost") == "30.00 €"
 
 
 def test_all_vehicles_timeline_has_per_vehicle_summary(client: TestClient) -> None:
@@ -742,3 +742,29 @@ def test_selected_vehicle_that_gets_archived_falls_back_to_all(client: TestClien
     _post(client, "/preferences/vehicle", {"vehicle": str(golf)})
     _post(client, f"/vehicles/{golf}/archive", {"archived": "1"})
     assert _selected_option(client.get("/").text, "vehicle") == "all"
+
+
+def test_hidden_summaries_are_stored_and_survive_card_changes(
+    engine: Engine, client: TestClient
+) -> None:
+    golf, clio = _two_vehicles(client)
+    _post(client, "/preferences/cards", {"card": ["odometer"], "offered": ["all", str(golf), str(clio)],
+                                         "summary": ["all", str(clio)]})  # fmt: skip
+    with Session(engine) as session:
+        stored = session.scalar(select(Setting.value).where(Setting.key == "hidden_summaries"))
+    assert stored == f'["{golf}"]'
+    # a card change from a single-vehicle view does not offer groups: nothing is reset
+    _post(client, "/preferences/cards", {"card": ["cost_km"]})
+    page = client.get("/").text
+    assert re.search(rf'data-summary="{golf}"\s+hidden', page)
+    assert not re.search(rf'data-summary="{clio}"\s+hidden', page)
+    # a vehicle added later is shown by default
+    _post(client, "/vehicles/new", {"name": "Fiat"})
+    fiat = _vehicle_id(client, "Fiat")
+    assert not re.search(rf'data-summary="{fiat}"\s+hidden', client.get("/").text)
+
+
+def test_hidden_summaries_ignore_junk_values(client: TestClient) -> None:
+    golf, _ = _two_vehicles(client)
+    _post(client, "/preferences/cards", {"offered": ["all", "x;drop", str(golf)], "summary": []})
+    assert client.get("/").status_code == 200

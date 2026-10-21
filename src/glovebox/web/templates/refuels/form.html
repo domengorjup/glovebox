@@ -1,5 +1,5 @@
 {% extends layout %}
-{% from "_macros.html" import messages, field, textarea, switch, select, dialog_head with context %}
+{% from "_macros.html" import messages, field, textarea, switch, select, dialog_head, vehicle_select with context %}
 {% set dialog_page = true %}
 {% set heading = 'Edit refuelling' if refuel_id else 'New refuelling' %}
 {% set new_station = f.new_station_name or f.station_id == '__new' %}
@@ -15,15 +15,7 @@
     <p class="help">Calculated: {{ figures.litres_milli | litres }} L at
     {{ figures.price_per_litre_milli | price }} per litre, total {{ figures.total_cents | money }}.</p>
     {% endif %}
-    <div class="field">
-      <label for="i-vehicle_id">Vehicle</label>
-      <select id="i-vehicle_id" name="vehicle_id" required>
-        <option value="">Choose...</option>
-        {% for v in vehicles %}
-        <option value="{{ v.id }}" {{ 'selected' if f.vehicle_id == v.id | string }}>{{ v.name }}</option>
-        {% endfor %}
-      </select>
-    </div>
+    {{ vehicle_select(vehicles, f.vehicle_id) }}
     <div class="grid2">
       {{ field('Date', 'date', f.date, type='date', required=True) }}
       {{ field('Time (optional)', 'time', f.time, type='time') }}

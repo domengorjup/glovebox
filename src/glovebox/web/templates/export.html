@@ -1,5 +1,5 @@
 {% extends layout %}
-{% from "_macros.html" import back with context %}
+{% from "_macros.html" import page_head with context %}
 {% block title %}Export - Glovebox{% endblock %}
 {% macro vehicle_select(caller_id) %}
   <div class="field">
@@ -11,8 +11,7 @@
   </div>
 {% endmacro %}
 {% block content %}
-{{ back(request) }}
-<div class="page-title"><h1>Export</h1></div>
+{{ page_head(request, 'Export') }}
 <form class="card card-pad stack" method="get" action="{{ url(request, '/export/native') }}">
   <div><div class="card-title">Full backup (native format)</div>
   <p class="card-sub">ZIP with vehicles, stations, refuels and expenses. It can be imported back into Glovebox.</p></div>

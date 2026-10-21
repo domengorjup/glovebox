@@ -36,8 +36,8 @@ Constraints:
 
 ## Decisions
 
-### D1. Stack: FastAPI + SQLAlchemy 2 + Alembic + Jinja2 templates, vendored Chart.js
-- **Server-rendered HTML** keeps the front end small: no Node build, no single-page-app framework. Forms work without JavaScript; Chart.js renders the charts from JSON embedded in the page or fetched from the same JSON endpoints the stats API uses.
+### D1. Stack: FastAPI + SQLAlchemy 2 + Alembic + Jinja2 templates, inline SVG charts
+- **Server-rendered HTML** keeps the front end small: no Node build, no single-page-app framework. Forms work without JavaScript; small vanilla JavaScript draws inline SVG charts from JSON embedded in the page.
 - **FastAPI** gives HTML routes and the JSON API in one app, with typed request models.
 - **Alembic** is required because add-on users upgrade in place; the schema must migrate automatically at startup.
 - **Alternatives considered:**
@@ -45,7 +45,7 @@ Constraints:
   - Django: too heavy.
   - A SPA (React/Vue): needs a JS build and is more work for a form- and table-heavy app.
   - Raw `sqlite3`: migrations would have to be hand-rolled.
-- Front-end assets (Chart.js and a classless CSS such as Pico.css) are vendored into `static/`. Ingress and offline installs must not depend on a CDN.
+- Front-end assets are the project's own CSS and JavaScript plus the used Material Design Icons (one SVG sprite, licence file included), all in `static/`. Charts are inline SVG, so no chart library is needed. Ingress and offline installs must not depend on a CDN.
 
 ### D2. Storage units and money
 - **Units:** distance is stored in km, volume in litres. Money is stored as integer minor units (cents) to avoid float drift.
