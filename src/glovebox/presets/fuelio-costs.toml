@@ -1,13 +1,13 @@
-# Fuelio backup, "## Costs" section (expenses).
-# Source: converted from the earlier built-in mapping [costs] and its rules.
-# Reverse-engineered, not checked against a real export. Template and income
-# rows and rows with cost 0 are skipped. The category is mapped from
-# "CostTitle" (design D9: "## CostCategories" is no longer looked up); other
-# titles become "other". The header carries no distance unit, so the preview
-# asks when the odometer column is present.
+# Export: Fuelio (Android) CSV backup file, "## Costs" section (expenses). The
+# exact menu path in Fuelio was not checked.
+# NEVER TESTED against a real export: the layout was reverse-engineered from
+# open-source parsers. Template and income rows and rows with cost 0 are
+# skipped. The category is mapped from "CostTitle" (design D9: "##
+# CostCategories" is not looked up); other titles become "other". The header
+# carries no distance unit, so the preview asks when the odometer is present.
 
 name = "Fuelio (costs)"
-note = "Fuelio backup, ## Costs section. Category is taken from the cost title; unknown titles become 'other'. Based on open-source parsers."
+note = "Never tested against a real export (based on open-source parsers). Fuelio CSV backup, ## Costs section. Category is taken from the cost title; unknown titles become 'other'."
 verified = false
 export = false
 

@@ -24,16 +24,19 @@ Standard files and full backups: a file in the standard format picks the **Glove
 | Preset | File | Status |
 |---|---|---|
 | Glovebox | The standard CSV format, or a full backup ZIP | Verified |
-| Fuelly (metric), (US), (website export) | Fuelly import-format and website export CSV | Unverified: based on public descriptions |
-| Fuelio (fill-ups), (costs) | Fuelio backup CSV, one section per preset | Unverified: based on open-source parsers |
-| Drivvo (refuelling), (services), (expenses) | Drivvo CSV | **Best effort, untested** |
+| Drivvo (refuelling), (expenses), (services) | Drivvo Android app CSV (History), one section per preset | Verified with real exports |
+| Fuelly (metric), (US), (website export) | Fuelly import-format and website export CSV | **Never tested** against a real export: based on public descriptions |
+| Fuelio (fill-ups), (costs) | Fuelio backup CSV, one section per preset | **Never tested** against a real export: based on open-source parsers |
 
-!!! warning "Unverified and untested presets"
+!!! warning "Presets never tested against a real export"
     These mappings were not checked against a real export. If a file is not recognised or a value looks wrong, correct the mapping in the editor and save it as your own preset. Rows that cannot be read are listed with their line number and left out; the rest can still be imported.
 
-### Fuelio backups have two sections
+### Files with several sections (Drivvo, Fuelio)
 
-A Fuelio file holds fill-ups (`## Log`) and costs (`## Costs`). Import it once with **Fuelio (fill-ups)**, which is selected automatically, and once more with **Fuelio (costs)**. After the first import the page offers the other sections. Fuelio files carry no vehicle name, so you choose the vehicle.
+Some apps write several tables into one file, each after a section line. Import such a file once per section: the first upload selects the fill-up preset, and after that import the page names the remaining sections. Upload the same file again and pick the preset for the next section. Records already imported are skipped. These files carry no vehicle name, so you choose the vehicle each time.
+
+- **Drivvo**: in the Android app open **History** with one vehicle selected and export CSV. The file holds `##Refuelling`, `##Expense` and `##Service`; import it with **Drivvo (refuelling)**, **Drivvo (expenses)** and **Drivvo (services)**. Drivvo writes one service row per item, so a service visit becomes several maintenance expenses on the same day; items without a price are skipped. Expense types Glovebox does not know (for example ones you created yourself) become *other*: add them to the category map in the mapping step and save your own preset. The web app's export holds the same records but is not covered by a shipped preset; use the phone export.
+- **Fuelio**: the backup holds fill-ups (`## Log`) and costs (`## Costs`); import it with **Fuelio (fill-ups)** and **Fuelio (costs)**.
 
 ## Vehicles and stations in the file
 
@@ -56,7 +59,7 @@ Under the preview, **Save this mapping as a preset** stores it under a name you 
 
 ## Good to know
 
-- **Re-importing is safe.** Records matching an existing one (same vehicle, date, odometer and litres for refuellings; same vehicle, date, category and amount for expenses) are skipped and counted.
+- **Re-importing is safe.** Records matching an existing one (same vehicle, date, odometer and litres for refuellings; same vehicle, date, category and amount for expenses) are skipped and counted. Equal expenses within one file (two items of the same price on one day) are all kept; on a re-import each one is matched to one existing record.
 - **Undo.** Every import appears in the batch list and can be undone. That deletes the records it added, and the stations only that import created. Details filled into existing vehicles and stations are not taken back.
 - **Brands** are never guessed. A brand is set only when the file gives one and the station is created. Set them under [Gas stations](stations.md).
 - **Numbers** are read strictly: a thousands separator that the mapping does not expect makes that row an error instead of silently changing the value.

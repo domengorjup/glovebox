@@ -10,6 +10,7 @@ import pytest
 
 from glovebox.importers import engine
 from glovebox.importers.base import Answers
+from glovebox.importers.pipeline import PREFERRED_ON_TIE
 from glovebox.importers.presets import Preset, shipped_presets
 from glovebox.models import ExpenseCategory
 from glovebox.standard import RECORD_FIELDS
@@ -19,7 +20,7 @@ IDS = {
     "fuelio-fillups", "fuelio-costs",
     "drivvo-refuelling", "drivvo-services", "drivvo-expenses",
 }  # fmt: skip
-UNTESTED_NOTE = "Best effort, untested: not checked against a real export."
+VERIFIED = {"glovebox", "drivvo-refuelling", "drivvo-services", "drivvo-expenses"}
 
 
 def preset(preset_id: str) -> Preset:
@@ -27,11 +28,11 @@ def preset(preset_id: str) -> Preset:
 
 
 def detect(data: bytes) -> tuple[str | None, dict[str, float]]:
-    """Best shipped preset with score above 0.5 (as the import page does)."""
+    """Best shipped preset with score above 0.5 (ties as the import page breaks them)."""
     scores = {
         p.id: engine.score(p, engine.read_file(data, p)) for p in shipped_presets()
     }
-    best = max(scores, key=lambda key: scores[key])
+    best = max(scores, key=lambda key: (scores[key], key in PREFERRED_ON_TIE))
     return (best if scores[best] > 0.5 else None), scores
 
 
@@ -78,10 +79,19 @@ def test_export_flags() -> None:
 
 def test_unverified_presets_say_so() -> None:
     for p in shipped_presets():
-        assert p.verified == (p.id == "glovebox")
+        assert p.verified == (p.id in VERIFIED)
         assert p.note
+        if not p.verified:
+            assert p.note.startswith("Never tested against a real export")
     for preset_id in ("drivvo-refuelling", "drivvo-services", "drivvo-expenses"):
-        assert preset(preset_id).note == UNTESTED_NOTE
+        assert preset(preset_id).note.startswith("Tested with Drivvo Android exports")
+
+
+def test_shipped_preset_files_explain_the_export() -> None:
+    from glovebox.importers.presets import SHIPPED_DIR
+
+    for path in SHIPPED_DIR.glob("*.toml"):
+        assert path.read_text(encoding="utf-8").startswith("# Export: "), path.name
 
 
 def test_fuelio_presets_read_their_sections() -> None:
@@ -112,9 +122,7 @@ def test_fuelly_metric_matches_v1_export_layout() -> None:
         ("fuelly_import_ambiguous_dates.csv", "fuelly-metric"),
         ("fuelly_export.csv", "fuelly-website"),
         ("fuelio_semicolon_miles.csv", "fuelio-fillups"),
-        ("drivvo_refuel_en.csv", "drivvo-refuelling"),
-        ("drivvo_service_en.csv", "drivvo-services"),
-        ("drivvo_expense_en.csv", "drivvo-expenses"),
+        ("drivvo_en_sections.csv", "drivvo-refuelling"),
     ],
 )
 def test_fixture_is_detected(fixtures_dir, name: str, expected: str) -> None:
@@ -363,37 +371,79 @@ class TestFuelio:
 
 
 class TestDrivvo:
-    def test_refuel_rows(self, fixtures_dir) -> None:
-        result = run(fixtures_dir, "drivvo_refuel_en.csv", "drivvo-refuelling")
+    """The Android History export: three sections in one file (synthetic sample)."""
+
+    def test_detection_and_section_scores(self, fixtures_dir) -> None:
+        data = (fixtures_dir / "drivvo_en_sections.csv").read_bytes()
+        _, scores = detect(data)
+        assert scores["drivvo-refuelling"] == 1.0
+        assert scores["drivvo-expenses"] == 1.0 and scores["drivvo-services"] == 1.0
+        assert engine.read_file(data).sections == ["Refuelling", "Expense", "Service"]
+
+    def test_refuel_rows_use_the_first_fuel(self, fixtures_dir) -> None:
+        result = run(fixtures_dir, "drivvo_en_sections.csv", "drivvo-refuelling")
         assert not result.errors and not result.row_errors and not result.questions
-        first, second = result.refuels
-        assert first.date == date(2024, 2, 1)
-        assert first.odometer_km == 5000
-        assert (first.litres_milli, first.price_per_litre_milli) == (40000, 1500)
-        assert first.total_cents == 6000
+        assert not result.expenses and len(result.refuels) == 4
+        first, second, partial, last = result.refuels
+        assert (first.date, first.time) == (date(2025, 3, 2), time(8, 15))
+        assert first.odometer_km == 10250
+        assert (first.litres_milli, first.price_per_litre_milli) == (40000, 1453)
+        assert first.total_cents == 5812
         assert first.station_name == "Alpha Fuel"
         assert first.is_full and not first.missed_previous
-        assert not second.is_full
-        assert second.notes == "short stop"
+        assert second.notes == "Weekly shop" and second.time == time(17, 40, 12)
+        assert not partial.is_full and partial.total_cents == 1520
+        assert last.station_name == "Čista Črpalka"
+        assert first.vehicle_name is None  # no vehicle column: chosen at import
 
-    def test_service_rows_become_expenses(self, fixtures_dir) -> None:
-        result = run(fixtures_dir, "drivvo_service_en.csv", "drivvo-services")
-        oil, insurance, wipers = result.expenses
-        assert (oil.title, oil.category) == ("Oil change", ExpenseCategory.MAINTENANCE)
-        assert oil.amount_cents == 8990 and oil.odometer_km == 5200
-        assert insurance.category == ExpenseCategory.INSURANCE
-        # Unknown service types default to maintenance but keep their title.
-        assert (wipers.title, wipers.category) == ("Wiper blades", "maintenance")
+    def test_malformed_header_cells_are_read(self, fixtures_dir) -> None:
+        data = (fixtures_dir / "drivvo_en_sections.csv").read_bytes()
+        source = engine.read_file(data, preset("drivvo-refuelling"))
+        headers = source.tables[0].headers
+        assert len(headers) == 29
+        assert headers[6] == "Filled tank completely"
+        assert headers[11] == "Filled tank completely 2"
+        assert headers.count("Price / L") == 3
 
     def test_expense_rows(self, fixtures_dir) -> None:
-        result = run(fixtures_dir, "drivvo_expense_en.csv", "drivvo-expenses")
-        parking, tax = result.expenses
+        result = run(fixtures_dir, "drivvo_en_sections.csv", "drivvo-expenses")
+        assert not result.errors and not result.row_errors and not result.refuels
+        parking, insurance, registration = result.expenses
         assert (parking.title, parking.category) == ("Parking", ExpenseCategory.OTHER)
-        assert parking.odometer_km is None
-        assert tax.category == ExpenseCategory.REGISTRATION
+        assert parking.odometer_km is None  # "0.0" means no reading
+        assert parking.notes == "Old ticket"
+        assert insurance.category == ExpenseCategory.INSURANCE
+        assert insurance.amount_cents == 35000 and insurance.odometer_km == 11000
+        assert registration.category == ExpenseCategory.REGISTRATION
+        assert registration.amount_cents == 12050
+
+    def test_service_items_become_maintenance_expenses(self, fixtures_dir) -> None:
+        result = run(fixtures_dir, "drivvo_en_sections.csv", "drivvo-services")
+        assert not result.errors and not result.row_errors
+        assert result.skipped == 1  # the item without a price
+        titles = [e.title for e in result.expenses]
+        assert titles == ["Oil Change", "Cabin Air Filter", "Wiper Blades", "Labor Cost"]
+        assert {e.category for e in result.expenses} == {ExpenseCategory.MAINTENANCE}
+        assert sum(e.amount_cents for e in result.expenses) == 15800
+        assert result.expenses[1].notes == "First line\nsecond line"
+
+    def test_web_export_sections_and_escapes_are_read(self, fixtures_dir) -> None:
+        # The web export uses "#Section" markers, "%uXXXX" escapes and spaces
+        # before some quoted header cells. Its expenses read with the shipped
+        # preset; its "#Refueling" section is not covered by one.
+        data = (fixtures_dir / "drivvo_web_sections.csv").read_bytes()
+        source = engine.read_file(data)
+        assert source.sections == ["Vehicle", "Refueling", "Expense", "Service"]
+        assert detect(data)[1]["drivvo-refuelling"] == 0.0
+        result = run(fixtures_dir, "drivvo_web_sections.csv", "drivvo-expenses")
+        (insurance,) = result.expenses
+        assert insurance.category == ExpenseCategory.INSURANCE
+        assert (insurance.date, insurance.amount_cents) == (date(2025, 3, 25), 35000)
+        services = run(fixtures_dir, "drivvo_web_sections.csv", "drivvo-services")
+        assert [e.notes for e in services.expenses] == ["Menjava olja in filtra, žaga"]
 
     def test_headers_are_case_and_whitespace_insensitive(self) -> None:
-        data = b"  DATE ,odometer,VOLUME ,total  COST\n2024-01-01,100,10.0,15.0\n"
+        data = b"##Refuelling\n  DATE ,odometer (KM),VOLUME ,total  COST\n2024-01-01,100,10.0,15.0\n"
         chosen = preset("drivvo-refuelling")
         result = engine.apply(chosen, engine.read_file(data, chosen), Answers())
         assert len(result.refuels) == 1

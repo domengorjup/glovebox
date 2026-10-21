@@ -1,28 +1,42 @@
-# Drivvo CSV, refuelling rows.
-# Source: converted from the earlier built-in mapping [refuel]. BEST EFFORT, UNTESTED:
-# the English header names are a guess and were not taken from a real Drivvo
-# export. Fix the mapping in the editor and save it as your own preset.
+# Export: Drivvo Android app → History, with one vehicle selected → export
+# CSV. One file per vehicle, no vehicle column: choose the vehicle at import.
+# Tested with real Drivvo Android exports, October 2026 ("##Refuelling" section).
+# The file has three sections: "##Refuelling", "##Expense" and "##Service".
+# Import the same file once per section preset: this one, then
+# "Drivvo (expenses)" and "Drivvo (services)". The section repeats
+# "Price / L", "Total cost" and "Volume" for a second and third fuel; the
+# first match (the first fuel) is used. There is no missed fill-up column.
+# "Fuel efficiency" and "Distance" are Drivvo's own figures and are not
+# imported; "Discount" is not applied.
+# The Drivvo web export (History or vehicle menu → Export → CSV) holds the
+# same records and values (checked), so no separate preset is shipped: use
+# the phone export. The web file adds a "Vehicle Name" column and a
+# "#Vehicle" section, which bring nothing for a one-vehicle file; its
+# "#Refueling" section has other headers ("Price / gal", "Gas station") and
+# is not covered.
 
 name = "Drivvo (refuelling)"
-note = "Best effort, untested: not checked against a real export."
-verified = false
+note = "Tested with Drivvo Android exports, October 2026. ##Refuelling section of the History CSV; import the same file again with 'Drivvo (expenses)' and 'Drivvo (services)'. Only the first fuel is read; Discount is ignored. Use the phone export: the web export holds the same records."
+verified = true
 export = false
+
+[file]
+section = "Refuelling"
 
 [format]
 date_format = "auto"
-decimal_char = "auto"
+decimal_char = "."
 group_char = ""
-distance_unit = "km"
+distance_unit = "auto"
 volume_unit = "l"
 
 [fields]
 type = { value = "refuel" }
 date = { column = "Date" }
-odometer_km = { column = ["Odometer", "Odo"] }
-fuel_l = { column = ["Volume", "Liters", "Litres", "Quantity", "Fuel quantity"] }
-price_per_l = { column = ["Price per unit", "Price/L", "Unit price", "Price per liter"] }
-total = { column = ["Total cost", "Total price", "Total", "Total value"] }
-full = { column = ["Full tank", "Full"], true_values = ["Yes", "Y", "True", "1"], false_values = ["No", "N", "False", "0"], default = "true" }
-missed_previous = { column = ["Missed refuelling", "Missed refueling", "Skipped"], true_values = ["Yes", "Y", "True", "1"], false_values = ["No", "N", "False", "0"] }
-station = { column = ["Gas station", "Station", "Fuel station", "Place"] }
-notes = { column = ["Notes", "Note"] }
+odometer_km = { column = "Odometer" }
+fuel_l = { column = "Volume" }
+price_per_l = { column = "Price / L" }
+total = { column = "Total cost" }
+full = { column = "Filled tank completely", true_values = ["Yes"], false_values = ["No"], default = "true" }
+station = { column = "Petrol station" }
+notes = { column = "Notes" }

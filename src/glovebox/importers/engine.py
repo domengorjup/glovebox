@@ -59,9 +59,13 @@ _DETECT_LINES = 80
 _MAX_UNCOMPRESSED = 200 * 1024 * 1024
 _DELIMITERS = (",", ";", "\t")
 _ORDERS = ("ymd", "dmy", "mdy")
+# A section marker is a single-cell line "## name" or "# name" (Drivvo's web
+# export uses one "#").
 _SECTION_RE = re.compile(
-    r'^\s*"?\s*##\s*(?P<name>[^",;\t]*?)\s*"?\s*[,;\t]*\s*$'
+    r'^\s*"?\s*##?\s*(?P<name>[^",;\t#\s][^",;\t]*?)\s*"?\s*[,;\t]*\s*$'
 )
+# "%u0161" escapes (JavaScript ``escape()``), written by Drivvo's web export.
+_PERCENT_U_RE = re.compile(r"(?:%u[0-9A-Fa-f]{4})+")
 _PAREN_RE = re.compile(r"\s*\([^()]*\)\s*$")
 _UNIT_RE = re.compile(r"\(([^()]*)\)\s*$")
 _TRUE_WORDS = {"true", "1", "yes", "y", "t"}
@@ -134,7 +138,7 @@ class SourceFile:
     vehicles: SourceTable | None = None
     stations: SourceTable | None = None
     is_backup: bool = False
-    sections: list[str] = field(default_factory=list)  # ``## name`` lines found
+    sections: list[str] = field(default_factory=list)  # ``## name`` / ``# name`` lines found
 
 
 # --- Standard preset --------------------------------------------------------
@@ -310,6 +314,7 @@ def _read_text_file(
     if decoded is None:
         return SourceFile()
     text, encoding = decoded
+    text = _unescape_percent_u(text)
     lines = text.split("\n")
     blocks = _split_blocks(lines)
     sections = [b[0] for b in blocks if b[0] is not None]
@@ -344,6 +349,16 @@ def _read_text_file(
     return SourceFile(tables=[table], sections=sections)
 
 
+def _unescape_percent_u(text: str) -> str:
+    """Replace ``%uXXXX`` escapes by their characters (surrogate pairs joined)."""
+
+    def decode(match: re.Match[str]) -> str:
+        units = bytes.fromhex("".join(match.group(0).split("%u")))
+        return units.decode("utf-16-be", errors="replace")
+
+    return _PERCENT_U_RE.sub(decode, text)
+
+
 def _candidates(preset: Preset | None) -> list[tuple[str, ...]]:
     if preset is None:
         return []
@@ -354,7 +369,11 @@ def _parse(
     text: str, delimiter: str, offset: int = 0
 ) -> tuple[list[tuple[int, list[str]]], bool]:
     """Non-blank rows with their file line numbers; ``False`` if the CSV broke."""
-    reader = csv.reader(io.StringIO(text, newline=""), delimiter=delimiter)
+    # skipinitialspace: a quoted cell after spaces (', "Total cost"') is
+    # still read as quoted.
+    reader = csv.reader(
+        io.StringIO(text, newline=""), delimiter=delimiter, skipinitialspace=True
+    )
     rows: list[tuple[int, list[str]]] = []
     previous = 0
     try:
@@ -474,7 +493,7 @@ def apply(
     if not source.tables:
         wanted = preset.file.section
         if wanted:
-            result.errors.append(f'The file has no section "## {wanted}".')
+            result.errors.append(f'The file has no section "{wanted}".')
         else:
             result.errors.append("The file could not be read as a table.")
         return result

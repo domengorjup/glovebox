@@ -1,11 +1,12 @@
-# Fuelly import-format CSV, metric (litres, kilometres).
-# Source: converted from the earlier built-in mapping [import] section and its
-# exporter. Based on public descriptions of the format; not checked against a
-# real file. The same layout is what Glovebox writes for this preset.
-# The file has no vehicle column: the file name (or ZIP member) names the vehicle.
+# Export: a CSV in Fuelly's import format with litres and kilometres, as
+# accepted by Fuelly's CSV import on the website (one file per vehicle). This
+# is also the layout Glovebox writes when you export with this preset.
+# NEVER TESTED against a real Fuelly file: based on public descriptions of the
+# format. The file has no vehicle column: the file name (or ZIP member) names
+# the vehicle.
 
 name = "Fuelly (metric)"
-note = "Fuelly import-format CSV with litres. Based on public descriptions of the format."
+note = "Never tested against a real export (based on public descriptions). Fuelly import-format CSV with litres."
 verified = false
 export = true
 split_by_vehicle = true

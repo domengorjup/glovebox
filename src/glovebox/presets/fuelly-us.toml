@@ -1,11 +1,11 @@
-# Fuelly import-format CSV, US units (gallons, miles).
-# Source: converted from the earlier built-in mapping [import] section. Not checked
-# against a real file. The file has no vehicle column: the file name (or ZIP
-# member) names the vehicle. The odometer column may be called "odometer" or
-# "miles".
+# Export: a CSV in Fuelly's import format with US gallons and miles (one file
+# per vehicle).
+# NEVER TESTED against a real Fuelly file: based on public descriptions of the
+# format. The file has no vehicle column: the file name (or ZIP member) names
+# the vehicle. The odometer column may be called "odometer" or "miles".
 
 name = "Fuelly (US)"
-note = "Fuelly import-format CSV with US gallons and miles. Based on public descriptions of the format."
+note = "Never tested against a real export (based on public descriptions). Fuelly import-format CSV with US gallons and miles."
 verified = false
 export = false
 split_by_vehicle = true

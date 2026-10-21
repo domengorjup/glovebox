@@ -1,26 +1,42 @@
-# Drivvo CSV, expense rows.
-# Source: converted from the earlier built-in mapping [expense] and [categories].
-# BEST EFFORT, UNTESTED: the English header names are a guess and were not
-# taken from a real Drivvo export. The expense type is kept as the title; the
-# category defaults to other.
+# Export: Drivvo Android app → History, with one vehicle selected → export
+# CSV. One file per vehicle, no vehicle column: choose the vehicle at import.
+# Tested with real Drivvo Android exports, October 2026 ("##Expense" section).
+# Import the same file again with the refuelling and services presets. The
+# type of expense is kept as the title and mapped to a category; types the
+# map does not know (including your own custom types) become "other": add
+# them to the map and save your own preset. "Expense location", "Title",
+# "Discount" and the instalment columns are not imported.
+# The Drivvo web export (History or vehicle menu → Export → CSV) holds the
+# same records and values (checked), so no separate preset is shipped: use
+# the phone export. The web file adds a "Vehicle Name" column and a
+# "#Vehicle" section, which bring nothing for a one-vehicle file; its
+# "#Refueling" section has other headers ("Price / gal", "Gas station") and
+# is not covered.
 
 name = "Drivvo (expenses)"
-note = "Best effort, untested: not checked against a real export."
-verified = false
+note = "Tested with Drivvo Android exports, October 2026. ##Expense section of the History CSV. Unknown expense types become 'other': extend the category map and save it as your own preset. Use the phone export: the web export holds the same records."
+verified = true
 export = false
+
+[file]
+section = "Expense"
 
 [format]
 date_format = "auto"
-decimal_char = "auto"
+decimal_char = "."
 group_char = ""
-distance_unit = "km"
+distance_unit = "auto"
 volume_unit = "l"
 
 [fields]
 type = { value = "expense" }
 date = { column = "Date" }
-odometer_km = { column = ["Odometer", "Odo"], missing_values = ["0"] }
-title = { column = ["Expense", "Expense type", "Type"] }
-category = { column = ["Expense", "Expense type", "Type"], default = "other", map = { maintenance = ["Oil change", "Service", "Maintenance", "Repair", "Brakes", "Tyres", "Tires", "Battery"], insurance = ["Insurance"], registration = ["Registration", "Vehicle tax", "Road tax", "Inspection"] } }
-total = { column = ["Total cost", "Total price", "Total", "Cost"] }
-notes = { column = ["Notes", "Note"] }
+odometer_km = { column = "Odometer", missing_values = ["0", "0.0"] }
+title = { column = "Type of expense" }
+category = { column = "Type of expense", default = "other", map = { insurance = ["Insurance"], registration = ["Registration", "Licensing", "Vehicle tax", "Road tax"], maintenance = ["Repair", "Tires", "Tyres"] } }
+total = { column = "Total cost" }
+notes = { column = "Notes" }
+
+[[skip_rows]]
+column = "Total cost"
+values = ["0", "0.0", "0.00"]

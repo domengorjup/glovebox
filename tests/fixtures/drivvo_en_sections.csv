@@ -1,0 +1,22 @@
+##Refuelling
+"Odometer (km)","Date","Fuel","Price / L","Total cost","Volume","Filled tank completely","Second fuel","Price / L","Total cost","Volume","Filled tank completely" 2,"Third fuel","Price / L","Total cost","Volume","Filled tank completely" 3,"Fuel efficiency","Distance","Charging type","Battery start (%)","Battery end (%)","Duration (min)","Petrol station","Driver","Reason","Payment method","Notes","Discount"
+"10250.0","2025-03-02 08:15:00","Gasoline","1.453","58.12","40.000","Yes","","0","0","0","No","","0","0","0","No","0 L/100km","","","","","","Alpha Fuel","","","","","0"
+"10840.0","2025-03-20 17:40:12","Gasoline","1.497","47.90","32.000","Yes","","0","0","0","No","","0","0","0","No","5,424 L/100km","590.0","","","","","Beta Oil","","","","Weekly shop","0"
+"11200.0","2025-04-02 07:05:30","Gasoline","1.520","15.2","10.000","No","","0","0","0","No","","0","0","0","No","2,778 L/100km","360.0","","","","","Gamma Station","","","","","0"
+"11600.0","2025-04-15 18:22:00","Gasoline","1.499","44.97","30.000","Yes","","0","0","0","No","","0","0","0","No","5,263 L/100km","400.0","","","","","Čista Črpalka","","","","","0"
+
+##Expense
+"Odometer (km)","Date","Total cost","Type of expense","Expense location","Driver","Reason","Payment method","Notes","Title","Discount","Instalments","First instalment"
+"0.0","2025-01-10 09:00:00","15","Parking","","","","","Old ticket","","0","",""
+"11000.0","2025-03-25 10:00:00","350.0","Insurance","Example Insurer","","","","","","0","",""
+"11000.0","2025-03-25 10:05:00","120.5","Registration","","","","","","","0","",""
+
+##Service
+"Odometer (km)","Date","Total cost","Type of service","Service location","Driver","Payment method","Notes","Title","Discount","Instalments","First instalment"
+"11500.0","2025-04-10 09:30:00","48","Oil Change","Example Garage","","","","","0","",""
+"11500.0","2025-04-10 09:30:00","0","Oil Filter","Example Garage","","","","","0","",""
+"11500.0","2025-04-10 09:30:00","25","Cabin Air Filter","Example Garage","","","First line
+second line","","0","",""
+"11500.0","2025-04-10 09:30:00","25","Wiper Blades","Example Garage","","","","","0","",""
+"11500.0","2025-04-10 09:30:00","60","Labor Cost","Example Garage","","","","","0","",""
+

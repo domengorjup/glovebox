@@ -703,7 +703,7 @@ date = { column = "d" }
 
     def test_missing_section_message(self) -> None:
         preset_ = preset(FUELIO_FILLUPS)
-        assert "## Log" in run(preset_, b"a,b\n1,2\n").errors[0]
+        assert '"Log"' in run(preset_, b"a,b\n1,2\n").errors[0]
 
 
 class TestStandardFixtures:
@@ -806,3 +806,24 @@ class TestSectionedFile:
         assert engine.score(costs, engine.read_file(FUELIO_FILE, costs)) == 1.0
         std = engine.read_file(FUELIO_FILE, STANDARD)
         assert engine.score(STANDARD, std) < 0.5
+
+    def test_single_hash_section_markers(self) -> None:
+        data = b"\n#Vehicle\n\nname,model,\nCar,X,\n\n#Refueling\n\nDate,Odo\n2024-01-01,5\n"
+        assert engine.read_file(data).sections == ["Vehicle", "Refueling"]
+        wanted = preset('name = "W"\n[file]\nsection = "Refueling"\n[fields]\n'
+                        'type = { value = "refuel" }\ndate = { column = "Date" }\n'
+                        'odometer_km = { column = "Odo" }\n[format]\ndistance_unit = "km"\n')
+        table = engine.read_file(data, wanted).tables[0]
+        assert table.headers == ["Date", "Odo"] and len(table.rows) == 1
+
+
+class TestWebExportQuirks:
+    def test_percent_u_escapes_are_decoded(self) -> None:
+        data = b"Date,Odo,Station\n2024-01-01,5,%u010Crpalka %u0160entvid %uD83D%uDE97\n"
+        table = engine.read_file(data, STANDARD).tables[0]
+        assert table.rows[0][1][2] == "Črpalka Šentvid \U0001f697"
+
+    def test_quoted_header_after_spaces(self) -> None:
+        data = b'"Date",  "Price / gal",  "Total cost"\n2024-01-01,1.5,30\n'
+        table = engine.read_file(data, STANDARD).tables[0]
+        assert table.headers == ["Date", "Price / gal", "Total cost"]

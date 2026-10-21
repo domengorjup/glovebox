@@ -11,3 +11,6 @@ Only hand-made or fully anonymised files belong here.
 - Fixtures belong to presets: each `fuelio_*`, `fuelly_*` and `drivvo_*` file
   is the sample for the shipped preset of that name, and `standard_*` files are
   samples of the standard format (see `tests/test_presets_shipped.py`).
+- `drivvo_web_sections.csv` is a sample of Drivvo's web export, which no
+  shipped preset covers; it tests the engine's handling of `#Section` lines,
+  `%uXXXX` escapes and quoted headers after spaces.

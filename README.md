@@ -74,6 +74,10 @@ Import is under Manage, Import (upload, map columns, preview, confirm); export i
 
 Use the full backup in the app (a ZIP of CSV files plus a `datapackage.json`) as a backup. To restore, start the app on a fresh `/data` volume and import that ZIP. In the add-on, `/data` is also included in Home Assistant backups.
 
+## Contributing
+
+Contributions are welcome; a good first one is an import preset for an app you use. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Licence
 
 Released under the MIT licence, see [LICENSE](LICENSE). Bundled and referenced third-party material is listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

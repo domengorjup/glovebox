@@ -9,14 +9,14 @@ A preset describes how one CSV layout maps onto the standard fields: which sourc
 | Id | Name | Verified | Export | Note |
 |---|---|---|---|---|
 | `glovebox` | Glovebox | yes | yes | The Glovebox standard CSV format (see the format description). |
-| `drivvo-expenses` | Drivvo (expenses) | no | no | Best effort, untested: not checked against a real export. |
-| `drivvo-refuelling` | Drivvo (refuelling) | no | no | Best effort, untested: not checked against a real export. |
-| `drivvo-services` | Drivvo (services) | no | no | Best effort, untested: not checked against a real export. |
-| `fuelio-costs` | Fuelio (costs) | no | no | Fuelio backup, ## Costs section. Category is taken from the cost title; unknown titles become 'other'. Based on open-source parsers. |
-| `fuelio-fillups` | Fuelio (fill-ups) | no | no | Fuelio backup, ## Log section. Import the same file again with 'Fuelio (costs)' for the costs. Based on open-source parsers. |
-| `fuelly-metric` | Fuelly (metric) | no | yes | Fuelly import-format CSV with litres. Based on public descriptions of the format. |
-| `fuelly-us` | Fuelly (US) | no | no | Fuelly import-format CSV with US gallons and miles. Based on public descriptions of the format. |
-| `fuelly-website` | Fuelly (website export) | no | no | Fuelly website export. Units are asked. No partial or missed flags: all fill-ups are imported as full. |
+| `drivvo-expenses` | Drivvo (expenses) | yes | no | Tested with Drivvo Android exports, October 2026. ##Expense section of the History CSV. Unknown expense types become 'other': extend the category map and save it as your own preset. Use the phone export: the web export holds the same records. |
+| `drivvo-refuelling` | Drivvo (refuelling) | yes | no | Tested with Drivvo Android exports, October 2026. ##Refuelling section of the History CSV; import the same file again with 'Drivvo (expenses)' and 'Drivvo (services)'. Only the first fuel is read; Discount is ignored. Use the phone export: the web export holds the same records. |
+| `drivvo-services` | Drivvo (services) | yes | no | Tested with Drivvo Android exports, October 2026. ##Service section of the History CSV: one maintenance expense per service item; items with a cost of 0 are skipped. Use the phone export: the web export holds the same records. |
+| `fuelio-costs` | Fuelio (costs) | no | no | Never tested against a real export (based on open-source parsers). Fuelio CSV backup, ## Costs section. Category is taken from the cost title; unknown titles become 'other'. |
+| `fuelio-fillups` | Fuelio (fill-ups) | no | no | Never tested against a real export (based on open-source parsers). Fuelio CSV backup, ## Log section. Import the same file again with 'Fuelio (costs)' for the costs. |
+| `fuelly-metric` | Fuelly (metric) | no | yes | Never tested against a real export (based on public descriptions). Fuelly import-format CSV with litres. |
+| `fuelly-us` | Fuelly (US) | no | no | Never tested against a real export (based on public descriptions). Fuelly import-format CSV with US gallons and miles. |
+| `fuelly-website` | Fuelly (website export) | no | no | Never tested against a real export (based on public descriptions). Fuelly website export. Units are asked. No partial or missed flags: all fill-ups are imported as full. |
 
 ## Keys
 
@@ -30,7 +30,7 @@ A preset describes how one CSV layout maps onto the standard fields: which sourc
 | `file.encoding` | string | a Python codec name |  | Text encoding. Unset: UTF-8 (BOM accepted), then cp1252. |
 | `file.delimiter` | string | `,` `;` or a tab (`\t`) |  | Field delimiter. Unset: detected. |
 | `file.header_row` | integer | 1 or more |  | Header row, counted over the non-blank rows of the file or section (1 is the first). Unset: detected. |
-| `file.section` | string |  |  | Read only the lines after `## <section>` up to the next `## ` line. |
+| `file.section` | string |  |  | Read only the lines after `## <section>` (or `# <section>`) up to the next such line. |
 | `format.date_format` | string | `auto` or a pattern containing `%`, e.g. `%d.%m.%Y %H:%M` | "auto" | Date (and time) pattern in strptime syntax, or automatic detection. |
 | `format.decimal_char` | string | `.` `,` `auto` | "auto" | Decimal separator. |
 | `format.group_char` | string | empty, `,` `.` space or `'` | "" | Thousands separator; empty means none (a number containing one is a row error). |

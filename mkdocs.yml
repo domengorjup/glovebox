@@ -67,4 +67,5 @@ nav:
       - API reference: dev/api-reference.md
       - Offline use (draft): dev/offline.md
       - Add-on and releases: dev/release.md
+      - Contributing: dev/contributing.md
       - Licence and notices: dev/licence.md

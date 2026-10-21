@@ -11,6 +11,7 @@ preset.
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass, field
 
 from sqlalchemy import delete, select, update
@@ -47,9 +48,10 @@ CHOOSE_VEHICLE_MESSAGE = "Choose a target vehicle for this file."
 NOTHING_NEW_MESSAGE = "Nothing new to import: every row is already present."
 CUSTOM_FORMAT = "custom"  # batch format of a preset that was never saved
 DETECT_THRESHOLD = 0.5
-# A Fuelio backup holds both sections and scores 1.0 for both Fuelio presets;
-# among tied shipped presets this one wins. Tied user presets always win.
-PREFERRED_ON_TIE = "fuelio-fillups"
+# A Fuelio backup or a Drivvo export holds several sections and scores 1.0 for
+# each of its section presets; among tied shipped presets these (the fill-ups)
+# win. Tied user presets always win.
+PREFERRED_ON_TIE = ("fuelio-fillups", "drivvo-refuelling")
 _BACKUP_TABLES = ("records", "vehicles", "stations")
 
 
@@ -150,7 +152,7 @@ def detect_preset(session: Session, data: bytes) -> Preset | None:
     """
     The best-matching preset for an upload (user presets first, then shipped),
     or ``None`` if none finds at least half of its columns. On a tie the first
-    user preset wins, and among shipped presets ``PREFERRED_ON_TIE``. A full
+    user preset wins, and among shipped presets one of ``PREFERRED_ON_TIE``. A full
     backup gets the standard preset. When this returns ``None``, start the mapping from
     ``engine.fallback_preset(engine.read_file(data))``.
     """
@@ -169,7 +171,7 @@ def detect_preset(session: Session, data: bytes) -> Preset | None:
             best is not None
             and value == best_score
             and best.shipped
-            and preset.id == PREFERRED_ON_TIE
+            and preset.id in PREFERRED_ON_TIE
         )
         if best is None or value > best_score or tie_win:
             best, best_score = preset, value
@@ -469,7 +471,7 @@ def _map_and_dedupe(
         preview.needs_vehicle_choice = True
         return
     refuel_keys: set[tuple] = set()
-    expense_keys: set[tuple] = set()
+    expense_matched: Counter[tuple] = Counter()
     known = _ExistingKeys(session)
     for refuel in result.refuels:
         target = _target(refuel.vehicle_name, plan, mapping)
@@ -490,13 +492,16 @@ def _map_and_dedupe(
             continue
         refuel_keys.add(key)
         plan.refuels.append((refuel, figures, target))
+    # Expenses are matched one to one: a file may hold several equal rows (e.g.
+    # two service items of the same price on one day), and each of them is a
+    # duplicate only if the database already holds as many rows with that key.
     for expense in result.expenses:
         target = _target(expense.vehicle_name, plan, mapping)
         key = (target, expense.date, expense.category, expense.amount_cents)
-        if key in expense_keys or key in known.expenses(target):
+        if expense_matched[key] < known.expenses(target)[key]:
+            expense_matched[key] += 1
             preview.duplicate_expenses += 1
             continue
-        expense_keys.add(key)
         plan.expenses.append((expense, target))
     # Odometers are never invented on import; only point out the gaps.
     without = sum(1 for expense, _ in plan.expenses if expense.odometer_km is None)
@@ -548,7 +553,7 @@ class _ExistingKeys:
     def __init__(self, session: Session) -> None:
         self._session = session
         self._refuels: dict[int, set[tuple]] = {}
-        self._expenses: dict[int, set[tuple]] = {}
+        self._expenses: dict[int, Counter[tuple]] = {}
 
     def refuels(self, target: int | str) -> set[tuple]:
         if isinstance(target, str):
@@ -565,16 +570,17 @@ class _ExistingKeys:
             }
         return self._refuels[target]
 
-    def expenses(self, target: int | str) -> set[tuple]:
+    def expenses(self, target: int | str) -> Counter[tuple]:
+        """Number of existing expenses per duplicate key."""
         if isinstance(target, str):
-            return set()
+            return Counter()
         if target not in self._expenses:
             rows = self._session.execute(
                 select(
                     Expense.date, Expense.category, Expense.amount_cents
                 ).where(Expense.vehicle_id == target)
             )
-            self._expenses[target] = {(target, d, c, a) for d, c, a in rows}
+            self._expenses[target] = Counter((target, d, c, a) for d, c, a in rows)
         return self._expenses[target]
 
 

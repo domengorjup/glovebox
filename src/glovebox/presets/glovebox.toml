@@ -1,7 +1,8 @@
+# Export: Glovebox → Export → standard CSV (or records.csv inside a full
+# backup ZIP).
 # Glovebox standard format (design D1/D5): identity mapping, fixed formats.
 # Every column of the standard records table maps to the column of the same
-# name. This is the format of the export and of the full backup's records.csv.
-# Verified by the round-trip tests.
+# name. Verified by the round-trip tests.
 
 name = "Glovebox"
 note = "The Glovebox standard CSV format (see the format description)."

@@ -1160,7 +1160,7 @@ date = { column = "when" }
 def test_presets_page_lists_shipped_presets_with_status_and_download(client):
     html = client.get("/presets", headers=INGRESS).text
     assert "Glovebox" in html and "Verified" in html and "Unverified" in html
-    assert "Best effort, untested" in html
+    assert "Never tested against a real export" in html
     assert f'href="{PREFIX}/presets/glovebox/download"' in html
     assert "No own presets yet." in html and "Delete" not in html.split("Shipped presets")[1]
 

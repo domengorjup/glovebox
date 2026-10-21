@@ -1,0 +1,22 @@
+
+#Vehicle
+
+"Vehicle Name","Active","Vehicle type","Manufacturer","Model","License plate","Year","Fuel capacity(gal)","Odometer (km)","VIN (Vehicle Identification Number)","Registration ID","Notes",
+"Test Car","Yes","Car","Examplecar","Model X1","","2020","45.000","Kilometers (km)","","","",
+
+#Refueling
+
+"Vehicle Name","Odometer (km)","Date","Fuel",  "Price / gal",  "Total cost",  "Volume","Filled tank completely","Second fuel","Price / gal","Total cost","Volume","Filled tank completely 2","Third fuel","Price / gal","Total cost","Volume","Filled tank completely 3","Fuel efficiency","Fuel efficiency 2","Fuel efficiency 3","Charge type","Starting battery (%)","Ending battery (%)","Duration (min)","Gas station","Driver","Payment method","Reason","Notes","(System Date)"
+"Test Car","10250","2025-03-02 08:15","Gasoline","1.453","58.12","40.000","Yes","","0","0","0","No","","0","0","0","No","","","","","","","","Alpha Fuel","","","","","2025-03-02 07:15"
+"Test Car","10840","2025-03-20 17:40","Gasoline","1.497","47.90","32.000","Yes","","0","0","0","No","","0","0","0","No","5.424","","","","","","","%u010Cista %u010Crpalka","","","","","2025-03-20 16:40"
+
+#Expense
+
+"Vehicle Name","Odometer (km)","Date","Total cost","Type of expense","Expense location","Driver","Payment method","Reason","Notes","(System Date)"
+"Test Car","11000","2025-03-25 10:00","350.0","Insurance","Zavarovalnica %u0160tirje","","","","","2025-03-25 08:00"
+
+#Service
+
+"Vehicle Name","Odometer (km)","Date","Total cost","Type of service","Service location","Driver","Payment method","Notes","(System Date)"
+"Test Car","11500","2025-04-10 09:30","45","Oil Change","Example Garage","","","Menjava olja in filtra, %u017Eaga","2025-04-10 07:30"
+"Test Car","11500","2025-04-10 09:30","0","Oil Filter","Example Garage","","","","2025-04-10 07:30"

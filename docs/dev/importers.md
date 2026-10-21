@@ -14,11 +14,11 @@ The web UI calls only the pipeline. There is no code per format: the layout of a
 |---|---|
 | `standard.py` | The standard CSV format: field definitions, example, Data Package descriptor. Docs are generated from it. |
 | `importers/presets.py` | The `Preset` dataclasses, the key table, `load_preset` (validates, names the bad key), the TOML writer, shipped presets (`src/glovebox/presets/*.toml`) and user presets (database table `preset`). |
-| `importers/engine.py` | Pure, no database. `read_file` (encoding, delimiter, ZIP members, `## Section`, header row), `score` (how well a preset fits), `apply` (skip rules, mapping, value maps, number and date parsing, units) giving canonical records, row errors and questions. |
+| `importers/engine.py` | Pure, no database. `read_file` (encoding, delimiter, ZIP members, `## Section` or `#Section` lines, `%uXXXX` escapes, header row), `score` (how well a preset fits), `apply` (skip rules, mapping, value maps, number and date parsing, units) giving canonical records, row errors and questions. |
 | `importers/base.py` | Canonical record types, `RowError`, `Question`, `Answers`, and the locale helpers. |
 | `importers/pipeline.py` | `detect_preset`, `preview_import`, `commit_import`, `undo_batch`: vehicle mapping, duplicates, stations, companion tables, the single transaction. |
 
-`detect_preset` scores user presets first, then the shipped ones; the best score of at least 0.5 wins. On a tie the first user preset wins, and among shipped presets `fuelio-fillups` (a Fuelio backup fits both Fuelio presets). With no match the mapping starts from the standard field names (`engine.fallback_preset`).
+`detect_preset` scores user presets first, then the shipped ones; the best score of at least 0.5 wins. On a tie the first user preset wins, and among shipped presets one of `PREFERRED_ON_TIE` (`fuelio-fillups`, `drivvo-refuelling`): a sectioned file fits each of its section presets equally. With no match the mapping starts from the standard field names (`engine.fallback_preset`).
 
 ## Companion tables and backups
 
@@ -42,6 +42,13 @@ fuel_l = { column = "Liter" }
 
 ## Add a layout
 
-No code change. Write the preset in the app (preview step, then **Save this mapping as a preset**) or as a file in `src/glovebox/presets/`, add an anonymised fixture to `tests/fixtures/` and a case in `tests/test_presets_shipped.py`. Set `verified = true` only after checking against a real export. A shipped preset used for export needs `export = true` and no skip rules.
+No code change. Write the preset in the app (preview step, then **Save this mapping as a preset**) or as a file in `src/glovebox/presets/`, add an anonymised fixture to `tests/fixtures/` and a case in `tests/test_presets_shipped.py`. A shipped preset used for export needs `export = true` and no skip rules.
 
-Notes: stations are created by name and location; a brand is only set when the file provides one. Duplicate keys are (vehicle, date, odometer, litres to 0.01) for refuels and (vehicle, date, category, amount) for expenses.
+Notes: stations are created by name and location; a brand is only set when the file provides one. Duplicate keys are (vehicle, date, odometer, litres to 0.01) for refuels and (vehicle, date, category, amount) for expenses. Refuels with the same key within one file count as duplicates; expenses are matched one to one, so equal expenses within one file are all kept and a re-import skips each against one existing record.
+
+## Writing a preset
+
+- **Header comment.** Every shipped preset file starts with TOML comments, the first line beginning `# Export:`, that say how the export it expects is made: app, platform (Android, iOS, web), menu path and options, for example "Drivvo Android app → History, with one vehicle selected → export CSV". Then the details: sections, columns that are skipped, quirks. A test checks the `# Export:` line.
+- **Tested status.** `verified = true` only when the preset was checked against a real export and the numbers agree with the app's own reports. Say which export and when, in the comment and in the `note` the UI shows ("Tested with Drivvo Android exports, October 2026"). A preset never tested against a real file says so plainly: its `note` starts with "Never tested against a real export" and it keeps `verified = false`. The `note` is the user-facing part: the preview and the [presets list](../user/presets.md) show it; the comments are for whoever edits the file.
+- **One preset per data source, not per file format.** Another export format of the same app gets its own preset only if it adds something Glovebox uses, for example vehicle details it reads or a vehicle column for multi-vehicle files. If it stores the same records in another way, ship one preset, for the export most people have (usually the phone app's), and say so in the comment and the `note`, e.g. "Use the phone export: the web export holds the same records."
+- **Fixtures.** Real exports never go into the repo. Build a synthetic fixture with the same layout (headers, section lines, value formats, quirks) and invented values.

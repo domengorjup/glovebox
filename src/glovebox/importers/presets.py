@@ -97,7 +97,7 @@ KEY_TABLE: tuple[KeySpec, ...] = (
     ),
     KeySpec(
         "file.section", "string",
-        "Read only the lines after `## <section>` up to the next `## ` line.",
+        "Read only the lines after `## <section>` (or `# <section>`) up to the next such line.",
     ),
     KeySpec(
         "format.date_format", "string",

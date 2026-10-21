@@ -1,13 +1,14 @@
-# Fuelio backup, "## Log" section (fill-ups).
-# Source: converted from the earlier built-in mapping [log] and its rules. The
-# format was reverse-engineered from open-source parsers, not checked against
-# a real export. Units are read from the headers ("Odo (km)", "Fuel (litres)").
-# Fuelio writes 0 for a price that was not given. Not used any more (design
-# D9): station names from "## FavStations", the vehicle name from
-# "## Vehicle". The vehicle is chosen at import (a ZIP member's name is proposed).
+# Export: Fuelio (Android) CSV backup file, "## Log" section (fill-ups). The
+# exact menu path in Fuelio was not checked.
+# NEVER TESTED against a real export: the layout was reverse-engineered from
+# open-source parsers. Units are read from the headers ("Odo (km)",
+# "Fuel (litres)"). Fuelio writes 0 for a price that was not given. Station
+# names from "## FavStations" and the vehicle name from "## Vehicle" are not
+# used (design D9); the vehicle is chosen at import (a ZIP member's name is
+# proposed). Import the same file again with "Fuelio (costs)" for the costs.
 
 name = "Fuelio (fill-ups)"
-note = "Fuelio backup, ## Log section. Import the same file again with 'Fuelio (costs)' for the costs. Based on open-source parsers."
+note = "Never tested against a real export (based on open-source parsers). Fuelio CSV backup, ## Log section. Import the same file again with 'Fuelio (costs)' for the costs."
 verified = false
 export = false
 

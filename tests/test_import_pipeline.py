@@ -375,6 +375,18 @@ class TestDuplicates:
         assert (preview.new_expenses, preview.duplicate_expenses) == (1, 1)
 
 
+    def test_equal_expenses_in_one_file_are_all_kept(self, session, fixtures_dir) -> None:
+        # Two service items of the same price on the same day are two records;
+        # a re-import matches them one to one against the database.
+        services = next(p for p in list_presets(session) if p.id == "drivvo-services")
+        data = (fixtures_dir / "drivvo_en_sections.csv").read_bytes()
+        mapping = _mapping(session)
+        first = preview_import(session, data, services, mapping=mapping)
+        assert (first.new_expenses, first.duplicate_expenses) == (4, 0)
+        commit_import(session, data, "d.csv", mapping, preset=services)
+        again = preview_import(session, data, services, mapping=mapping)
+        assert (again.new_expenses, again.duplicate_expenses) == (0, 4)
+
 class TestUndo:
     def test_undo_removes_batch_and_its_stations(self, session, standard_file) -> None:
         batch = commit_import(session, standard_file, "f.csv", VehicleMapping(), STANDARD)

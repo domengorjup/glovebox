@@ -1,12 +1,12 @@
-# Fuelly website export format (headers "Fuelup Date", "Odometer", ...).
-# Source: converted from the earlier built-in mapping [export] section. Not checked
-# against a real file. The "Miles" column is the trip distance, not the
-# odometer, and is not mapped. The file does not say which units it uses, so
-# the preview asks. The format has no partial or missed flags: every fill-up
-# is imported as full.
+# Export: Fuelly website, the CSV export of a vehicle's fill-ups (headers
+# "Fuelup Date", "Odometer", ...). The exact menu path was not checked.
+# NEVER TESTED against a real export: based on public descriptions of the
+# format. The "Miles" column is the trip distance, not the odometer, and is
+# not mapped. The file does not say which units it uses, so the preview asks.
+# The format has no partial or missed flags: every fill-up is imported as full.
 
 name = "Fuelly (website export)"
-note = "Fuelly website export. Units are asked. No partial or missed flags: all fill-ups are imported as full."
+note = "Never tested against a real export (based on public descriptions). Fuelly website export. Units are asked. No partial or missed flags: all fill-ups are imported as full."
 verified = false
 export = false
 

@@ -455,9 +455,7 @@ def _counts(engine: Engine) -> tuple[int, int, int]:
 
 # file, form changes, (refuels, expenses, vehicles) after commit
 IMPORT_CASES = [
-    ("drivvo_refuel_en.csv", {"default_vehicle": "1"}, (2, 0, 1)),
-    ("drivvo_service_en.csv", {"default_vehicle": "1"}, (0, 3, 1)),
-    ("drivvo_expense_en.csv", {"default_vehicle": "1"}, (0, 2, 1)),
+    ("drivvo_en_sections.csv", {"default_vehicle": "1"}, (4, 0, 1)),
     ("fuelio_comma_km.csv", {"default_vehicle": "1"}, (4, 0, 1)),
     ("fuelio_semicolon_miles.csv", {"default_vehicle": "1", "ans_distance_unit": "mi"}, (2, 0, 1)),
     ("fuelly_import_metric.csv", {"default_vehicle": "1"}, (3, 0, 1)),
@@ -498,6 +496,22 @@ def test_import_each_fixture_then_undo(
         assert session.scalar(select(func.count(Station.id))) == 0
         assert session.scalar(select(func.count(ImportBatch.id))) == 0
     assert batch_id in batches
+
+
+def test_drivvo_file_is_imported_once_per_section(
+    client: TestClient, engine: Engine, fixtures_dir: Path
+) -> None:
+    _post(client, "/vehicles/new", {"name": "Existing"})
+    data = (fixtures_dir / "drivvo_en_sections.csv").read_bytes()
+    page = client.get(_upload(client, "d.csv", data)).text
+    assert _selected_option(page, "preset") == "drivvo-refuelling"
+    _import_file(client, "d.csv", data, {"default_vehicle": "1"})
+    done = client.get("/import?done=1&more=Expense&more=Service").text
+    assert "The file has more sections: Expense, Service" in done
+    for preset_id in ("drivvo-expenses", "drivvo-services"):
+        _import_file(client, "d.csv", data, {"default_vehicle": "1", "preset": preset_id})
+    # 3 expenses, 4 priced service items (the 0-cost item is skipped)
+    assert _counts(engine) == (4, 7, 1)
 
 
 def test_commit_shows_the_result_with_undo(client: TestClient, fixtures_dir: Path) -> None:

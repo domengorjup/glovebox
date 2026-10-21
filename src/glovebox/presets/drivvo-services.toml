@@ -1,26 +1,43 @@
-# Drivvo CSV, service rows.
-# Source: converted from the earlier built-in mapping [service] and [categories].
-# BEST EFFORT, UNTESTED: the English header names are a guess and were not
-# taken from a real Drivvo export. The service type is kept as the title; the
-# category defaults to maintenance.
+# Export: Drivvo Android app → History, with one vehicle selected → export
+# CSV. One file per vehicle, no vehicle column: choose the vehicle at import.
+# Tested with real Drivvo Android exports, October 2026 ("##Service" section).
+# Import the same file again with the refuelling and expenses presets. Drivvo
+# writes one row per service item, so a visit becomes several maintenance
+# expenses on the same date, each titled with its type of service. Items with
+# a total cost of 0 (listed without a price) are skipped and counted.
+# "Service location", "Title", "Discount" and the instalment columns are not
+# imported.
+# The Drivvo web export (History or vehicle menu → Export → CSV) holds the
+# same records and values (checked), so no separate preset is shipped: use
+# the phone export. The web file adds a "Vehicle Name" column and a
+# "#Vehicle" section, which bring nothing for a one-vehicle file; its
+# "#Refueling" section has other headers ("Price / gal", "Gas station") and
+# is not covered.
 
 name = "Drivvo (services)"
-note = "Best effort, untested: not checked against a real export."
-verified = false
+note = "Tested with Drivvo Android exports, October 2026. ##Service section of the History CSV: one maintenance expense per service item; items with a cost of 0 are skipped. Use the phone export: the web export holds the same records."
+verified = true
 export = false
+
+[file]
+section = "Service"
 
 [format]
 date_format = "auto"
-decimal_char = "auto"
+decimal_char = "."
 group_char = ""
-distance_unit = "km"
+distance_unit = "auto"
 volume_unit = "l"
 
 [fields]
 type = { value = "expense" }
 date = { column = "Date" }
-odometer_km = { column = ["Odometer", "Odo"], missing_values = ["0"] }
-title = { column = ["Service", "Service type"] }
-category = { column = ["Service", "Service type"], default = "maintenance", map = { maintenance = ["Oil change", "Service", "Maintenance", "Repair", "Brakes", "Tyres", "Tires", "Battery"], insurance = ["Insurance"], registration = ["Registration", "Vehicle tax", "Road tax", "Inspection"] } }
-total = { column = ["Total cost", "Total price", "Total", "Cost"] }
-notes = { column = ["Notes", "Note"] }
+odometer_km = { column = "Odometer", missing_values = ["0", "0.0"] }
+title = { column = "Type of service" }
+category = { value = "maintenance" }
+total = { column = "Total cost" }
+notes = { column = "Notes" }
+
+[[skip_rows]]
+column = "Total cost"
+values = ["0", "0.0", "0.00"]
