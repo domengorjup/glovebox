@@ -9,11 +9,11 @@ A preset describes how one CSV layout maps onto the standard fields: which sourc
 | Id | Name | Verified | Export | Note |
 |---|---|---|---|---|
 | `glovebox` | Glovebox | yes | yes | The Glovebox standard CSV format (see the format description). |
-| `drivvo-expenses` | Drivvo (expenses) | yes | no | Tested with Drivvo Android exports, October 2026. ##Expense section of the History CSV. Unknown expense types become 'other': extend the category map and save it as your own preset. Use the phone export: the web export holds the same records. |
-| `drivvo-refuelling` | Drivvo (refuelling) | yes | no | Tested with Drivvo Android exports, October 2026. ##Refuelling section of the History CSV; import the same file again with 'Drivvo (expenses)' and 'Drivvo (services)'. Only the first fuel is read; Discount is ignored. Use the phone export: the web export holds the same records. |
-| `drivvo-services` | Drivvo (services) | yes | no | Tested with Drivvo Android exports, October 2026. ##Service section of the History CSV: one maintenance expense per service item; items with a cost of 0 are skipped. Use the phone export: the web export holds the same records. |
+| `drivvo-expenses` | Drivvo (expenses) | yes | no | Tested with Drivvo Android exports, October 2026. Unknown expense types become 'other'. |
+| `drivvo-refuelling` | Drivvo (refuelling) | yes | no | Tested with Drivvo Android exports, October 2026. Only the first fuel is read; Discount is ignored. |
+| `drivvo-services` | Drivvo (services) | yes | no | Tested with Drivvo Android exports, October 2026. One maintenance expense per priced service item. |
 | `fuelio-costs` | Fuelio (costs) | no | no | Never tested against a real export (based on open-source parsers). Fuelio CSV backup, ## Costs section. Category is taken from the cost title; unknown titles become 'other'. |
-| `fuelio-fillups` | Fuelio (fill-ups) | no | no | Never tested against a real export (based on open-source parsers). Fuelio CSV backup, ## Log section. Import the same file again with 'Fuelio (costs)' for the costs. |
+| `fuelio-fillups` | Fuelio (fill-ups) | no | no | Never tested against a real export (based on open-source parsers). Fuelio CSV backup, ## Log section. Then use 'Import next section' for the costs. |
 | `fuelly-metric` | Fuelly (metric) | no | yes | Never tested against a real export (based on public descriptions). Fuelly import-format CSV with litres. |
 | `fuelly-us` | Fuelly (US) | no | no | Never tested against a real export (based on public descriptions). Fuelly import-format CSV with US gallons and miles. |
 | `fuelly-website` | Fuelly (website export) | no | no | Never tested against a real export (based on public descriptions). Fuelly website export. Units are asked. No partial or missed flags: all fill-ups are imported as full. |
@@ -23,7 +23,9 @@ A preset describes how one CSV layout maps onto the standard fields: which sourc
 | Key | Type | Allowed values | Default | Description |
 |---|---|---|---|---|
 | `name` | string |  |  | Display name; must be unique among all presets. |
-| `note` | string |  | "" | Free text shown in the preview. |
+| `note` | string |  | "" | One short line shown in the preview. |
+| `steps` | list of strings |  | [] | Short instructions for the person importing, shown as a numbered list under the preset select of the mapping page. Give a preset steps when its import needs more than upload, preview, import. Keep each item to about 8 words and the list to 5 items. |
+| `zero_amount` | string | `error`, `note` | error | What to do with an expense row whose amount is 0: `error` reports it as a row error; `note` adds its title as "Also: ..." to the notes of the first priced expense with the same date and odometer, and skips it (counted) if there is none. |
 | `verified` | boolean |  | false | True only when the mapping was checked against a real file. |
 | `export` | boolean |  | false | Offer the preset on the export page. |
 | `split_by_vehicle` | boolean |  | false | Export: one file per vehicle. Import: the file has no vehicle column. |

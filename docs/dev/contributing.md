@@ -8,7 +8,7 @@ If you use a fuel or car-cost app that Glovebox has no preset for, or one whose 
 
 1. Export your data from the app and note exactly how you did it (platform, menu path, options).
 2. In Glovebox, import the file, adjust the column mapping until the preview is clean, and save it as a preset. Download it from **Manage → Presets**.
-3. Follow [Writing a preset](importers.md#writing-a-preset): add the `# Export:` comment, a note saying what it was tested with, and put the file in `src/glovebox/presets/`.
+3. Follow [Writing a preset](importers.md#writing-a-preset): add the `# Export:` comment, a one-line note saying what it was tested with, `steps` if the import needs more than upload, preview, import (short, phone-friendly: about 8 words each, at most 5), and put the file in `src/glovebox/presets/`.
 4. Add a small **made-up** fixture with the same layout (real column names, invented values) and a test, as the existing presets do. Never commit your real export: it contains personal data.
 5. Run the checks below and open a pull request.
 

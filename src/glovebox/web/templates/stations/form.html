@@ -15,6 +15,7 @@
     {{ field('Brand', 'brand', v.brand or '') }}
   </div>
   <div class="dialog-foot">
+    <a class="btn danger" href="{{ url(request, '/stations/%d/delete' % station.id) }}" data-dialog>Delete</a>
     <a class="btn" href="{{ url(request, '/stations') }}" data-close>Cancel</a>
     <button type="submit" class="btn primary">Save</button>
   </div>

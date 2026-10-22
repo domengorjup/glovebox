@@ -45,6 +45,7 @@ from glovebox.services.records import (
 )
 
 CHOOSE_VEHICLE_MESSAGE = "Choose a target vehicle for this file."
+NEW_VEHICLE_NAME_MESSAGE = "Enter a name for the new vehicle."
 NOTHING_NEW_MESSAGE = "Nothing new to import: every row is already present."
 CUSTOM_FORMAT = "custom"  # batch format of a preset that was never saved
 DETECT_THRESHOLD = 0.5
@@ -112,11 +113,15 @@ class VehicleMapping:
     A name that is absent from ``by_name`` is matched to the active vehicle of
     the same name, else created. A name mapped to ``None`` is always created
     (the preview reports an error if an active vehicle already has that name).
-    ``default_vehicle_id`` serves files without vehicle names.
+    ``default_vehicle_id`` serves files without vehicle names; instead,
+    ``default_new_name`` (``None`` = not chosen) creates a vehicle of that name
+    for them in the commit transaction. The name is required (stripped) and must
+    not belong to an active vehicle.
     """
 
     by_name: dict[str, int | None] = field(default_factory=dict)
     default_vehicle_id: int | None = None
+    default_new_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -137,6 +142,7 @@ class _Plan:
     )
     expenses: list[tuple[CanonicalExpense, int | str]] = field(default_factory=list)
     vehicle_ids: dict[str, int | None] = field(default_factory=dict)
+    new_default: str | None = None  # name of the vehicle created for unnamed records
     vehicle_details: dict[str, dict] = field(default_factory=dict)  # vehicles.csv
     stations: list[_StationRow] = field(default_factory=list)  # stations.csv
     vehicle_fills: dict[int, dict] = field(default_factory=dict)  # id -> empty fields to set
@@ -148,19 +154,27 @@ class _Plan:
         return bool(self.preview.errors or self.preview.questions)
 
 
-def detect_preset(session: Session, data: bytes) -> Preset | None:
+def detect_preset(
+    session: Session, data: bytes, section: str | None = None
+) -> Preset | None:
     """
     The best-matching preset for an upload (user presets first, then shipped),
     or ``None`` if none finds at least half of its columns. On a tie the first
     user preset wins, and among shipped presets one of ``PREFERRED_ON_TIE``. A full
     backup gets the standard preset. When this returns ``None``, start the mapping from
     ``engine.fallback_preset(engine.read_file(data))``.
+
+    With ``section`` only presets that read that section of the file are
+    considered (the "next section" step of a multi-section file).
     """
     presets = list_presets(session)
     if all(p.id != STANDARD_ID for p in presets):
         presets.append(engine.standard_preset())
     if engine.read_file(data).is_backup:
         return next(p for p in presets if p.id == STANDARD_ID)
+    if section is not None:
+        wanted = section.casefold()
+        presets = [p for p in presets if (p.file.section or "").casefold() == wanted]
     best: Preset | None = None
     best_score = 0.0
     for preset in presets:
@@ -467,9 +481,8 @@ def _map_and_dedupe(
         r.vehicle_name is None for r in [*result.refuels, *result.expenses]
     )
     if needs_default and mapping.default_vehicle_id is None:
-        preview.errors.append(CHOOSE_VEHICLE_MESSAGE)
-        preview.needs_vehicle_choice = True
-        return
+        if not _plan_new_default(session, mapping, plan):
+            return
     refuel_keys: set[tuple] = set()
     expense_matched: Counter[tuple] = Counter()
     known = _ExistingKeys(session)
@@ -512,6 +525,32 @@ def _map_and_dedupe(
     preview.new_expenses = len(plan.expenses)
 
 
+def _plan_new_default(session: Session, mapping: VehicleMapping, plan: _Plan) -> bool:
+    """
+    Plan the vehicle for unnamed records from ``mapping.default_new_name``.
+    Returns False (with an error in the preview) if there is none or it is
+    invalid.
+    """
+    preview = plan.preview
+    preview.needs_vehicle_choice = True
+    if mapping.default_new_name is None:
+        preview.errors.append(CHOOSE_VEHICLE_MESSAGE)
+        return False
+    name = mapping.default_new_name.strip()
+    if not name:
+        preview.errors.append(NEW_VEHICLE_NAME_MESSAGE)
+        return False
+    if _active_vehicle_id(session, name) is not None:
+        preview.errors.append(
+            f'A vehicle named "{name}" already exists; '
+            "choose it instead of creating a new one."
+        )
+        return False
+    plan.new_default = name
+    plan.vehicle_ids.setdefault(name, None)
+    return True
+
+
 def _hundredths(figures: DerivedFigures) -> int:
     """Litres rounded to 0.01 L (half up), as an integer."""
     return (figures.litres_milli + 5) // 10
@@ -542,6 +581,8 @@ def _active_vehicle_id(session: Session, name: str) -> int | None:
 def _target(name: str | None, plan: _Plan, mapping: VehicleMapping) -> int | str:
     """Existing vehicle id, or the file's vehicle name if it will be created."""
     if name is None:
+        if plan.new_default is not None:
+            return plan.new_default
         return mapping.default_vehicle_id  # type: ignore[return-value]
     vehicle_id = plan.vehicle_ids[name]
     return name if vehicle_id is None else vehicle_id

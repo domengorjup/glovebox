@@ -667,3 +667,80 @@ class TestCompanionTables:
         assert (a.new_refuels, a.new_expenses, a.vehicle_names) == (
             b.new_refuels, b.new_expenses, b.vehicle_names,
         )
+
+
+class TestNewDefaultVehicle:
+    """A file without vehicle names can create its vehicle at commit."""
+
+    def test_vehicle_is_created_in_the_commit(self, session) -> None:
+        mapping = VehicleMapping(default_new_name=" Passat ")
+        preview = preview_import(session, FUELLY, REFUELS, mapping=mapping)
+        assert not preview.errors and preview.new_refuels == 3
+        assert count(session, Vehicle) == 0  # a preview creates nothing
+        batch = commit_import(session, FUELLY, "log.csv", mapping, REFUELS)
+        vehicle = session.scalar(select(Vehicle))
+        assert vehicle.name == "Passat" and batch.refuels_imported == 3
+        assert {r.vehicle_id for r in session.scalars(select(Refuel))} == {vehicle.id}
+
+    def test_undo_keeps_the_vehicle(self, session) -> None:
+        batch = commit_import(
+            session, FUELLY, "log.csv", VehicleMapping(default_new_name="Passat"), REFUELS
+        )
+        undo_batch(session, batch.id)
+        assert count(session, Refuel) == 0 and count(session, Vehicle) == 1
+
+    @pytest.mark.parametrize(
+        ("name", "message"),
+        [("", "Enter a name"), ("   ", "Enter a name"), ("Taken", "already exists")],
+    )
+    def test_invalid_names_block_the_import(self, session, name, message) -> None:
+        session.add(Vehicle(name="Taken"))
+        session.commit()
+        mapping = VehicleMapping(default_new_name=name)
+        preview = preview_import(session, FUELLY, REFUELS, mapping=mapping)
+        assert any(message in e for e in preview.errors)
+        with pytest.raises(ValidationError):
+            commit_import(session, FUELLY, "log.csv", mapping, REFUELS)
+        assert count(session, Refuel) == 0 and count(session, Vehicle) == 1
+
+    def test_an_archived_vehicle_name_is_free(self, session) -> None:
+        session.add(Vehicle(name="Old", archived=True))
+        session.commit()
+        mapping = VehicleMapping(default_new_name="Old")
+        assert not preview_import(session, FUELLY, REFUELS, mapping=mapping).errors
+
+    def test_nothing_chosen_still_asks(self, session) -> None:
+        preview = preview_import(session, FUELLY, REFUELS, mapping=VehicleMapping())
+        assert preview.needs_vehicle_choice and preview.errors
+
+
+
+def _drivvo(fixtures_dir) -> bytes:
+    return (fixtures_dir / "drivvo_en_sections.csv").read_bytes()
+
+
+class TestSectionSteps:
+    def test_detection_by_section(self, session, fixtures_dir) -> None:
+        data = _drivvo(fixtures_dir)
+        assert detect_preset(session, data).id == "drivvo-refuelling"
+        for section, expected in (("Expense", "drivvo-expenses"),
+                                  ("service", "drivvo-services"),
+                                  ("Refuelling", "drivvo-refuelling")):
+            assert detect_preset(session, data, section).id == expected
+        assert detect_preset(session, data, "Costs") is None
+
+    def test_sections_in_turn_skip_what_is_imported(self, session, fixtures_dir) -> None:
+        data = _drivvo(fixtures_dir)
+        session.add(Vehicle(name="Car"))
+        session.commit()
+        mapping = VehicleMapping(default_vehicle_id=1)
+        for section, expected in (("Refuelling", (4, 0)), ("Expense", (0, 3)),
+                                  ("Service", (0, 4))):
+            chosen = detect_preset(session, data, section)
+            batch = commit_import(session, data, "d.csv", mapping, chosen)
+            assert (batch.refuels_imported, batch.expenses_imported) == expected
+        oil = session.scalar(select(Expense).where(Expense.title == "Oil Change"))
+        assert oil.notes == "Also: Oil Filter"
+        again = preview_import(session, data, detect_preset(session, data, "Service"),
+                               mapping=mapping)
+        assert again.new_expenses == 0 and again.duplicate_expenses == 4 and again.nothing_new

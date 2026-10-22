@@ -1,10 +1,13 @@
 # Export: Drivvo Android app → History, with one vehicle selected → export
 # CSV. One file per vehicle, no vehicle column: choose the vehicle at import.
 # Tested with real Drivvo Android exports, October 2026 ("##Service" section).
-# Import the same file again with the refuelling and expenses presets. Drivvo
-# writes one row per service item, so a visit becomes several maintenance
-# expenses on the same date, each titled with its type of service. Items with
-# a total cost of 0 (listed without a price) are skipped and counted.
+# Reached from "Import next section", or by uploading the same file again.
+# Drivvo writes one row per service item, so a visit becomes several
+# maintenance expenses on the same date, each titled with its type of service.
+# Items with a total cost of 0 (listed without a price) are not expenses: with
+# zero_amount = "note" their names are added to the note of the first priced
+# item of the same visit (same date and odometer) as "Also: Oil filter, ...".
+# A free item without a priced one in its visit is skipped and counted.
 # "Service location", "Title", "Discount" and the instalment columns are not
 # imported.
 # The Drivvo web export (History or vehicle menu → Export → CSV) holds the
@@ -15,7 +18,12 @@
 # is not covered.
 
 name = "Drivvo (services)"
-note = "Tested with Drivvo Android exports, October 2026. ##Service section of the History CSV: one maintenance expense per service item; items with a cost of 0 are skipped. Use the phone export: the web export holds the same records."
+note = "Tested with Drivvo Android exports, October 2026. One maintenance expense per priced service item."
+steps = [
+  "Zero-cost items become notes on the visit.",
+  "Preview, then Import.",
+]
+zero_amount = "note"
 verified = true
 export = false
 
@@ -37,7 +45,3 @@ title = { column = "Type of service" }
 category = { value = "maintenance" }
 total = { column = "Total cost" }
 notes = { column = "Notes" }
-
-[[skip_rows]]
-column = "Total cost"
-values = ["0", "0.0", "0.00"]

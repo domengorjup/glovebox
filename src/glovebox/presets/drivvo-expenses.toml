@@ -1,7 +1,8 @@
 # Export: Drivvo Android app → History, with one vehicle selected → export
 # CSV. One file per vehicle, no vehicle column: choose the vehicle at import.
 # Tested with real Drivvo Android exports, October 2026 ("##Expense" section).
-# Import the same file again with the refuelling and services presets. The
+# Reached from "Import next section" after the refuelling section, or by
+# uploading the same file again. The
 # type of expense is kept as the title and mapped to a category; types the
 # map does not know (including your own custom types) become "other": add
 # them to the map and save your own preset. "Expense location", "Title",
@@ -14,7 +15,13 @@
 # is not covered.
 
 name = "Drivvo (expenses)"
-note = "Tested with Drivvo Android exports, October 2026. ##Expense section of the History CSV. Unknown expense types become 'other': extend the category map and save it as your own preset. Use the phone export: the web export holds the same records."
+note = "Tested with Drivvo Android exports, October 2026. Unknown expense types become 'other'."
+steps = [
+  "Map your own types under Categories.",
+  "E.g. your insurance type: Insurance.",
+  "Save as your own preset to reuse.",
+  "Preview, then Import.",
+]
 verified = true
 export = false
 

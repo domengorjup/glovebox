@@ -69,11 +69,6 @@ ANSWER_LABELS = {
     "km": "Kilometres", "mi": "Miles",
     "l": "Litres", "gal_us": "US gallons", "gal_uk": "UK gallons",
 }
-# Rarely used fields: the mapping page folds them into "More fields".
-RARE_FIELDS = frozenset({
-    "currency", "station_location", "station_brand", "coverage_start", "coverage_end",
-    "notes", "derived", "source", "source_ref",
-})
 ANSWER_KEYS = ("date_order", "distance_unit", "volume_unit")
 
 
@@ -205,6 +200,25 @@ def preset_from_form(form: FormData, base: Preset) -> Preset:
 
 # --- Submitted state ---------------------------------------------------------
 
+NEW_VEHICLE = "new"  # value of the vehicle select: create a vehicle at commit
+
+
+@dataclass(frozen=True)
+class Carry:
+    """What a multi-section import carries from one section to the next."""
+
+    default_vehicle: str = ""  # vehicle id, or NEW_VEHICLE
+    new_vehicle: str = ""  # name for NEW_VEHICLE
+    seen: tuple[str, ...] = ()  # sections already imported from this upload
+
+
+def _carry(form: FormData) -> Carry:
+    return Carry(
+        default_vehicle=str(form.get("default_vehicle", "")),
+        new_vehicle=str(form.get("new_vehicle_name", "")),
+        seen=tuple(str(v) for v in form.getlist("seen")),
+    )
+
 
 @dataclass
 class Submitted:
@@ -218,6 +232,12 @@ class Submitted:
     maps: list[str]
     default_vehicle: str
     selected: str = ""  # id of the preset picked in the mapping step
+    new_vehicle: str = ""  # name typed for the "New vehicle..." choice
+    seen: tuple[str, ...] = ()
+
+    @property
+    def carry(self) -> Carry:
+        return Carry(self.default_vehicle, self.new_vehicle, self.seen)
 
     @property
     def mapping(self) -> VehicleMapping:
@@ -225,7 +245,10 @@ class Submitted:
         for name, target in zip(self.names, self.maps):
             by_name[name] = int(target) if target.isdigit() else None
         default = int(self.default_vehicle) if self.default_vehicle.isdigit() else None
-        return VehicleMapping(by_name=by_name, default_vehicle_id=default)
+        new_name = self.new_vehicle if self.default_vehicle == NEW_VEHICLE else None
+        return VehicleMapping(
+            by_name=by_name, default_vehicle_id=default, default_new_name=new_name
+        )
 
 
 def _answers(form: FormData) -> Answers:
@@ -249,6 +272,7 @@ def _submitted(request: Request, form: FormData) -> Submitted:
     _upload_path(request, token)
     base = _base_preset(form)
     preset = preset_from_form(form, base) if form.get("edited") else base
+    carry = _carry(form)
     return Submitted(
         token=token,
         filename=str(form.get("filename", "")) or "upload",
@@ -258,6 +282,8 @@ def _submitted(request: Request, form: FormData) -> Submitted:
         maps=[str(v) for v in form.getlist("maps")],
         default_vehicle=str(form.get("default_vehicle", "")),
         selected=str(form.get("selected_preset", "")),
+        new_vehicle=carry.new_vehicle,
+        seen=carry.seen,
     )
 
 
@@ -271,15 +297,28 @@ def _preset_names(session: Session) -> dict[str, str]:
 @router.get("")
 def import_home(
     request: Request, session: SessionDep, more: Annotated[list[str], Query()] = [],
-    done: int | None = None,
+    done: int | None = None, token: str = "", filename: str = "upload",
+    vehicle: str = "", seen: Annotated[list[str], Query()] = [],
 ):
-    """Upload form, the list of past import batches and, after a commit, its result."""
+    """
+    Upload form, the list of past import batches and, after a commit, its result.
+
+    ``more`` lists the sections of the stored upload ``token`` that are still to
+    import; the first one is offered as "Import next section".
+    """
+    sections = [m for m in more if m.strip()]
+    next_url = None
+    if sections and _TOKEN.match(token) and (_upload_dir(request) / f"{token}.upload").is_file():
+        query = [("token", token), ("filename", filename), ("section", sections[0]),
+                 ("vehicle", vehicle), *[("seen", s) for s in seen]]
+        next_url = f"/import/mapping?{urlencode(query)}"
     return render(
         request,
         "import/index.html",
         batches=pipeline.list_batches(session),
         preset_names=_preset_names(session),
-        more_sections=[m for m in more if m.strip()],
+        more_sections=sections,
+        next_url=next_url,
         done=session.get(ImportBatch, done) if done is not None else None,
         errors=[],
     )
@@ -321,7 +360,9 @@ def _field_rows(preset: Preset, headers: list[str]) -> list[dict]:
                 source, missing_column = KEEP, mapping.columns[0]
         rows.append({
             "name": target.name,
-            "more": target.name in RARE_FIELDS,
+            "shown": bool(source or _required_text(target) or mapping and (
+                mapping.map or mapping.true_values or mapping.false_values
+                or mapping.missing_values or mapping.default)),
             "description": target.description,
             "type": target.type,
             "enum": target.enum if target.type == ENUM else (),
@@ -364,7 +405,7 @@ def _unmapped_required(preset: Preset) -> list[str]:
 
 def _mapping_page(
     request: Request, session: Session, token: str, filename: str, preset: Preset,
-    selected: str, status: int = 200, errors: list[str] | None = None,
+    selected: str, carry: Carry, status: int = 200, errors: list[str] | None = None,
 ):
     """Render the mapping step for the stored upload."""
     data = _upload_path(request, token).read_bytes()
@@ -382,6 +423,7 @@ def _mapping_page(
     if table is not None and unmapped:
         warnings.append("Map the required fields before the preview: " + ", ".join(unmapped) + ".")
     rows = _field_rows(preset, headers)
+    explicit = any((preset.file.encoding, preset.file.delimiter, preset.file.header_row))
     return render(
         request,
         "import/mapping.html",
@@ -390,6 +432,10 @@ def _mapping_page(
         filename=filename,
         preset=preset,
         selected=selected,
+        carry=carry,
+        file_summary=_file_summary(table, preset),
+        formats_summary=_formats_summary(preset),
+        file_open=table is None or explicit or bool(all_errors),
         presets=list_presets(session),
         base_toml=write_preset(preset),
         table=table,
@@ -397,7 +443,6 @@ def _mapping_page(
         headers=headers,
         sections=sections,
         rows=rows,
-        more_in_use=any(r["more"] and (r["source"] or r["has_options"]) for r in rows),
         encodings=ENCODINGS, delimiters=DELIMITERS, decimals=DECIMALS, groups=GROUPS,
         distances=DISTANCES, volumes=VOLUMES,
         errors=all_errors,
@@ -405,18 +450,64 @@ def _mapping_page(
     )
 
 
+def _file_summary(table, preset: Preset) -> str:
+    """One line for the folded File block: what was detected or set."""
+    if table is None:
+        return "Could not be read"
+    delimiter = {"\t": "tab", ",": "comma", ";": "semicolon"}.get(table.delimiter, table.delimiter)
+    parts = [table.encoding.upper(), delimiter, f"header row {table.header_row}"]
+    if preset.file.section:
+        parts.append(f"section {preset.file.section}")
+    return " · ".join(parts)
+
+
+def _formats_summary(preset: Preset) -> str:
+    """One line for the folded Value formats block."""
+    fmt = preset.format
+    decimal = dict(DECIMALS)[fmt.decimal_char].lower() if fmt.decimal_char in dict(DECIMALS) else fmt.decimal_char
+    parts = ["dates " + ("auto" if fmt.date_format == "auto" else fmt.date_format),
+             f"decimal {decimal}"]
+    if fmt.distance_unit == fmt.volume_unit == "auto":
+        parts.append("units from header")
+    else:
+        parts += [dict(DISTANCES)[fmt.distance_unit].lower(), dict(VOLUMES)[fmt.volume_unit].lower()]
+    return " · ".join(parts)
+
+
 @router.get("/mapping")
 def mapping_get(
     request: Request, session: SessionDep, token: str, filename: str = "upload",
-    preset: str = "",
+    preset: str = "", section: str = "", vehicle: str = "",
+    seen: Annotated[list[str], Query()] = [],
 ):
-    """Mapping step: the detected (or chosen) preset, ready to adjust."""
+    """
+    Mapping step: the detected (or chosen) preset, ready to adjust.
+
+    ``section`` (the "next section" step) detects the preset among those that
+    read that section; ``vehicle`` and ``seen`` carry the previous section's
+    choices.
+    """
     data = _upload_path(request, token).read_bytes()
     try:
-        chosen = get_preset(session, preset) if preset else _detected_preset(session, data)
+        if preset:
+            chosen = get_preset(session, preset)
+        elif section:
+            chosen = _section_preset(session, data, section)
+        else:
+            chosen = _detected_preset(session, data)
     except NotFoundError as exc:
         raise HTTPException(404, detail=str(exc)) from None
-    return _mapping_page(request, session, token, filename, chosen, chosen.id)
+    carry = Carry(default_vehicle=vehicle, seen=tuple(seen))
+    return _mapping_page(request, session, token, filename, chosen, chosen.id, carry)
+
+
+def _section_preset(session: Session, data: bytes, section: str) -> Preset:
+    """Best preset for one section of the file, else the file's own names."""
+    found = pipeline.detect_preset(session, data, section)
+    if found is not None:
+        return found
+    fallback = engine.fallback_preset(engine.read_file(data))
+    return replace(fallback, file=replace(fallback.file, section=section))
 
 
 @router.post("/mapping")
@@ -427,6 +518,7 @@ async def mapping_post(request: Request, session: SessionDep):
     filename = str(form.get("filename", "")) or "upload"
     _upload_path(request, token)
     base = _base_preset(form)
+    carry = _carry(form)
     selected = str(form.get("selected_preset", ""))
     chosen = str(form.get("preset", "")) or selected
     if chosen != selected:
@@ -434,14 +526,14 @@ async def mapping_post(request: Request, session: SessionDep):
             preset = get_preset(session, chosen)
         except NotFoundError as exc:
             raise HTTPException(404, detail=str(exc)) from None
-        return _mapping_page(request, session, token, filename, preset, chosen)
+        return _mapping_page(request, session, token, filename, preset, chosen, carry)
     if not form.get("edited"):
-        return _mapping_page(request, session, token, filename, base, selected)
+        return _mapping_page(request, session, token, filename, base, selected, carry)
     try:
         preset = preset_from_form(form, base)
     except PresetError as exc:
-        return _mapping_page(request, session, token, filename, base, selected, 422, [str(exc)])
-    return _mapping_page(request, session, token, filename, preset, selected)
+        return _mapping_page(request, session, token, filename, base, selected, carry, 422, [str(exc)])
+    return _mapping_page(request, session, token, filename, preset, selected, carry)
 
 
 def _preview_page(
@@ -467,7 +559,10 @@ def _preview_page(
         e for e in [*(errors or []), *preview.errors] if e != CHOOSE_VEHICLE_MESSAGE
     ]
     warnings = list(preview.warnings)
-    nothing_new = preview.nothing_new and not shown_errors and not questions
+    nothing_new = (
+        preview.nothing_new and not shown_errors and not questions
+        and not preview.needs_vehicle_choice
+    )
     if nothing_new:
         warnings.insert(0, NOTHING_NEW_MESSAGE)
     notes = list(notes or [])
@@ -484,6 +579,7 @@ def _preview_page(
         preview=preview,
         vehicles=vehicles,
         selection=selection,
+        vehicle_choice=sub.default_vehicle or (NEW_VEHICLE if not vehicles else ""),
         blocked=bool(preview.errors or questions),
         nothing_new=nothing_new,
         questions=_question_rows(questions, answers),
@@ -550,7 +646,7 @@ def _mapping_from_error(request: Request, session: Session, form: FormData, exc:
     base = _base_preset(form)
     return _mapping_page(
         request, session, str(form.get("token", "")), str(form.get("filename", "")) or "upload",
-        base, str(form.get("selected_preset", "")), 422, [str(exc)],
+        base, str(form.get("selected_preset", "")), _carry(form), 422, [str(exc)],
     )
 
 
@@ -571,17 +667,37 @@ async def import_commit(request: Request, session: SessionDep):
     except (ValueError, RecordsError) as exc:
         session.rollback()
         return _preview_page(request, session, sub, 422, [str(exc)])
-    other = _other_sections(data, sub.preset)
-    path.unlink(missing_ok=True)
-    query = urlencode([("done", batch.id), *[("more", s) for s in other]])
-    return redirect(request, f"/import?{query}")
+    seen = (*sub.seen, *([sub.preset.file.section] if sub.preset.file.section else []))
+    remaining = _remaining_sections(data, sub.preset, seen)
+    query = [("done", batch.id)]
+    if remaining:  # keep the upload for "Import next section"
+        query += [("token", sub.token), ("filename", sub.filename),
+                  ("vehicle", _used_vehicle(session, sub))]
+        query += [("seen", s) for s in seen] + [("more", s) for s in remaining]
+    else:
+        path.unlink(missing_ok=True)
+    return redirect(request, f"/import?{urlencode(query)}")
 
 
-def _other_sections(data: bytes, preset: Preset) -> list[str]:
-    """Sections of the file that this commit did not read (e.g. Fuelio's Costs)."""
+def _remaining_sections(data: bytes, preset: Preset, seen: tuple[str, ...]) -> list[str]:
+    """Sections of the file that no import of this upload has read yet."""
     if not preset.file.section:
         return []
-    return [s for s in engine.read_file(data, preset).sections if s != preset.file.section]
+    done = {s.casefold() for s in seen}
+    return [s for s in engine.read_file(data, preset).sections if s.casefold() not in done]
+
+
+def _used_vehicle(session: Session, sub: Submitted) -> str:
+    """Id of the vehicle chosen for the records without a vehicle name, if any."""
+    if sub.default_vehicle.isdigit():
+        return sub.default_vehicle
+    if sub.default_vehicle == NEW_VEHICLE:
+        vehicle = next(
+            (v for v in records.list_vehicles(session) if v.name == sub.new_vehicle.strip()),
+            None,
+        )
+        return str(vehicle.id) if vehicle else ""
+    return ""
 
 
 @router.post("/save-preset")

@@ -185,7 +185,7 @@ def build_cards(figures: list[_Figures], today: date, currency: str) -> dict[str
             f"{currency}/km", "All costs, last 12 months",
         ),
         "avg_price": card(
-            "avg_price", f"{fuel * 10 / litres / 1000:.3f}" if litres else None,
+            "avg_price", f"{fuel * 10 / litres:.3f}" if litres else None,
             f"{currency}/L", no_fuel or "Last 12 months",
         ),
         "odometer": card("odometer", odometer, odometer_unit, odometer_hint),

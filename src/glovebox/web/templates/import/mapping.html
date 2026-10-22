@@ -14,6 +14,9 @@
   <input type="hidden" name="selected_preset" value="{{ selected }}">
   <input type="hidden" name="preset_id" value="{{ preset.id }}">
   <input type="hidden" name="edited" value="1">
+  <input type="hidden" name="default_vehicle" value="{{ carry.default_vehicle }}">
+  <input type="hidden" name="new_vehicle_name" value="{{ carry.new_vehicle }}">
+  {% for s in carry.seen %}<input type="hidden" name="seen" value="{{ s }}">{% endfor %}
 
   <h2>Preset</h2>
   <div class="card card-pad stack">
@@ -25,67 +28,72 @@
       </select>
     </div>
     {% if preset.note %}<p class="help flush">{{ preset.note }}</p>{% endif %}
+    {% if preset.steps %}<ol class="steps">{% for step in preset.steps %}<li>{{ step }}</li>{% endfor %}</ol>{% endif %}
     <p class="help flush">Changing the preset replaces the mapping below. Your edits are kept when you press Update or Preview.</p>
   </div>
 
-  <h2>File</h2>
-  <div class="card card-pad stack">
-    <div class="grid2">
-      <div class="field">
-        <label for="i-encoding">Encoding</label>
-        <select id="i-encoding" name="encoding">
-          <option value="">Auto{{ ' (' ~ table.encoding | upper ~ ')' if table }}</option>
-          {% for value, text in encodings %}<option value="{{ value }}" {{ 'selected' if preset.file.encoding == value }}>{{ text }}</option>{% endfor %}
-        </select>
+  <details class="card fold" {{ 'open' if file_open }}>
+    <summary><span class="fold-title">File</span><span class="fold-sum">{{ file_summary }}</span></summary>
+    <div class="fold-body stack">
+      <div class="grid2">
+        <div class="field">
+          <label for="i-encoding">Encoding</label>
+          <select id="i-encoding" name="encoding">
+            <option value="">Auto{{ ' (' ~ table.encoding | upper ~ ')' if table }}</option>
+            {% for value, text in encodings %}<option value="{{ value }}" {{ 'selected' if preset.file.encoding == value }}>{{ text }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="i-delimiter">Delimiter</label>
+          <select id="i-delimiter" name="delimiter">
+            <option value="">Auto{{ ' (' ~ ('tab' if table.delimiter == '\t' else table.delimiter) ~ ')' if table }}</option>
+            {% for value, text in delimiters %}<option value="{{ value }}" {{ 'selected' if preset.file.delimiter == value }}>{{ text }}</option>{% endfor %}
+          </select>
+        </div>
       </div>
-      <div class="field">
-        <label for="i-delimiter">Delimiter</label>
-        <select id="i-delimiter" name="delimiter">
-          <option value="">Auto{{ ' (' ~ ('tab' if table.delimiter == '\t' else table.delimiter) ~ ')' if table }}</option>
-          {% for value, text in delimiters %}<option value="{{ value }}" {{ 'selected' if preset.file.delimiter == value }}>{{ text }}</option>{% endfor %}
-        </select>
+      <div class="grid2">
+        {{ field('Header row', 'header_row', preset.file.header_row or '', inputmode='numeric', placeholder=('Auto (' ~ table.header_row ~ ')') if table else 'Auto') }}
+        {% if sections or preset.file.section %}
+        <div class="field">
+          <label for="i-section">Section</label>
+          <select id="i-section" name="section">
+            <option value="">Whole file</option>
+            {% for s in sections %}<option value="{{ s }}" {{ 'selected' if preset.file.section == s }}>{{ s }}</option>{% endfor %}
+          </select>
+        </div>
+        {% endif %}
       </div>
-    </div>
-    <div class="grid2">
-      {{ field('Header row', 'header_row', preset.file.header_row or '', inputmode='numeric', placeholder=('Auto (' ~ table.header_row ~ ')') if table else 'Auto') }}
-      {% if sections or preset.file.section %}
-      <div class="field">
-        <label for="i-section">Section</label>
-        <select id="i-section" name="section">
-          <option value="">Whole file</option>
-          {% for s in sections %}<option value="{{ s }}" {{ 'selected' if preset.file.section == s }}>{{ s }}</option>{% endfor %}
-        </select>
-      </div>
+      {% if table %}
+      <details class="archived">
+        <summary>Columns found in the file ({{ headers | length }})</summary>
+        <p class="help">{{ headers | join(' · ') }}</p>
+      </details>
       {% endif %}
     </div>
-    {% if table %}
-    <details class="archived">
-      <summary>Columns found in the file ({{ headers | length }})</summary>
-      <p class="help">{{ headers | join(' · ') }}</p>
-    </details>
-    {% endif %}
-  </div>
+  </details>
 
-  <h2>Value formats</h2>
-  <div class="card card-pad stack">
-    <div class="grid2">
-      {{ field('Date pattern', 'date_format', preset.format.date_format, placeholder='auto or %d.%m.%Y %H:%M') }}
-      {{ select('Decimal separator', 'decimal_char', decimals, preset.format.decimal_char) }}
+  <details class="card fold" {{ 'open' if errors }}>
+    <summary><span class="fold-title">Value formats</span><span class="fold-sum">{{ formats_summary }}</span></summary>
+    <div class="fold-body stack">
+      <div class="grid2">
+        {{ field('Date pattern', 'date_format', preset.format.date_format, placeholder='auto or %d.%m.%Y %H:%M') }}
+        {{ select('Decimal separator', 'decimal_char', decimals, preset.format.decimal_char) }}
+      </div>
+      <div class="grid3">
+        {{ select('Thousands separator', 'group_char', groups, preset.format.group_char) }}
+        {{ select('Distance unit', 'distance_unit', distances, preset.format.distance_unit) }}
+        {{ select('Volume unit', 'volume_unit', volumes, preset.format.volume_unit) }}
+      </div>
+      <p class="help flush">With no thousands separator, a number that contains one is reported as a row error.
+        Prices follow the volume unit. Automatic units are read from a unit in brackets in the header.</p>
     </div>
-    <div class="grid3">
-      {{ select('Thousands separator', 'group_char', groups, preset.format.group_char) }}
-      {{ select('Distance unit', 'distance_unit', distances, preset.format.distance_unit) }}
-      {{ select('Volume unit', 'volume_unit', volumes, preset.format.volume_unit) }}
-    </div>
-    <p class="help flush">With no thousands separator, a number that contains one is reported as a row error.
-      Prices follow the volume unit. Automatic units are read from a unit in brackets in the header.</p>
-  </div>
+  </details>
 
   {% macro field_row(r) %}
-    <div>
+    <div class="map-item">
       <div class="grid2 map-row">
         <div class="field">
-          <label for="i-src-{{ r.name }}">{{ r.name }}{{ ' - ' ~ r.required if r.required }}</label>
+          <label for="i-src-{{ r.name }}" title="{{ r.description }}">{{ r.name }}{{ ' - ' ~ r.required if r.required }}</label>
           <select id="i-src-{{ r.name }}" name="src.{{ r.name }}">
             <option value="" {{ 'selected' if not r.source }}>Not mapped</option>
             <option value="=" {{ 'selected' if r.source == '=' }}>Constant value</option>
@@ -105,10 +113,10 @@
           {% endif %}
         </div>
       </div>
-      <p class="help flush">{{ r.description }}</p>
-      <details class="archived" {{ 'open' if r.has_options }}>
+      <details class="map-opts" {{ 'open' if r.has_options }}>
         <summary>Options</summary>
         <div class="stack">
+          <p class="help flush">{{ r.description }}</p>
           {% if r.enum %}
           <div class="field">
             <label for="i-map-{{ r.name }}">Value map (one line per value: target = source, source)</label>
@@ -132,18 +140,22 @@
   {% endmacro %}
 
   <h2>Fields</h2>
-  <div class="card card-pad stack">
-    {% for r in rows if not r.more %}
+  {% set shown = rows | selectattr('shown') | list %}
+  {% set unused = rows | rejectattr('shown') | list %}
+  <div class="card card-pad map-list">
+    {% for r in shown %}
     {{ field_row(r) }}
     {% endfor %}
-    <details class="archived" {{ 'open' if more_in_use }}>
-      <summary>More fields ({{ rows | selectattr('more') | list | length }})</summary>
-      <div class="stack">
-        {% for r in rows if r.more %}
+    {% if unused %}
+    <details class="map-item more-fields">
+      <summary>Fields not mapped ({{ unused | length }})</summary>
+      <div class="map-list">
+        {% for r in unused %}
         {{ field_row(r) }}
         {% endfor %}
       </div>
     </details>
+    {% endif %}
   </div>
 
   <div class="actions">

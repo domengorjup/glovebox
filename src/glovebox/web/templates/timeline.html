@@ -23,6 +23,7 @@
     <summary class="btn with-icon">{{ icon('tune-variant', 18) }}Customise</summary>
     <form class="popover" method="post" action="{{ url(request, '/preferences/cards') }}" data-cards-form>
       <input type="hidden" name="next" value="{{ location }}">
+      <div class="pop-head"><h3>Customise</h3><button type="button" class="btn" data-close-customise>Done</button></div>
       <div class="pop-title">Show these cards</div>
       {% for key in card_order %}
       <label class="check-row">

@@ -420,11 +420,12 @@ class TestDrivvo:
     def test_service_items_become_maintenance_expenses(self, fixtures_dir) -> None:
         result = run(fixtures_dir, "drivvo_en_sections.csv", "drivvo-services")
         assert not result.errors and not result.row_errors
-        assert result.skipped == 1  # the item without a price
+        assert result.skipped == 0  # the free item became a note
         titles = [e.title for e in result.expenses]
         assert titles == ["Oil Change", "Cabin Air Filter", "Wiper Blades", "Labor Cost"]
         assert {e.category for e in result.expenses} == {ExpenseCategory.MAINTENANCE}
         assert sum(e.amount_cents for e in result.expenses) == 15800
+        assert result.expenses[0].notes == "Also: Oil Filter"
         assert result.expenses[1].notes == "First line\nsecond line"
 
     def test_web_export_sections_and_escapes_are_read(self, fixtures_dir) -> None:
@@ -440,10 +441,29 @@ class TestDrivvo:
         assert insurance.category == ExpenseCategory.INSURANCE
         assert (insurance.date, insurance.amount_cents) == (date(2025, 3, 25), 35000)
         services = run(fixtures_dir, "drivvo_web_sections.csv", "drivvo-services")
-        assert [e.notes for e in services.expenses] == ["Menjava olja in filtra, žaga"]
+        assert [e.notes for e in services.expenses] == ["Menjava olja in filtra, žaga\nAlso: Oil Filter"]
 
     def test_headers_are_case_and_whitespace_insensitive(self) -> None:
         data = b"##Refuelling\n  DATE ,odometer (KM),VOLUME ,total  COST\n2024-01-01,100,10.0,15.0\n"
         chosen = preset("drivvo-refuelling")
         result = engine.apply(chosen, engine.read_file(data, chosen), Answers())
         assert len(result.refuels) == 1
+
+
+def test_drivvo_presets_have_short_steps() -> None:
+    for preset_id in ("drivvo-refuelling", "drivvo-expenses", "drivvo-services"):
+        chosen = preset(preset_id)
+        assert 1 <= len(chosen.steps) <= 5
+        assert all(len(step.split()) <= 9 for step in chosen.steps), chosen.steps
+        assert "\n" not in chosen.note and len(chosen.note) < 140
+
+
+def test_every_shipped_preset_keeps_steps_short() -> None:
+    for chosen in shipped_presets():
+        assert len(chosen.steps) <= 5
+        assert all(len(step.split()) <= 9 for step in chosen.steps), chosen.id
+
+
+def test_drivvo_services_turn_free_items_into_notes() -> None:
+    assert preset("drivvo-services").zero_amount == "note"
+    assert not preset("drivvo-services").skip_rows

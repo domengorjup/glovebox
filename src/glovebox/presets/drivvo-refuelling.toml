@@ -2,8 +2,10 @@
 # CSV. One file per vehicle, no vehicle column: choose the vehicle at import.
 # Tested with real Drivvo Android exports, October 2026 ("##Refuelling" section).
 # The file has three sections: "##Refuelling", "##Expense" and "##Service".
-# Import the same file once per section preset: this one, then
-# "Drivvo (expenses)" and "Drivvo (services)". The section repeats
+# Import the same file once per section: this preset, then "Drivvo
+# (expenses)" and "Drivvo (services)". After each import the result offers
+# "Import next section", which continues with the stored file and the same
+# vehicle (the vehicle can be created at the first import). The section repeats
 # "Price / L", "Total cost" and "Volume" for a second and third fuel; the
 # first match (the first fuel) is used. There is no missed fill-up column.
 # "Fuel efficiency" and "Distance" are Drivvo's own figures and are not
@@ -16,7 +18,14 @@
 # is not covered.
 
 name = "Drivvo (refuelling)"
-note = "Tested with Drivvo Android exports, October 2026. ##Refuelling section of the History CSV; import the same file again with 'Drivvo (expenses)' and 'Drivvo (services)'. Only the first fuel is read; Discount is ignored. Use the phone export: the web export holds the same records."
+note = "Tested with Drivvo Android exports, October 2026. Only the first fuel is read; Discount is ignored."
+steps = [
+  "In Drivvo: History, Export, CSV, per vehicle.",
+  "Upload it here; this preset is picked.",
+  "Choose the vehicle, or add a new one.",
+  "Preview, then Import.",
+  "Then: Import next section (expenses, services).",
+]
 verified = true
 export = false
 

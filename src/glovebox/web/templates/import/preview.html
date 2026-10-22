@@ -13,6 +13,7 @@
   <input type="hidden" name="base_toml" value="{{ base_toml }}">
   <input type="hidden" name="selected_preset" value="{{ sub.selected }}">
   <input type="hidden" name="preset_id" value="{{ preset.id }}">
+  {% for s in sub.seen %}<input type="hidden" name="seen" value="{{ s }}">{% endfor %}
 
   {% if questions %}
   <h2>Questions</h2>
@@ -47,10 +48,18 @@
     {% else %}
       <div class="field">
         <label for="i-default_vehicle">{% if preview.needs_vehicle_choice %}Which vehicle do these records belong to?{% else %}The file has no vehicle names. Import into{% endif %}</label>
-        <select id="i-default_vehicle" name="default_vehicle">
+        <select id="i-default_vehicle" name="default_vehicle" data-reveal-select="new-vehicle" data-autosubmit data-autosubmit-skip="new">
           <option value="">Choose...</option>
-          {% for v in vehicles %}<option value="{{ v.id }}" {{ 'selected' if sub.default_vehicle == v.id | string }}>{{ v.name }}</option>{% endfor %}
+          {% for v in vehicles %}<option value="{{ v.id }}" {{ 'selected' if vehicle_choice == v.id | string }}>{{ v.name }}</option>{% endfor %}
+          <option value="new" {{ 'selected' if vehicle_choice == 'new' }}>New vehicle...</option>
         </select>
+      </div>
+      <div id="new-vehicle" class="new-vehicle" data-reveal="new">
+        <div class="field">
+          <label for="i-new_vehicle_name">Name of the new vehicle</label>
+          <input id="i-new_vehicle_name" name="new_vehicle_name" value="{{ sub.new_vehicle }}" placeholder="e.g. Golf" data-autosubmit>
+        </div>
+        <p class="help">Used only with "New vehicle...". It is created when you import.</p>
       </div>
     {% endif %}
   </div>

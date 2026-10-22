@@ -13,7 +13,7 @@ import functools
 import io
 import re
 import zipfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation
 from pathlib import PurePosixPath
@@ -641,6 +641,7 @@ def _apply_table(
         volume=volume,
         default_vehicle=None if "vehicle" in preset.fields else (table.name or None),
     )
+    first_expense = len(result.expenses)
     for line, row in table.rows:
         if any(_norm(_cell(row, i)) in v for i, v in skip_columns):
             result.skipped += 1
@@ -654,6 +655,46 @@ def _apply_table(
             result.refuels.append(record)
         else:
             result.expenses.append(record)
+    if preset.zero_amount == "note":
+        _fold_zero_items(result, first_expense)
+
+
+def _fold_zero_items(result: ImportResult, start: int) -> None:
+    """
+    Turn the zero-amount expenses read from ``result.expenses[start:]`` into
+    "Also: ..." text on the first priced expense of the same visit (same date
+    and odometer). Items without a priced expense of their visit are dropped
+    and counted as skipped.
+    """
+    new = result.expenses[start:]
+
+    def visit(expense: CanonicalExpense) -> tuple:
+        return (expense.date, expense.odometer_km)
+
+    priced: dict[tuple, int] = {}
+    for index, expense in enumerate(new):
+        if expense.amount_cents > 0:
+            priced.setdefault(visit(expense), index)
+    free_items: dict[int, list[str]] = {}
+    kept = []
+    for index, expense in enumerate(new):
+        if expense.amount_cents > 0:
+            kept.append(index)
+            continue
+        target = priced.get(visit(expense))
+        if target is None:
+            result.skipped += 1
+        elif expense.title not in free_items.setdefault(target, []):
+            free_items[target].append(expense.title)
+    folded = []
+    for index in kept:
+        expense = new[index]
+        if titles := free_items.get(index):
+            line = "Also: " + ", ".join(titles)
+            notes = f"{expense.notes}\n{line}" if expense.notes else line
+            expense = replace(expense, notes=notes)
+        folded.append(expense)
+    result.expenses[start:] = folded
 
 
 def _cell(row: list[str], index: int | None) -> str:
@@ -970,7 +1011,10 @@ class _RowReader:
         total = self.number("total")
         if total is None:
             raise _Bad("total", "", "The amount is missing.")
-        if total <= 0:
+        # With zero_amount = "note" a free item is read as 0 and folded into the
+        # notes of its visit afterwards (see _fold_zero_items).
+        free_item_ok = total == 0 and self.preset.zero_amount == "note"
+        if total <= 0 and not free_item_ok:
             raise _Bad("total", str(total), "The amount must be greater than 0.")
         title = self.text("title")
         if not title:

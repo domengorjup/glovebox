@@ -353,11 +353,43 @@ def merge_stations(session: Session, source_id: int, target_id: int) -> Station:
     return target
 
 
-def delete_station(session: Session, station_id: int) -> None:
-    """Delete a station; its refuels keep existing with ``station_id`` NULL."""
+def count_station_refuels(session: Session, station_id: int) -> int:
+    """Count the refuels that use a station (for the delete confirmation)."""
+    return (
+        session.scalar(
+            select(func.count()).select_from(Refuel).where(Refuel.station_id == station_id)
+        )
+        or 0
+    )
+
+
+def station_move_targets(session: Session, station_id: int) -> list[Station]:
+    """Other stations a deleted station's refuels can move to: same brand first
+    (when the brand is set), then by name."""
     station = get_station(session, station_id)
+    others = [s for s in list_stations(session) if s.id != station_id]
+    brand = station.brand
+
+    def sort_key(other: Station) -> tuple[bool, str, int]:
+        return (brand is None or other.brand != brand, other.name.lower(), other.id)
+
+    return sorted(others, key=sort_key)
+
+
+def delete_station(
+    session: Session, station_id: int, move_to_id: int | None = None
+) -> None:
+    """Delete a station; its refuels move to ``move_to_id``, or get no station
+    (``station_id`` NULL) when it is ``None``. Both happen in one transaction."""
+    station = get_station(session, station_id)
+    if move_to_id == station_id:
+        raise ValidationError(["Choose a different station to move the refuels to"])
+    if move_to_id is not None and session.get(Station, move_to_id) is None:
+        raise ValidationError(["The station to move the refuels to does not exist"])
     session.execute(
-        update(Refuel).where(Refuel.station_id == station_id).values(station_id=None)
+        update(Refuel)
+        .where(Refuel.station_id == station_id)
+        .values(station_id=move_to_id)
     )
     session.delete(station)
     session.flush()

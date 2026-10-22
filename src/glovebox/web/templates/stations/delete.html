@@ -1,0 +1,29 @@
+{% extends layout %}
+{% from "_macros.html" import messages with context %}
+{% set dialog_page = true %}
+{% block title %}Delete station - Glovebox{% endblock %}
+{% block content %}
+<div class="scrim" data-scrim>
+<form class="dialog confirm" method="post" role="alertdialog" aria-label="Delete station"
+      action="{{ url(request, '/stations/%d/delete' % station.id) }}">
+  <h3>Delete {{ station.name }}?</h3>
+  {{ messages(errors) }}
+  {% if refuel_count %}
+  <p><strong>{{ refuel_count }}</strong> {{ 'refuelling uses' if refuel_count == 1 else 'refuellings use' }} this station. Choose the station they move to.</p>
+  <div class="field">
+    <label for="i-move_to_id">Move them to</label>
+    <select id="i-move_to_id" name="move_to_id">
+      <option value="">No station</option>
+      {% for s in targets %}<option value="{{ s.id }}">{{ s.name }}{{ ' - ' ~ s.location if s.location }}{{ ' · ' ~ s.brand if s.brand }}</option>{% endfor %}
+    </select>
+  </div>
+  {% else %}
+  <p>No refuelling uses this station. It will be deleted.</p>
+  {% endif %}
+  <div class="dialog-foot">
+    <a class="btn" href="{{ url(request, '/stations') }}" data-close>Cancel</a>
+    <button type="submit" class="btn danger-fill">Delete</button>
+  </div>
+</form>
+</div>
+{% endblock %}

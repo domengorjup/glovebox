@@ -202,3 +202,35 @@ def test_missing_preset(session: Session, shipped) -> None:
         presets.delete_user_preset(session, "user-nope")
     with pytest.raises(NotFoundError):
         presets.save_user_preset(session, _mine(), replace_id="user-nope")
+
+
+# --- steps and zero_amount -------------------------------------------------
+
+MINIMAL = 'name = "X"\n{extra}\n[fields]\ntype = {{ value = "expense" }}\n'
+
+
+def test_steps_and_zero_amount_round_trip() -> None:
+    text = MINIMAL.format(extra='steps = ["One.", " Two. "]\nzero_amount = "note"')
+    preset = load_preset(text)
+    assert preset.steps == ("One.", "Two.") and preset.zero_amount == "note"
+    assert load_preset(write_preset(preset)) == preset
+
+
+def test_steps_and_zero_amount_defaults_are_not_written() -> None:
+    preset = load_preset(MINIMAL.format(extra=""))
+    assert preset.steps == () and preset.zero_amount == "error"
+    assert "steps" not in write_preset(preset) and "zero_amount" not in write_preset(preset)
+
+
+@pytest.mark.parametrize(
+    ("extra", "path"),
+    [
+        ('steps = "one"', "steps"),
+        ("steps = [1]", "steps"),
+        ('steps = ["ok", " "]', "steps"),
+        ('zero_amount = "skip"', "zero_amount"),
+    ],
+)
+def test_invalid_steps_and_zero_amount_name_the_key(extra: str, path: str) -> None:
+    with pytest.raises(PresetError, match=path):
+        load_preset(MINIMAL.format(extra=extra))

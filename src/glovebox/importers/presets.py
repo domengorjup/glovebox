@@ -68,7 +68,23 @@ class KeySpec:
 
 KEY_TABLE: tuple[KeySpec, ...] = (
     KeySpec("name", "string", "Display name; must be unique among all presets."),
-    KeySpec("note", "string", "Free text shown in the preview.", default='""'),
+    KeySpec("note", "string", "One short line shown in the preview.", default='""'),
+    KeySpec(
+        "steps", "list of strings",
+        "Short instructions for the person importing, shown as a numbered list "
+        "under the preset select of the mapping page. Give a preset steps when "
+        "its import needs more than upload, preview, import. Keep each item to "
+        "about 8 words and the list to 5 items.",
+        default="[]",
+    ),
+    KeySpec(
+        "zero_amount", "string",
+        "What to do with an expense row whose amount is 0: `error` reports it "
+        "as a row error; `note` adds its title as \"Also: ...\" to the notes of "
+        "the first priced expense with the same date and odometer, and skips "
+        "it (counted) if there is none.",
+        "`error`, `note`", default="error",
+    ),
     KeySpec(
         "verified", "boolean",
         "True only when the mapping was checked against a real file.",
@@ -169,7 +185,7 @@ KEY_TABLE: tuple[KeySpec, ...] = (
     ),
 )
 
-_TOP_KEYS = {"name", "note", "verified", "export", "split_by_vehicle",
+_TOP_KEYS = {"name", "note", "steps", "zero_amount", "verified", "export", "split_by_vehicle",
              "file", "format", "fields", "skip_rows"}
 _FILE_KEYS = {"encoding", "delimiter", "header_row", "section"}
 _FORMAT_KEYS = {"date_format", "decimal_char", "group_char",
@@ -242,6 +258,8 @@ class Preset:
     format: FormatSettings = field(default_factory=FormatSettings)
     fields: dict[str, FieldMapping] = field(default_factory=dict)
     skip_rows: tuple[SkipRule, ...] = ()
+    steps: tuple[str, ...] = ()
+    zero_amount: str = "error"
 
 
 # --- Loading and validation ------------------------------------------------
@@ -285,6 +303,10 @@ def load_preset(text: str, *, id: str = "", shipped: bool = False) -> Preset:
         format=_format_settings(format_raw),
         fields={key: _field_mapping(key, value) for key, value in fields_raw.items()},
         skip_rows=tuple(_skip_rule(i, rule) for i, rule in enumerate(skip_raw)),
+        steps=_steps(raw),
+        zero_amount=_string(
+            raw, "zero_amount", "zero_amount", default="error", allowed=("error", "note")
+        ),
     )
 
 
@@ -327,6 +349,13 @@ def _strings(raw: dict[str, Any], key: str, path: str) -> tuple[str, ...]:
     if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
         raise PresetError(f"{path}: expected a list of strings")
     return tuple(value)
+
+
+def _steps(raw: dict[str, Any]) -> tuple[str, ...]:
+    steps = tuple(v.strip() for v in _strings(raw, "steps", "steps"))
+    if not all(steps):
+        raise PresetError("steps: items must not be empty")
+    return steps
 
 
 def _file_settings(raw: dict[str, Any]) -> FileSettings:
@@ -482,6 +511,10 @@ def write_preset(preset: Preset) -> str:
         f"export = {_bool_text(preset.export)}",
         f"split_by_vehicle = {_bool_text(preset.split_by_vehicle)}",
     ]
+    if preset.steps:
+        lines.append(f"steps = {_list(preset.steps)}")
+    if preset.zero_amount != "error":
+        lines.append(f"zero_amount = {_q(preset.zero_amount)}")
     f = preset.file
     file_lines = [
         f"{key} = {_q(value) if isinstance(value, str) else value}"

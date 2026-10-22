@@ -94,6 +94,8 @@
   document.addEventListener("change", function (event) {
     var control = event.target;
     if (!control.matches || !control.matches("[data-autosubmit]") || !control.form) { return; }
+    // A choice that needs more input first (e.g. "New vehicle..." needs a name) does not submit.
+    if (control.getAttribute("data-autosubmit-skip") === control.value) { return; }
     if (control.form.requestSubmit) { control.form.requestSubmit(); } else { control.form.submit(); }
   });
 })();

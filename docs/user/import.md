@@ -9,8 +9,8 @@ Every import works the same way: a **preset** says which column of your file fee
 ## Steps
 
 1. **Upload**: choose a CSV file, or a ZIP of CSV files, and press **Upload and map**. Glovebox reads it and selects the best-fitting preset. It changes nothing yet.
-2. **Map columns.** (Screenshot above.) Check the preset, the file settings (encoding, delimiter, header row, section) and the value formats (date pattern, decimal and thousands separators, units). Each Glovebox field takes a column of your file, a constant value, or nothing. Rarely used fields are under **More fields**. A file that no preset fits starts as a custom mapping; the required fields (`type`, `date`, and `odometer_km` for refuels, `total` and `title` for expenses) must be mapped before you can go on.
-3. **Preview.** (Screenshot below.) It shows the preset and its note, record counts, the vehicles found, duplicates, rows that are left out and why, and warnings. Nothing is written yet.
+2. **Map columns.** (Screenshot above.) Check the preset: below it, a short list of **steps** says what to do for that preset (for example Drivvo). The **File** settings (encoding, delimiter, header row, section) and the **Value formats** (date pattern, decimal and thousands separators, units) are folded into one line each; tap to open them when something looks wrong. Each Glovebox field takes a column of your file, a constant value, or nothing. Fields that are not mapped are folded under **Fields not mapped**; open it to map one. A file that no preset fits starts as a custom mapping; the required fields (`type`, `date`, and `odometer_km` for refuels, `total` and `title` for expenses) must be mapped before you can go on.
+3. **Preview.** (Screenshot below.) It shows the preset and its note, record counts, the vehicles found, duplicates, rows that are left out and why, and warnings. Nothing is written yet. For a file without vehicle names, choose the vehicle here: an existing one, or **New vehicle...** and a name. The new vehicle is created when you press **Import now** (undoing the import keeps it).
 4. **Answer questions** if there are any (see below), then press **Import now**. All records are added together as one **import batch**. The Import page then shows how many were added, with an **Undo** button. If every row is already present, the preview says so and offers no **Import now**; no empty batch is created.
 
 ![Import preview](../assets/screenshots/import-preview-desktop-light.png)
@@ -33,10 +33,12 @@ Standard files and full backups: a file in the standard format picks the **Glove
 
 ### Files with several sections (Drivvo, Fuelio)
 
-Some apps write several tables into one file, each after a section line. Import such a file once per section: the first upload selects the fill-up preset, and after that import the page names the remaining sections. Upload the same file again and pick the preset for the next section. Records already imported are skipped. These files carry no vehicle name, so you choose the vehicle each time.
+Some apps write several tables into one file, each after a section line. Glovebox keeps the file after you import one section: the result page says which sections are left and offers **Import next section: ...**. It opens the mapping for that section with the right preset and the vehicle you used before, so you only check and press **Preview** and **Import now**. Records already imported are skipped. These files carry no vehicle name, so choose the vehicle (or a new one) once, for the first section.
 
-- **Drivvo**: in the Android app open **History** with one vehicle selected and export CSV. The file holds `##Refuelling`, `##Expense` and `##Service`; import it with **Drivvo (refuelling)**, **Drivvo (expenses)** and **Drivvo (services)**. Drivvo writes one service row per item, so a service visit becomes several maintenance expenses on the same day; items without a price are skipped. Expense types Glovebox does not know (for example ones you created yourself) become *other*: add them to the category map in the mapping step and save your own preset. The web app's export holds the same records but is not covered by a shipped preset; use the phone export.
-- **Fuelio**: the backup holds fill-ups (`## Log`) and costs (`## Costs`); import it with **Fuelio (fill-ups)** and **Fuelio (costs)**.
+- **Drivvo**: in the Android app open **History** with one vehicle selected and export CSV. The file holds `##Refuelling`, `##Expense` and `##Service`; Glovebox picks **Drivvo (refuelling)** first, then offers **Drivvo (expenses)** and **Drivvo (services)**. Drivvo writes one service row per item, so a service visit becomes several maintenance expenses on the same day. Items without a price are not expenses: their names are added to the note of the first priced item of the same visit (same date and odometer) as `Also: Oil filter, Air filter`; a free item with no priced item in its visit is skipped and counted. Expense types Glovebox does not know (for example ones you created yourself) become *other*: add them to the category map in the mapping step and save your own preset. The web app's export holds the same records but is not covered by a shipped preset; use the phone export.
+- **Fuelio**: the backup holds fill-ups (`## Log`) and costs (`## Costs`); import it with **Fuelio (fill-ups)** and then **Fuelio (costs)**.
+
+If you leave before the last section, the stored file is kept for 24 hours; after that, upload the file again.
 
 ## Vehicles and stations in the file
 
@@ -47,7 +49,7 @@ A ZIP can hold `vehicles.csv` and/or `stations.csv` next to the records, with or
 
 ## Questions you may be asked
 
-- **Vehicle**: the vehicle names of the file can be mapped to an existing vehicle or to a new one. A file without vehicle names asks which vehicle to use. A ZIP of several CSVs uses each file name as the vehicle name.
+- **Vehicle**: the vehicle names of the file can be mapped to an existing vehicle or to a new one. A file without vehicle names asks which vehicle to use: an existing one, or **New vehicle...** with a name that no active vehicle has. A ZIP of several CSVs uses each file name as the vehicle name.
 - **Dates**: if every date fits both day-first and month-first (like `03/04/2024`), you choose the order.
 - **Units**: if the file does not say whether it uses miles and gallons or km and litres, you choose. Everything is stored in km and litres.
 

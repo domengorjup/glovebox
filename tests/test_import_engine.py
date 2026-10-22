@@ -827,3 +827,60 @@ class TestWebExportQuirks:
         data = b'"Date",  "Price / gal",  "Total cost"\n2024-01-01,1.5,30\n'
         table = engine.read_file(data, STANDARD).tables[0]
         assert table.headers == ["Date", "Price / gal", "Total cost"]
+
+
+# --- zero_amount = "note" ---------------------------------------------------
+
+ZERO_NOTE = load_preset(
+    """
+name = "Visits"
+zero_amount = "note"
+[format]
+date_format = "%Y-%m-%d"
+distance_unit = "km"
+[fields]
+type = { value = "expense" }
+date = { column = "Date" }
+odometer_km = { column = "Odo" }
+title = { column = "Item" }
+category = { value = "maintenance" }
+total = { column = "Cost" }
+notes = { column = "Notes" }
+"""
+)
+
+
+def _visits(text: str, preset=ZERO_NOTE):
+    data = ("Date,Odo,Item,Cost,Notes\n" + text).encode()
+    return engine.apply(preset, engine.read_file(data, preset), Answers())
+
+
+def test_free_items_are_appended_to_the_priced_item_of_the_visit() -> None:
+    result = _visits(
+        "2025-04-10,11500,Oil,48,\n2025-04-10,11500,Filter,0,\n"
+        "2025-04-10,11500,Air filter,0,\n2025-04-10,11500,Filter,0,\n"
+        "2025-04-10,11500,Wipers,25,Own note\n"
+    )
+    assert not result.errors and not result.row_errors and result.skipped == 0
+    assert [e.title for e in result.expenses] == ["Oil", "Wipers"]
+    assert result.expenses[0].notes == "Also: Filter, Air filter"
+    assert result.expenses[1].notes == "Own note"
+
+
+def test_free_item_is_added_after_existing_notes() -> None:
+    result = _visits("2025-04-10,11500,Oil,48,Garage\n2025-04-10,11500,Filter,0,\n")
+    assert result.expenses[0].notes == "Garage\nAlso: Filter"
+
+
+def test_free_item_without_a_priced_item_of_its_visit_is_skipped() -> None:
+    result = _visits(
+        "2025-04-10,11500,Oil,48,\n2025-04-10,11600,Filter,0,\n2025-05-01,11500,Wash,0,\n"
+    )
+    assert [e.title for e in result.expenses] == ["Oil"]
+    assert result.expenses[0].notes is None and result.skipped == 2
+
+
+def test_zero_amount_is_an_error_by_default() -> None:
+    plain = replace(ZERO_NOTE, zero_amount="error")
+    result = _visits("2025-04-10,11500,Filter,0,\n", plain)
+    assert len(result.row_errors) == 1

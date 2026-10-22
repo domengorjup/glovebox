@@ -11,7 +11,11 @@
 </div>
 {% endif %}
 {% if more_sections %}
-{{ messages(None, ['The file has more sections: ' ~ (more_sections | join(', ')) ~ '. Upload it again and pick the preset for each one. Records that are already imported are skipped.']) }}
+<div class="alert next-section">
+  <span><strong>More sections in this file: {{ more_sections | join(', ') }}</strong><br>
+    {% if next_url %}Already imported records are skipped.{% else %}Upload the file again and pick the preset for each one. Already imported records are skipped.{% endif %}</span>
+  {% if next_url %}<a class="btn primary with-icon" href="{{ url(request, next_url) }}">{{ icon('upload', 18) }}Import next section: {{ more_sections[0] }}</a>{% endif %}
+</div>
 {% endif %}
 {{ messages(errors) }}
 <form class="card card-pad stack" method="post" action="{{ url(request, '/import/upload') }}" enctype="multipart/form-data">

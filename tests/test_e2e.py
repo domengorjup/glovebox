@@ -507,11 +507,85 @@ def test_drivvo_file_is_imported_once_per_section(
     assert _selected_option(page, "preset") == "drivvo-refuelling"
     _import_file(client, "d.csv", data, {"default_vehicle": "1"})
     done = client.get("/import?done=1&more=Expense&more=Service").text
-    assert "The file has more sections: Expense, Service" in done
+    assert "More sections in this file: Expense, Service" in done
     for preset_id in ("drivvo-expenses", "drivvo-services"):
         _import_file(client, "d.csv", data, {"default_vehicle": "1", "preset": preset_id})
     # 3 expenses, 4 priced service items (the 0-cost item is skipped)
     assert _counts(engine) == (4, 7, 1)
+
+
+def _next_section_url(client: TestClient, page: str, section: str) -> str:
+    """Path of the "Import next section: <section>" button."""
+    match = re.search(
+        rf'<a class="btn primary[^"]*" href="([^"]+)">(?:(?!</a>).)*Import next section: {section}',
+        page, re.S,
+    )
+    assert match, f"no 'Import next section: {section}' button"
+    href = match.group(1).replace("&amp;", "&")
+    return href.removeprefix(client.headers.get("X-Ingress-Path", ""))
+
+
+def test_drivvo_sections_guided_with_new_vehicle(
+    client: TestClient, engine: Engine, fixtures_dir: Path
+) -> None:
+    data = (fixtures_dir / "drivvo_en_sections.csv").read_bytes()
+    mapping = client.get(_upload(client, "d.csv", data)).text
+    assert _selected_option(mapping, "preset") == "drivvo-refuelling"
+    assert "Choose the vehicle, or add a new one." in mapping  # the preset's steps
+
+    # No vehicle exists yet: create one at the preview.
+    new = {"default_vehicle": "new", "new_vehicle_name": "Passat"}
+    preview = client.post("/import/preview", data=_merged(_form_fields(mapping), new)).text
+    assert 'value="new" selected' in preview and "Import now" in preview
+    done = client.post("/import/commit", data=_merged(_form_fields(preview), new),
+                       follow_redirects=False)
+    assert _counts(engine) == (4, 0, 1)
+    page = client.get(done.headers["location"].removeprefix(
+        client.headers.get("X-Ingress-Path", ""))).text
+    assert "Imported 4 refuels and 0 expenses" in _text(page)
+
+    for section, preset_id, expected in (
+        ("Expense", "drivvo-expenses", (4, 3, 1)),
+        ("Service", "drivvo-services", (4, 7, 1)),
+    ):
+        mapping = client.get(_next_section_url(client, page, section))
+        assert _selected_option(mapping.text, "preset") == preset_id
+        form = _form_fields(mapping.text)
+        assert ("default_vehicle", "1") in form  # the new vehicle is carried over
+        preview = client.post("/import/preview", data=_merged(form, {})).text
+        assert _selected_option(preview, "default_vehicle") == "1"
+        done = client.post("/import/commit", data=_merged(_form_fields(preview), {}),
+                           follow_redirects=False)
+        assert _counts(engine) == expected
+        page = client.get(done.headers["location"].removeprefix(
+            client.headers.get("X-Ingress-Path", ""))).text
+    assert "Import next section" not in page  # last section: upload removed
+    assert not list((client.app.state.settings.data_dir / "uploads").glob("*.upload"))
+
+    with Session(engine) as session:
+        oil = session.scalar(select(Expense).where(Expense.title == "Oil Change"))
+        assert oil.notes == "Also: Oil Filter"
+        assert session.scalar(select(func.count(Expense.id)).where(Expense.title == "Oil Filter")) == 0
+        assert session.scalar(select(Vehicle.name)) == "Passat"
+
+    # A re-import of the services section is a no-op, free items included.
+    again = _preview_of(client, "d.csv", data,
+                        {"default_vehicle": "1", "preset": "drivvo-services"})
+    assert "New expenses: <strong>0</strong>" in again
+
+
+def test_new_vehicle_at_import_needs_a_free_name(
+    client: TestClient, engine: Engine, fixtures_dir: Path
+) -> None:
+    _post(client, "/vehicles/new", {"name": "Golf"})
+    name = "fuelly_import_metric.csv"
+    data = (fixtures_dir / name).read_bytes()
+    for typed, message in (("  ", "Enter a name for the new vehicle."),
+                           ("Golf", "already exists")):
+        preview = _preview_of(client, name, data,
+                              {"default_vehicle": "new", "new_vehicle_name": typed})
+        assert message in preview and "Import now" not in preview
+    assert _counts(engine)[2] == 1
 
 
 def test_commit_shows_the_result_with_undo(client: TestClient, fixtures_dir: Path) -> None:
@@ -969,3 +1043,109 @@ def test_hidden_summaries_ignore_junk_values(client: TestClient) -> None:
     golf, _ = _two_vehicles(client)
     _post(client, "/preferences/cards", {"offered": ["all", "x;drop", str(golf)], "summary": []})
     assert client.get("/").status_code == 200
+
+
+def test_avg_price_card_shows_price_per_litre(client: TestClient) -> None:
+    golf, _ = _two_vehicles(client)
+    today = date.today()
+    _add_refuel(client, golf, today, 10000, litres="40", total="60.00")
+    _post(client, "/preferences/vehicle", {"vehicle": str(golf)})
+    page = client.get("/").text
+    card = re.search(r'data-card="avg_price".*?<div class="value">([^<]*)<', page, re.S)
+    assert card and card.group(1) == "1.500"
+
+
+# --- Deleting a station -----------------------------------------------------
+
+
+def _station_refuel_counts(engine: Engine) -> dict[str, int]:
+    with Session(engine) as session:
+        rows = session.execute(
+            select(Station.name, func.count(Refuel.id))
+            .join(Refuel, Refuel.station_id == Station.id, isouter=True)
+            .group_by(Station.id)
+        )
+        return dict(rows.all())
+
+
+def test_delete_used_station_moves_refuels(client: TestClient, engine: Engine) -> None:
+    _build_scenario(client)
+    alpha, beta = _station_id(client, "Alpha"), _station_id(client, "Beta")
+
+    page = client.get(f"/stations/{alpha}/delete").text
+    assert "<strong>4</strong> refuellings use this station" in page
+    select = re.search(r'<select id="i-move_to_id".*?</select>', page, re.S).group(0)
+    options = re.findall(r'<option value="(\d*)"[^>]*>([^<]*)</option>', select)
+    assert options == [("", "No station"), (str(beta), "Beta")]
+
+    _post(client, f"/stations/{alpha}/delete", {"move_to_id": str(beta)})
+    assert _station_refuel_counts(engine) == {"Beta": 5}
+    rows = {r[0]: r for r in _price_rows(client.get("/stats", params=ALL_TIME).text)}
+    assert "Alpha" not in rows and rows["Beta"][1] == "5"
+
+
+def test_delete_station_without_target_clears_the_station(
+    client: TestClient, engine: Engine
+) -> None:
+    _build_scenario(client)
+    _post(client, f"/stations/{_station_id(client, 'Beta')}/delete", {"move_to_id": ""})
+    assert _station_refuel_counts(engine) == {"Alpha": 4}
+    with Session(engine) as session:
+        assert session.scalar(select(func.count(Refuel.id))) == 5
+
+
+def test_delete_unused_station_only_confirms(client: TestClient, engine: Engine) -> None:
+    _build_scenario(client)
+    vid = _vehicle_id(client, "Golf")
+    _add_refuel(client, vid, date(2025, 6, 1), 12000, litres="10",
+                price_per_litre="1.5", new_station_name="Spare")  # fmt: skip
+    spare = _station_id(client, "Spare")
+    with Session(engine) as session:
+        session.execute(Refuel.__table__.update().where(Refuel.station_id == spare)
+                        .values(station_id=None))
+        session.commit()
+    page = client.get(f"/stations/{spare}/delete").text
+    assert "No refuelling uses this station" in page and "move_to_id" not in page
+    _post(client, f"/stations/{spare}/delete", {})
+    assert "Spare" not in _station_refuel_counts(engine)
+
+
+def test_delete_station_rejects_itself_and_unknown_target(
+    client: TestClient, engine: Engine
+) -> None:
+    _build_scenario(client)
+    alpha = _station_id(client, "Alpha")
+    for bad in (str(alpha), "9999", "abc"):
+        response = client.post(f"/stations/{alpha}/delete", data={"move_to_id": bad})
+        assert response.status_code == 422
+    assert _station_refuel_counts(engine) == {"Alpha": 4, "Beta": 1}
+    assert client.get("/stations/9999/delete").status_code == 404
+
+
+def test_station_edit_dialog_offers_delete(client: TestClient) -> None:
+    _build_scenario(client)
+    alpha = _station_id(client, "Alpha")
+    assert f'href="/stations/{alpha}/delete"' in client.get(f"/stations/{alpha}/edit").text
+
+
+def test_import_undo_after_moving_a_station_keeps_the_target(
+    client: TestClient, engine: Engine, fixtures_dir: Path
+) -> None:
+    _post(client, "/vehicles/new", {"name": "Existing"})
+    vid = _vehicle_id(client, "Existing")
+    _add_refuel(client, vid, date(2020, 1, 1), 1, litres="10", price_per_litre="1",
+                new_station_name="Keep")  # fmt: skip
+    name, answers, _ = IMPORT_CASES[1]
+    _import_file(client, name, (fixtures_dir / name).read_bytes(), answers)
+    keep = _station_id(client, "Keep")
+    with Session(engine) as session:
+        imported = session.scalars(
+            select(Station.id).where(Station.import_batch_id.is_not(None))
+        ).all()
+    assert imported
+    for station_id in imported:
+        _post(client, f"/stations/{station_id}/delete", {"move_to_id": str(keep)})
+
+    batch_id = int(re.search(r"/import/(\d+)/undo", client.get("/import").text).group(1))
+    _post(client, f"/import/{batch_id}/undo", {})
+    assert _station_refuel_counts(engine) == {"Keep": 1}

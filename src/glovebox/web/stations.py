@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, Form, HTTPException, Request
 
 from glovebox.services import records
-from glovebox.services.records import StationInput, ValidationError
+from glovebox.services.records import NotFoundError, StationInput, ValidationError
 from glovebox.web.common import SessionDep, redirect, render
 
 router = APIRouter(prefix="/stations")
@@ -95,3 +95,45 @@ def station_merge(
         session.rollback()
         return _list_page(request, session, 422, exc.messages)
     return redirect(request, "/stations")
+
+
+@router.get("/{station_id}/delete")
+def station_delete_confirm(request: Request, station_id: int, session: SessionDep):
+    """Confirmation: how many refuels use the station and where to move them."""
+    return _delete_page(request, session, station_id)
+
+
+@router.post("/{station_id}/delete")
+def station_delete(
+    request: Request,
+    station_id: int,
+    session: SessionDep,
+    move_to_id: Annotated[str, Form()] = "",
+):
+    """Move the station's refuels to ``move_to_id`` (empty: no station), delete it."""
+    try:
+        target = int(move_to_id) if move_to_id else None
+        records.delete_station(session, station_id, target)
+    except NotFoundError as exc:
+        raise HTTPException(404, detail=str(exc)) from None
+    except (ValueError, ValidationError) as exc:
+        session.rollback()
+        messages = exc.messages if isinstance(exc, ValidationError) else [
+            "Choose a station from the list"]
+        return _delete_page(request, session, station_id, 422, messages)
+    return redirect(request, "/stations")
+
+
+def _delete_page(request: Request, session, station_id: int, status: int = 200,
+                 errors: list[str] | None = None):
+    try:
+        station = records.get_station(session, station_id)
+    except NotFoundError as exc:
+        raise HTTPException(404, detail=str(exc)) from None
+    return render(
+        request, "stations/delete.html", status,
+        station=station,
+        refuel_count=records.count_station_refuels(session, station_id),
+        targets=records.station_move_targets(session, station_id),
+        errors=errors or [],
+    )

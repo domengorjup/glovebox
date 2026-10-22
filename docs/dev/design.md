@@ -75,7 +75,7 @@ A grid of stat cards: label, big value with a small unit, and a hint line. `.sum
 </div>
 ```
 
-On the Timeline the user picks the cards (and in "All vehicles" the summary groups) in the **Customise** popover (`details.customise` with `form.popover`). Choices are stored server-side; `data-card` and `data-summary` let `app.js` apply them live.
+On the Timeline the user picks the cards (and in "All vehicles" the summary groups) in the **Customise** popover (`details.customise` with `form.popover`). On desktop it is a small dropdown; on phones it is a bottom sheet (fixed to the bottom, rounded top, dim backdrop made with a box-shadow, `.pop-head` with the title and a Done button `[data-close-customise]`, rows at least 48px). Tapping the backdrop, Done or Escape closes it. Choices are stored server-side; `data-card` and `data-summary` let `app.js` apply them live.
 
 ### List card and rows
 
@@ -135,7 +135,7 @@ The round `+` (`a.fab`, `data-dialog`) appears on the Timeline only. It opens `/
 
 ### Dialog and confirm
 
-All forms open as a dialog: `.scrim` (click to close) containing `form.dialog.form` with `.dialog-head`, `.dialog-body` and `.dialog-foot`. The head has a close `icon-btn` (a real link, so it works without JavaScript). On phones the form dialog is full screen. A confirmation is `form.dialog.confirm` with an `h3`, one paragraph and a foot with Cancel and the action.
+All forms open as a dialog: `.scrim` (click to close) containing `form.dialog.form` with `.dialog-head`, `.dialog-body` and `.dialog-foot`. The head has a close `icon-btn` (a real link, so it works without JavaScript). On phones the form dialog is full screen. A confirmation is `form.dialog.confirm` with an `h3`, one paragraph, optionally one `.field` (select) when the user must choose before confirming (delete station: where its refuellings move), and a foot with Cancel and the action.
 
 ```jinja
 <div class="scrim" data-scrim>
@@ -194,8 +194,12 @@ A native `<details>` with a `<summary>`; no custom widget. Used for the archived
 
 These pages reuse existing elements; the only new classes are listed under "Mapping row layout".
 
-- **Mapping field** (import mapping): inside one `.card.card-pad.stack`, each standard field is a `.grid2` of two filled fields (source select, constant value), a `.help` line with the description, and a `details.archived` "Options" block (value map, true/false values, missing values, default). The select's first options are "Not mapped" and "Constant value", then the file's headers.
-- **Mapping row layout** (new class `map-row` on the `.grid2`, `map-const` on the constant field): the constant-value field is hidden until "Constant value" is chosen in the source select (CSS `:has()`, no script), so a row is one select, one help line and the Options link on a phone. The common fields come first; the rarely used ones (`currency`, `station_location`, `station_brand`, `coverage_start`, `coverage_end`, `notes`, `derived`, `source`, `source_ref`) sit in a collapsible "More fields" section (`details.archived`), which opens by itself when one of them is mapped.
+- **Mapping field** (import mapping): a `.map-item` inside one `.card.card-pad.map-list` (items separated by hairlines): a `.grid2.map-row` of two filled fields (source select, constant value) and a `details.map-opts` "Options" block that starts with the description as `.help.flush`, then the value map, true/false values, missing values and default. The select's first options are "Not mapped" and "Constant value", then the file's headers. The description is also the label's `title`.
+- **Folded settings card** (`details.card.fold`, import mapping: File, Value formats): a card whose summary row shows a title (`.fold-title`), a one-line summary of the current values (`.fold-sum`, right-aligned, wraps) and a chevron; the body is `.fold-body.stack`. Collapsed by default so the mapping page is short on a phone; the inputs stay in the form and are submitted. It opens by itself when the file could not be read, a file setting is explicit or there is an error. Use it for any settings block that is correct most of the time.
+- **Preset steps** (`ol.steps`): a small numbered list in secondary text with a primary-coloured number, directly under the preset select and its one-line note. Its items come from the preset's `steps` (about 8 words each, at most 5). Use it for short "what to do" lists inside a card.
+- **New vehicle choice** (import preview): the vehicle select ends with "New vehicle..."; a `.new-vehicle` block with a filled name field follows and is shown only while that option is selected (`data-reveal-select` on the select, `data-reveal="new"` on the block; without JavaScript it stays visible). The select and the name field carry `data-autosubmit` (the select with `data-autosubmit-skip="new"`, since "New vehicle..." must wait for the name), so the preview updates in one step.
+- **Next section** (import result): after the `.alert.success`, an `.alert.next-section` (same flex layout as `.alert.success`, neutral border) names the remaining sections and holds a primary `a.btn.primary.with-icon` "Import next section: <section>".
+- **Mapping row layout** (new class `map-row` on the `.grid2`, `map-const` on the constant field): the constant-value field is hidden until "Constant value" is chosen in the source select (CSS `:has()`, no script), so a row is one select and the Options link on a phone. Fields that are mapped, have options or are required come first; the others sit in a collapsed "Fields not mapped (N)" block (`details.more-fields`), still in the form.
 - **Step state**: mapping, preview and confirm are one `form.stack`; the edited mapping travels as hidden fields (`base_toml`, `selected_preset`, `preset_id`) plus the mapping inputs. Buttons switch the step with `formaction`; the default (first) submit button must be the harmless one.
 - **Questions**: a `.filter-line` with `span.lbl` and a `.seg` of radio labels.
 - **Row errors**: `table.tbl` in `.card.card-pad.table-scroll`; the heading gives the total and how many are shown.

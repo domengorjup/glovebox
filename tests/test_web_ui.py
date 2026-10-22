@@ -255,6 +255,11 @@ def test_timeline_lists_entries_grouped_by_month(client):
     assert "Annual policy" in html and "Refuelling" in html
 
 
+def test_timeline_customise_sheet_has_title_and_done(client):
+    html = client.get("/").text
+    assert 'class="pop-head"' in html and "data-close-customise" in html
+
+
 def test_timeline_type_chip_filters(client):
     html = client.get("/?type=expense").text
     assert "Annual policy" in html and 'href="/refuels/1/edit"' not in html
@@ -946,8 +951,19 @@ def test_commit_of_a_file_with_more_sections_says_so(client, monkeypatch):
     form = state(html)
     form["base_toml"] = form["base_toml"].replace("[format]", '[file]\nsection = "Log"\n\n[format]', 1)
     response = client.post("/import/commit", data=form, follow_redirects=False)
-    assert response.headers["location"].endswith("/import?done=1&more=Costs")
-    assert "Costs" in client.get(response.headers["location"]).text
+    location = response.headers["location"]
+    assert "done=1" in location and "seen=Log" in location and "more=Costs" in location
+    page = client.get(location).text
+    assert "Import next section: Costs" in page
+    assert "section=Costs" in page and "seen=Log" in page
+    # the upload is kept for the next section
+    assert len(list((client.app.state.settings.data_dir / "uploads").glob("*.upload"))) == 1
+
+
+def test_import_page_without_a_stored_upload_offers_no_next_button(client):
+    page = client.get("/import?done=1&more=Costs&token=" + "0" * 32).text
+    assert "More sections in this file: Costs" in page
+    assert "Import next section" not in page
 
 
 def test_save_preset_from_the_preview_then_it_is_listed(client, monkeypatch):

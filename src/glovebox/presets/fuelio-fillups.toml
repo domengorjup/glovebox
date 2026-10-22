@@ -5,10 +5,10 @@
 # "Fuel (litres)"). Fuelio writes 0 for a price that was not given. Station
 # names from "## FavStations" and the vehicle name from "## Vehicle" are not
 # used (design D9); the vehicle is chosen at import (a ZIP member's name is
-# proposed). Import the same file again with "Fuelio (costs)" for the costs.
+# proposed). Then use "Import next section" (Fuelio (costs)) for the costs.
 
 name = "Fuelio (fill-ups)"
-note = "Never tested against a real export (based on open-source parsers). Fuelio CSV backup, ## Log section. Import the same file again with 'Fuelio (costs)' for the costs."
+note = "Never tested against a real export (based on open-source parsers). Fuelio CSV backup, ## Log section. Then use 'Import next section' for the costs."
 verified = false
 export = false
 

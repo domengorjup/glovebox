@@ -16,6 +16,7 @@ from glovebox.services.records import (
     ValidationError,
     VehicleInput,
     archive_vehicle,
+    count_station_refuels,
     count_vehicle_records,
     create_expense,
     create_refuel,
@@ -28,6 +29,7 @@ from glovebox.services.records import (
     list_refuels,
     list_stations,
     list_vehicles,
+    station_move_targets,
     merge_stations,
     preview_refuel,
     set_brand_bulk,
@@ -237,6 +239,38 @@ def test_delete_station_keeps_refuels(session, vehicle):
     delete_station(session, station.id)
     session.refresh(refuel)
     assert refuel.station_id is None
+
+
+def test_delete_station_moves_refuels(session, vehicle):
+    old = create_station(session, StationInput(name="Old"))
+    new = create_station(session, StationInput(name="New"))
+    refuels = [
+        create_refuel(session, refuel_input(vehicle.id, odo=1000 + i, station_id=old.id))
+        for i in range(2)
+    ]
+    assert count_station_refuels(session, old.id) == 2
+    delete_station(session, old.id, new.id)
+    for refuel in refuels:
+        session.refresh(refuel)
+        assert refuel.station_id == new.id
+    assert [s.name for s in list_stations(session)] == ["New"]
+
+
+def test_delete_station_rejects_bad_target(session, vehicle):
+    station = create_station(session, StationInput(name="Old"))
+    create_refuel(session, refuel_input(vehicle.id, station_id=station.id))
+    for target in (station.id, 9999):
+        with pytest.raises(ValidationError):
+            delete_station(session, station.id, target)
+    assert count_station_refuels(session, station.id) == 1
+
+
+def test_station_move_targets_same_brand_first_then_name(session):
+    gone = create_station(session, StationInput(name="Gone", brand="MOL"))
+    for name, brand in [("Zeta", "MOL"), ("Alpha", "OMV"), ("Beta", None), ("Mid", "MOL")]:
+        create_station(session, StationInput(name=name, brand=brand))
+    names = [s.name for s in station_move_targets(session, gone.id)]
+    assert names == ["Mid", "Zeta", "Alpha", "Beta"]
 
 
 def test_filter_refuels_by_brand_and_newest_first(session, vehicle):

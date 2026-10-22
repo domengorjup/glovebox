@@ -61,7 +61,7 @@
       openDialog(opener.href);
     }
     var pop = document.querySelector("details.customise[open]");
-    if (pop && !pop.contains(event.target)) { pop.removeAttribute("open"); }
+    if (pop && (!pop.contains(event.target) || event.target.closest("[data-close-customise]"))) { pop.removeAttribute("open"); }
   });
 
   document.addEventListener("keydown", function (event) {
@@ -167,6 +167,22 @@
     }
     select.addEventListener("change", sync);
     sync();
+  }
+
+  /* A select with data-reveal-select="<id>" shows that element only while its
+     value equals the element's data-reveal; without JavaScript it stays visible. */
+  function bindRevealSelect(root) {
+    root.querySelectorAll("[data-reveal-select]").forEach(function (select) {
+      var target = document.getElementById(select.getAttribute("data-reveal-select"));
+      if (!target || select.dataset.bound) { return; }
+      select.dataset.bound = "1";
+      function sync() {
+        if (select.value === target.getAttribute("data-reveal")) { target.removeAttribute("data-closed"); }
+        else { target.setAttribute("data-closed", ""); }
+      }
+      select.addEventListener("change", sync);
+      sync();
+    });
   }
 
   /* ---------- charts ---------- */
@@ -337,6 +353,7 @@
   bindOdometerHint(document);
   bindCalc(document);
   bindStationSelect(document);
+  bindRevealSelect(document);
   drawCharts();
   var resizeTimer;
   window.addEventListener("resize", function () {

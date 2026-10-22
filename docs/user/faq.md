@@ -24,6 +24,10 @@ The mapping step lists the columns of your file and the required fields that are
 
 Check that full tanks are marked as full, that no *missed fill-up* is flagged in the stretch, and that there are at least two full fills with rising odometer values. See [Statistics](statistics.md#how-consumption-is-calculated).
 
+## A home-screen shortcut on Android
+
+In the Home Assistant Android app, open **Settings > Companion app > Manage shortcuts**, add a shortcut of type *Dashboard* with the path `/dc7a9428_glovebox`, and pin it to the home screen (Android 8 or later). See the [companion app docs](https://companion.home-assistant.io/docs/integrations/android-shortcuts/). The path of the Glovebox panel is the part after your HA address when Glovebox is open in the sidebar.
+
 ## Where is my data? How do I back it up?
 
 In a SQLite database in `/data` (add-on: included in Home Assistant backups; standalone: the folder you mounted). Use the [full export](export.md) for a backup that does not depend on the install.
