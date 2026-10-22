@@ -8,6 +8,9 @@
   <span class="body">
     <span class="title">{{ v.name }}</span>
     <span class="detail">{{ ([v.make, v.model] | select | join(' ') , v.plate, v.fuel_type) | select | join(' · ') or 'No details' }}</span>
+    {% set more = [v.model_year, v.engine, v.tyre_size] | select | join(' · ') %}
+    {% set until = [('Insurance until ' ~ (v.insurance_valid_until | full_date)) if v.insurance_valid_until, ('Registration until ' ~ (v.registration_valid_until | full_date)) if v.registration_valid_until] | select | join(' · ') %}
+    {% if more or until %}<span class="detail">{{ [more, until] | select | join(' · ') }}</span>{% endif %}
     <span class="detail">{{ r.records }} {{ 'record' if r.records == 1 else 'records' }}{% if r.odometer is not none %} · {{ 'last' if r.records else 'initial' }} odometer {{ '{:,.0f}'.format(r.odometer) }}&nbsp;km{% endif %}</span>
   </span>
   <span class="chev">{{ icon('chevron-right', 24) }}</span>

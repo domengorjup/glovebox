@@ -67,6 +67,13 @@ class VehicleInput:
     fuel_type: str | None = None
     initial_odometer: float | None = None
     notes: str | None = None
+    vin: str | None = None
+    model_year: int | None = None
+    engine: str | None = None
+    tyre_size: str | None = None
+    insurance_policy: str | None = None
+    insurance_valid_until: date | None = None
+    registration_valid_until: date | None = None
 
 
 @dataclass(frozen=True)
@@ -156,6 +163,9 @@ class RecordCounts:
 INCONSISTENCY_TOLERANCE = 0.01
 
 
+FIRST_MODEL_YEAR = 1886  # Benz Patent-Motorwagen
+
+
 def _clean(value: str | None) -> str | None:
     """Strip whitespace; empty strings become ``None``."""
     if value is None:
@@ -207,6 +217,15 @@ def _check_vehicle_name(
     return name
 
 
+def _check_model_year(year: int | None) -> None:
+    """Reject a model year before the first cars or after next year."""
+    latest = date.today().year + 1
+    if year is not None and not FIRST_MODEL_YEAR <= year <= latest:
+        raise ValidationError(
+            [f"Model year must be between {FIRST_MODEL_YEAR} and {latest}"]
+        )
+
+
 def _apply_vehicle(vehicle: Vehicle, name: str, data: VehicleInput) -> None:
     vehicle.name = name
     vehicle.make = _clean(data.make)
@@ -215,12 +234,21 @@ def _apply_vehicle(vehicle: Vehicle, name: str, data: VehicleInput) -> None:
     vehicle.fuel_type = _clean(data.fuel_type)
     vehicle.initial_odometer = data.initial_odometer
     vehicle.notes = _clean(data.notes)
+    vin = _clean(data.vin)
+    vehicle.vin = None if vin is None else vin.upper()
+    vehicle.model_year = data.model_year
+    vehicle.engine = _clean(data.engine)
+    vehicle.tyre_size = _clean(data.tyre_size)
+    vehicle.insurance_policy = _clean(data.insurance_policy)
+    vehicle.insurance_valid_until = data.insurance_valid_until
+    vehicle.registration_valid_until = data.registration_valid_until
 
 
 def create_vehicle(session: Session, data: VehicleInput) -> Vehicle:
     """Create a vehicle; ``ValidationError`` if the name is empty or taken
     by a non-archived vehicle."""
     vehicle = Vehicle(archived=False)
+    _check_model_year(data.model_year)
     _apply_vehicle(vehicle, _check_vehicle_name(session, data.name), data)
     session.add(vehicle)
     session.flush()
@@ -232,6 +260,7 @@ def update_vehicle(session: Session, vehicle_id: int, data: VehicleInput) -> Veh
     vehicle = get_vehicle(session, vehicle_id)
     exclude = None if vehicle.archived else vehicle.id
     name = _check_vehicle_name(session, data.name, exclude_id=exclude)
+    _check_model_year(data.model_year)
     _apply_vehicle(vehicle, name, data)
     session.flush()
     return vehicle

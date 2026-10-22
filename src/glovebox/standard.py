@@ -12,9 +12,10 @@ from dataclasses import dataclass
 from typing import Any
 
 # Field types, as used by ``StandardField.type``.
-STRING, NUMBER, DATE, TIME, BOOLEAN, ENUM = (
+STRING, NUMBER, INTEGER, DATE, TIME, BOOLEAN, ENUM = (
     "string",
     "number",
+    "integer",
     "date",
     "time",
     "boolean",
@@ -47,7 +48,7 @@ class StandardField:
     name : str
         Column name; the unit is part of it where there is one.
     type : str
-        ``string``, ``number``, ``date``, ``time``, ``boolean`` or ``enum``.
+        ``string``, ``number``, ``integer``, ``date``, ``time``, ``boolean`` or ``enum``.
     unit : str | None
         Unit of a number (``km``, ``l``, ``currency``, ``currency/l``).
     applies_to : tuple[str, ...]
@@ -201,6 +202,36 @@ VEHICLE_FIELDS: tuple[StandardField, ...] = (
         applies_to=("vehicle",), enum=(TRUE_VALUE, FALSE_VALUE), default=FALSE_VALUE,
     ),
     StandardField("notes", STRING, "Free text.", "Company car", applies_to=("vehicle",)),
+    StandardField(
+        "vin", STRING, "Vehicle identification number.", "WVWZZZ1KZ6W000001",
+        applies_to=("vehicle",),
+    ),
+    StandardField(
+        "model_year", INTEGER, "Year of manufacture or model year.", "2018",
+        applies_to=("vehicle",),
+    ),
+    StandardField(
+        "engine", STRING, "Engine, free text.", "1.5 hybrid, 92 kW",
+        applies_to=("vehicle",),
+    ),
+    StandardField(
+        "tyre_size", STRING, "Tyre size, free text.", "205/55 R16",
+        applies_to=("vehicle",),
+    ),
+    StandardField(
+        "insurance_policy", STRING, "Insurance policy number.", "POL-2026-0042",
+        applies_to=("vehicle",),
+    ),
+    StandardField(
+        "insurance_valid_until", DATE,
+        "Last day the current insurance is valid, YYYY-MM-DD.", "2027-03-14",
+        applies_to=("vehicle",),
+    ),
+    StandardField(
+        "registration_valid_until", DATE,
+        "Last day the current registration is valid, YYYY-MM-DD.", "2027-05-30",
+        applies_to=("vehicle",),
+    ),
 )
 
 STATION_FIELDS: tuple[StandardField, ...] = (
@@ -253,7 +284,7 @@ EXAMPLE_RECORDS: tuple[dict[str, str], ...] = (
 DATAPACKAGE_PROFILE = "tabular-data-package"
 RESOURCE_PROFILE = "tabular-data-resource"
 _SCHEMA_TYPES = {
-    STRING: "string", NUMBER: "number", DATE: "date", TIME: "time",
+    STRING: "string", NUMBER: "number", INTEGER: "integer", DATE: "date", TIME: "time",
     BOOLEAN: "boolean", ENUM: "string",
 }
 _TABLE_TITLES = {

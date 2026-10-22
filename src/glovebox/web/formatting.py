@@ -39,6 +39,11 @@ def short_date(day: date) -> str:
     return f"{day.day}{NBSP}{MONTH_NAMES[day.month - 1][:3]}"
 
 
+def full_date(day: date) -> str:
+    """Return ``5 May 2026`` (English month names, no line break inside)."""
+    return f"{short_date(day)}{NBSP}{day.year}"
+
+
 def month_label(year: int, month: int) -> str:
     """Return ``May 2026``."""
     return f"{MONTH_NAMES[month - 1]} {year}"

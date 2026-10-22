@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Form, Request
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from glovebox.services import records
@@ -22,25 +24,73 @@ from glovebox.web.common import SessionDep, redirect, render
 router = APIRouter(prefix="/vehicles")
 
 
-def _vehicle_input(
-    name: str,
-    make: str,
-    model: str,
-    plate: str,
-    fuel_type: str,
-    initial_odometer: str,
-    notes: str,
-) -> VehicleInput:
+# Start of the messages about fields inside the "More details" section.
+_DETAIL_MESSAGES = ("Model year", "Insurance valid", "Registration valid")
+
+
+class VehicleForm(BaseModel):
+    """Raw (string) form fields; parsing and errors are handled in one place."""
+
+    name: str = ""
+    make: str = ""
+    model: str = ""
+    plate: str = ""
+    fuel_type: str = ""
+    initial_odometer: str = ""
+    notes: str = ""
+    vin: str = ""
+    model_year: str = ""
+    engine: str = ""
+    tyre_size: str = ""
+    insurance_policy: str = ""
+    insurance_valid_until: str = ""
+    registration_valid_until: str = ""
+
+
+def _whole_number(text: str, label: str) -> int | None:
+    """Parse a whole number (blank is unset); ``ValueError`` otherwise."""
+    text = text.strip()
+    if not text:
+        return None
+    try:
+        return int(text)
+    except ValueError:
+        raise ValueError(f"{label} must be a whole number") from None
+
+
+def _day(text: str, label: str) -> date | None:
+    """Parse ``YYYY-MM-DD`` (blank is unset); ``ValueError`` otherwise."""
+    text = text.strip()
+    if not text:
+        return None
+    try:
+        return date.fromisoformat(text)
+    except ValueError:
+        raise ValueError(f"{label} is not a date (YYYY-MM-DD)") from None
+
+
+def _vehicle_input(form: VehicleForm) -> VehicleInput:
     """Build the service input from raw form text (blank means unset)."""
-    odometer = parse_decimal(initial_odometer, "Initial odometer")
+    odometer = parse_decimal(form.initial_odometer, "Initial odometer")
     return VehicleInput(
-        name=name.strip(),
-        make=make.strip() or None,
-        model=model.strip() or None,
-        plate=plate.strip() or None,
-        fuel_type=fuel_type.strip() or None,
+        name=form.name.strip(),
+        make=form.make.strip() or None,
+        model=form.model.strip() or None,
+        plate=form.plate.strip() or None,
+        fuel_type=form.fuel_type.strip() or None,
         initial_odometer=None if odometer is None else float(odometer),
-        notes=notes.strip() or None,
+        notes=form.notes.strip() or None,
+        vin=form.vin,
+        model_year=_whole_number(form.model_year, "Model year"),
+        engine=form.engine,
+        tyre_size=form.tyre_size,
+        insurance_policy=form.insurance_policy,
+        insurance_valid_until=_day(
+            form.insurance_valid_until, "Insurance valid until"
+        ),
+        registration_valid_until=_day(
+            form.registration_valid_until, "Registration valid until"
+        ),
     )
 
 
@@ -92,26 +142,14 @@ def vehicle_new(request: Request, session: SessionDep):
 
 @router.post("/new")
 def vehicle_create(
-    request: Request,
-    session: SessionDep,
-    name: Annotated[str, Form()] = "",
-    make: Annotated[str, Form()] = "",
-    model: Annotated[str, Form()] = "",
-    plate: Annotated[str, Form()] = "",
-    fuel_type: Annotated[str, Form()] = "",
-    initial_odometer: Annotated[str, Form()] = "",
-    notes: Annotated[str, Form()] = "",
+    request: Request, session: SessionDep, form: Annotated[VehicleForm, Form()]
 ):
     """Create a vehicle, or show the form again with the validation messages."""
     try:
-        data = _vehicle_input(
-            name, make, model, plate, fuel_type, initial_odometer, notes
-        )
-        records.create_vehicle(session, data)
+        records.create_vehicle(session, _vehicle_input(form))
     except (ValueError, ValidationError) as exc:
         session.rollback()
-        return _form_error(request, None, name, make, model, plate, fuel_type,
-                           initial_odometer, notes, exc)
+        return _form_error(request, None, form, exc)
     return redirect(request, "/vehicles")
 
 
@@ -127,25 +165,15 @@ def vehicle_update(
     request: Request,
     vehicle_id: int,
     session: SessionDep,
-    name: Annotated[str, Form()] = "",
-    make: Annotated[str, Form()] = "",
-    model: Annotated[str, Form()] = "",
-    plate: Annotated[str, Form()] = "",
-    fuel_type: Annotated[str, Form()] = "",
-    initial_odometer: Annotated[str, Form()] = "",
-    notes: Annotated[str, Form()] = "",
+    form: Annotated[VehicleForm, Form()],
 ):
     """Save changes to a vehicle."""
     try:
-        data = _vehicle_input(
-            name, make, model, plate, fuel_type, initial_odometer, notes
-        )
-        records.update_vehicle(session, vehicle_id, data)
+        records.update_vehicle(session, vehicle_id, _vehicle_input(form))
     except (ValueError, ValidationError) as exc:
         session.rollback()
         vehicle = records.get_vehicle(session, vehicle_id)
-        return _form_error(request, vehicle, name, make, model, plate, fuel_type,
-                           initial_odometer, notes, exc)
+        return _form_error(request, vehicle, form, exc)
     return redirect(request, "/vehicles")
 
 
@@ -189,14 +217,10 @@ def vehicle_delete(
     return redirect(request, "/vehicles")
 
 
-def _form_error(request, vehicle, name, make, model, plate, fuel_type,
-                initial_odometer, notes, exc):
+def _form_error(request, vehicle, form: VehicleForm, exc):
     """Re-render the vehicle form with the entered values and messages."""
     messages = exc.messages if isinstance(exc, ValidationError) else [str(exc)]
-    entered = {
-        "name": name, "make": make, "model": model, "plate": plate,
-        "fuel_type": fuel_type, "initial_odometer": initial_odometer,
-        "notes": notes,
-    }
-    return render(request, "vehicles/form.html", 422,
-                  vehicle=vehicle, entered=entered, errors=messages)
+    detail_error = any(m.startswith(_DETAIL_MESSAGES) for m in messages)
+    return render(request, "vehicles/form.html", 422, vehicle=vehicle,
+                  entered=form.model_dump(), errors=messages,
+                  detail_error=detail_error)

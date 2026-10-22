@@ -178,6 +178,27 @@ h2 { font-size: 14px; font-weight: 500; color: var(--secondary-text-color); marg
   .popover .check-row input { width: 22px; height: 22px; }
 }
 
+/* Period chip (Timeline summaries): the chip opens the .popover (desktop) or the same bottom sheet (phone) */
+.head-tools { display: inline-flex; align-items: center; gap: var(--ha-space-2); }
+.veh-head-row { display: flex; align-items: center; justify-content: space-between; margin: var(--ha-space-5) 4px var(--ha-space-2); }
+.veh-head-row .veh-head { margin: 0; }
+.period-chip { padding: 4px 6px 4px 12px; font-size: 13px; gap: 2px; white-space: nowrap; }
+.period-chip svg { color: var(--secondary-text-color); }
+.period-chip.active svg { color: inherit; }
+.period-pop .check-row input { border-radius: 50%; }
+.pop-dates .field { padding-left: 10px; padding-right: 8px; }
+.pop-dates { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ha-space-2); padding: 8px 12px 4px; }
+.pop-apply { display: flex; justify-content: flex-end; padding: 4px 12px 8px; }
+.js .period-pop:not(:has(input[value="custom"]:checked)) .pop-custom { display: none; }
+@media (min-width: 700px) { .period-pop { top: calc(100% + 4px); min-width: 360px; } }
+@media (max-width: 699px) {
+  .pop-dates, .pop-apply { padding-left: 16px; padding-right: 16px; }
+  .head-tools { gap: 0; }
+  .cust-txt { display: none; }
+  .summary-head > .head-tools .customise > summary { padding: 8px; }
+  .summary-head h2 { white-space: nowrap; }
+}
+
 /* ---------- chips ---------- */
 .chips { display: flex; gap: var(--ha-space-2); flex-wrap: wrap; margin: var(--ha-space-5) 0 var(--ha-space-3); }
 .chip {
@@ -229,6 +250,10 @@ h2 { font-size: 14px; font-weight: 500; color: var(--secondary-text-color); marg
 .page-actions .btn { display: inline-flex; align-items: center; gap: 6px; padding-left: 18px; }
 .list-card button.row { width: 100%; background: none; border: 0; text-align: left; color: inherit; font: inherit; }
 .list-card .row .body .detail + .detail { margin-top: 1px; }
+.row .detail.wrap { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+.app-version { color: var(--secondary-text-color); font-size: 12px; white-space: nowrap; }
+.dialog-body .note-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.dialog-body .facts { color: var(--secondary-text-color); font-size: 13px; }
 .archived { margin-top: var(--ha-space-5); }
 .archived summary { cursor: pointer; padding: 8px 4px; font-weight: 500; color: var(--secondary-text-color); }
 .archived .help { margin: 0 4px var(--ha-space-2); }
@@ -239,6 +264,7 @@ h2 { font-size: 14px; font-weight: 500; color: var(--secondary-text-color); marg
 .dialog.confirm h3 { margin: 0; padding: 0 24px; font-size: 20px; font-weight: 500; }
 .dialog.confirm p { margin: 12px 24px 8px; color: var(--secondary-text-color); line-height: 1.45; }
 .dialog.confirm .field { margin: 8px 24px 0; }
+.dialog.confirm .actions { margin: 8px 24px 0; justify-content: flex-start; }
 .dialog.confirm .dialog-foot { border-top: 0; }
 .btn.danger-fill { background: var(--error-color); color: #fff; }
 .btn.danger-fill:hover { filter: brightness(1.08); background: var(--error-color); }
@@ -337,7 +363,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 /* ---------- phone ---------- */
 @media (max-width: 699px) {
   .app-header { padding: 0 var(--ha-space-3); gap: var(--ha-space-2); }
-  .brand span, .tabs { display: none; }
+  .brand span, .tabs, .app-header .spacer { display: none; }
   .vehicle-select { flex: 1; }
   .vehicle-select select { width: 100%; font-size: 15px; padding-top: 9px; padding-bottom: 9px; }
   main { padding: var(--ha-space-4) var(--ha-space-3) calc(160px + env(safe-area-inset-bottom)); }
@@ -459,3 +485,11 @@ a.choice { color: inherit; } .choice .t, .choice .s { display: block; }
 .new-vehicle[data-closed] { display: none; }
 .new-vehicle .help { margin: 6px 4px 0; }
 .alert.next-section { display: flex; align-items: center; justify-content: space-between; gap: var(--ha-space-3); flex-wrap: wrap; margin-top: calc(-1 * var(--ha-space-1)); }
+.field label .key { margin-left: 6px; font-family: ui-monospace, monospace; font-size: 11px; opacity: .8; }
+.actions.top { margin-top: 0; }
+
+/* ---------- vehicle details: copy button inside a field ---------- */
+.dialog-body > .fold { flex: none; }
+.field.has-copy input { padding-right: 44px; }
+.field-copy { position: absolute; right: 4px; bottom: 4px; width: 36px; height: 36px; }
+.field-copy[hidden] { display: none; }

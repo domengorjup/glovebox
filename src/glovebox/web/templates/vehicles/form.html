@@ -8,7 +8,17 @@
   'plate': (vehicle.plate or '') if vehicle else '',
   'fuel_type': (vehicle.fuel_type or '') if vehicle else '',
   'initial_odometer': ((vehicle.initial_odometer | km) if vehicle and vehicle.initial_odometer is not none else ''),
-  'notes': (vehicle.notes or '') if vehicle else '' } %}
+  'notes': (vehicle.notes or '') if vehicle else '',
+  'vin': (vehicle.vin or '') if vehicle else '',
+  'model_year': (vehicle.model_year | string if vehicle.model_year else '') if vehicle else '',
+  'engine': (vehicle.engine or '') if vehicle else '',
+  'tyre_size': (vehicle.tyre_size or '') if vehicle else '',
+  'insurance_policy': (vehicle.insurance_policy or '') if vehicle else '',
+  'insurance_valid_until': (vehicle.insurance_valid_until.isoformat() if vehicle.insurance_valid_until else '') if vehicle else '',
+  'registration_valid_until': (vehicle.registration_valid_until.isoformat() if vehicle.registration_valid_until else '') if vehicle else '' } %}
+{% set detail_keys = ['vin', 'model_year', 'engine', 'tyre_size', 'insurance_policy', 'insurance_valid_until', 'registration_valid_until'] %}
+{% set count = namespace(filled=0) %}
+{% for key in detail_keys %}{% if v[key] %}{% set count.filled = count.filled + 1 %}{% endif %}{% endfor %}
 {% set heading = 'Edit vehicle' if vehicle else 'Add vehicle' %}
 {% block title %}{{ heading }} - Glovebox{% endblock %}
 {% block content %}
@@ -29,6 +39,22 @@
     </div>
     <datalist id="fuel-types">{% for f in ['Petrol', 'Diesel', 'LPG', 'Hybrid', 'Electric'] %}<option value="{{ f }}">{% endfor %}</datalist>
     {{ field('Initial odometer', 'initial_odometer', v.initial_odometer, suffix='km', inputmode='decimal') }}
+    <details class="card fold" {{ 'open' if detail_error is defined and detail_error }}>
+      <summary><span class="fold-title">More details</span><span class="fold-sum">{{ count.filled ~ ' filled' if count.filled }}</span></summary>
+      <div class="fold-body stack">
+        {{ field('VIN', 'vin', v.vin, copy=True) }}
+        <div class="grid2">
+          {{ field('Model year', 'model_year', v.model_year, inputmode='numeric') }}
+          {{ field('Tyre size', 'tyre_size', v.tyre_size, placeholder='e.g. 205/55 R16') }}
+        </div>
+        {{ field('Engine', 'engine', v.engine, placeholder='e.g. 1.5 hybrid, 92 kW') }}
+        {{ field('Insurance policy number', 'insurance_policy', v.insurance_policy) }}
+        <div class="grid2">
+          {{ field('Insurance valid until', 'insurance_valid_until', v.insurance_valid_until, type='date') }}
+          {{ field('Registration valid until', 'registration_valid_until', v.registration_valid_until, type='date') }}
+        </div>
+      </div>
+    </details>
     {{ textarea('Notes', 'notes', v.notes) }}
     {% if vehicle and vehicle.archived %}
     <div class="help">This vehicle is archived. Unarchive it to use it in the vehicle menu and the add forms.</div>

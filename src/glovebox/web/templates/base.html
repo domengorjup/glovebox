@@ -28,6 +28,8 @@
       <a class="tab {{ 'active' if section == 'stats' }}" href="{{ url(request, '/stats') }}">Stats</a>
       <a class="tab {{ 'active' if section == 'manage' }}" href="{{ url(request, '/manage') }}">Manage</a>
     </nav>
+    <span class="spacer"></span>
+    <span class="app-version" title="Glovebox version">v{{ app_version }}</span>
   </header>
 
   <main>

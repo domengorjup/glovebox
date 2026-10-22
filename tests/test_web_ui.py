@@ -738,6 +738,11 @@ def hidden(html: str, name: str) -> str:
 
 
 def upload(client, data=STANDARD_CSV, headers=None):
+    """Upload; return the location of its mapping page (the upload itself goes to the review)."""
+    return upload_location(client, data, headers).replace("/import/preview?", "/import/mapping?")
+
+
+def upload_location(client, data=STANDARD_CSV, headers=None):
     response = client.post("/import/upload",
                            files={"file": ("log.csv", data)}, headers=headers or {},
                            follow_redirects=False)
@@ -768,9 +773,9 @@ def test_import_page_has_upload_and_no_format_choice(client):
     assert "Presets" in html
 
 
-def test_upload_goes_to_the_prefixed_mapping_page(client):
-    location = upload(client, headers=INGRESS)
-    assert location.startswith(f"{PREFIX}/import/mapping?token=")
+def test_upload_goes_to_the_prefixed_review_page(client):
+    location = upload_location(client, headers=INGRESS)
+    assert location.startswith(f"{PREFIX}/import/preview?token=")
     page = client.get(location.removeprefix(PREFIX), headers=INGRESS)
     assert page.status_code == 200
     assert all(t.startswith(PREFIX + "/") for t in urls_in(page.text))
@@ -834,7 +839,7 @@ def test_preview_of_an_edited_mapping_asks_for_the_vehicle(client, monkeypatch):
     monkeypatch.setattr(pipeline, "preview_import", fake)
     html = client.post("/import/preview", data=mapped_form(client)).text
     assert "Which vehicle do these records belong to?" in html
-    assert "Import now" not in html
+    assert ">Import now</button>" not in html
     assert pipeline.CHOOSE_VEHICLE_MESSAGE not in html
     preset = seen["preset"]
     assert preset.fields["type"].value == "refuel"
@@ -854,7 +859,7 @@ def test_preview_shows_counts_note_and_vehicle_mapping(client, monkeypatch):
     html = client.post("/import/preview", data=mapped_form(client)).text
     assert "My Golf" in html and "skipped: 2" in html and 'name="maps"' in html
     assert "Based on public descriptions." in html
-    assert "Rows not imported" in html and "Import now" in html
+    assert "Rows not imported" in html and ">Import now</button>" in html
 
 
 def test_preview_preselects_vehicle_with_same_name(client, monkeypatch):
@@ -871,7 +876,7 @@ def test_preview_lists_first_fifty_row_errors_with_the_total(client, monkeypatch
     html = client.post("/import/preview", data=mapped_form(client)).text
     assert "Rows with errors (60, first 50 shown)" in html
     assert html.count("31/31/2024") == 50
-    assert "<td class=\"num\">2</td>" in html and "Import now" in html
+    assert "<td class=\"num\">2</td>" in html and ">Import now</button>" in html
 
 
 def test_preview_asks_questions_and_blocks_commit(client, monkeypatch):
@@ -880,7 +885,7 @@ def test_preview_asks_questions_and_blocks_commit(client, monkeypatch):
     monkeypatch.setattr(pipeline, "preview_import",
                         lambda *a, **k: fake_preview(questions=[question]))
     html = client.post("/import/preview", data=mapped_form(client)).text
-    assert 'name="ans_date_order" value="dmy"' in html and "Import now" not in html
+    assert 'name="ans_date_order" value="dmy"' in html and ">Import now</button>" not in html
 
 
 def test_answered_question_stays_changeable(client, monkeypatch):
@@ -894,7 +899,7 @@ def test_answered_question_stays_changeable(client, monkeypatch):
     html = client.post("/import/preview",
                        data=mapped_form(client) | {"ans_date_order": "mdy"}).text
     assert seen["answers"].date_order == "mdy"
-    assert re.search(r'value="mdy" checked', html)
+    assert re.search(r'value="mdy"[^>]*checked', html)
 
 
 def test_commit_uses_preset_answers_mapping_and_removes_upload(
@@ -1003,7 +1008,7 @@ def test_backup_upload_goes_straight_to_the_preview(client, monkeypatch):
         archive.writestr("records.csv", "type,vehicle,date\n")
     monkeypatch.setattr(pipeline, "preview_import",
                         lambda *a, **k: fake_preview(is_backup=True))
-    location = upload(client, buffer.getvalue())
+    location = upload_location(client, buffer.getvalue())
     assert "/import/preview?token=" in location
     html = client.get(location).text
     assert "Glovebox" in html and 'name="src.' not in html
@@ -1023,7 +1028,7 @@ def test_import_walks_through_the_real_engine_and_pipeline(client, monkeypatch, 
         vehicle_id = session.scalar(select(Vehicle.id))
     form = mapped_form(client) | {"default_vehicle": str(vehicle_id)}
     preview = client.post("/import/preview", data=form).text
-    assert "New refuels: <strong>1</strong>" in preview and "Import now" in preview
+    assert "New refuels: <strong>1</strong>" in preview and ">Import now</button>" in preview
     saved = client.post("/import/save-preset", data=form | {"preset_name": "Plain"})
     assert hidden(saved.text, "preset_id") == "user-plain"
     committed = client.post("/import/commit", data=form, follow_redirects=False)
@@ -1193,7 +1198,8 @@ def test_preset_upload_download_and_delete(client):
                            follow_redirects=False)
     assert response.status_code == 303
     html = client.get("/presets").text
-    assert "Bank export" in html and 'action="/presets/user-bank-export/delete"' in html
+    assert "Bank export" in html and "Delete" not in html.split("<h2>Shipped presets")[0].split("<h2>Your presets")[1]
+    assert 'formaction="/presets/user-bank-export/delete"' in client.get("/presets/user-bank-export").text
     download = client.get("/presets/user-bank-export/download")
     assert load_preset(download.text).fields["date"].columns == ("when",)
     deleted = client.post("/presets/user-bank-export/delete", follow_redirects=False)
@@ -1321,3 +1327,46 @@ def test_autosubmit_is_attached_before_the_page_script_loads():
     static = Path(__file__).parents[1] / "src/glovebox/web/static"
     assert "data-autosubmit" in (static / "theme.js").read_text()
     assert "data-autosubmit" not in (static / "app.js").read_text()
+
+
+# --- preset detail and note editing; version label ---------------------------
+
+LONG_NOTE = "Tested with a real export. " * 12
+
+
+def test_own_preset_note_is_shown_in_full_and_can_be_edited(client):
+    body = USER_PRESET.replace('name = "Bank export"', f'name = "Bank export"\nnote = "{LONG_NOTE}"')
+    client.post("/presets/upload", files={"file": ("bank.toml", body.encode())})
+    assert LONG_NOTE.strip() in client.get("/presets").text
+    dialog = client.get("/presets/user-bank-export").text
+    assert "<textarea" in dialog and LONG_NOTE.strip() in dialog
+    response = client.post("/presets/user-bank-export/edit",
+                           data={"note": "Line one\nline  two"}, follow_redirects=False)
+    assert response.status_code == 303
+    saved = load_preset(client.get("/presets/user-bank-export/download").text)
+    assert saved.note == "Line one line two" and saved.name == "Bank export"
+    assert saved.fields["date"].columns == ("when",)
+
+
+def test_shipped_preset_is_readable_with_steps_but_not_editable(client):
+    html = client.get("/presets/drivvo-refuelling").text
+    assert "<textarea" not in html and "Steps" in html and "<ol" in html
+    assert "Shipped presets are always locked" in html and "/duplicate" in html
+    assert client.post("/presets/drivvo-refuelling/edit", data={"note": "x"}).status_code == 403
+    assert client.get("/presets/nope").status_code == 404
+    assert client.post("/presets/user-nope/edit", data={"note": "x"}).status_code == 404
+
+
+def test_app_bar_shows_the_installed_version(client):
+    from importlib.metadata import version
+
+    html = client.get("/").text
+    assert f'<span class="app-version" title="Glovebox version">v{version("glovebox")}</span>' in html
+
+
+def test_timeline_period_picker_is_a_plain_form(client):
+    html = client.get("/").text
+    assert 'action="/preferences/period"' in html
+    assert 'name="owner" value="combined"' in html and 'name="date_from"' in html
+    assert 'type="radio" name="period" value="12m" checked' in html
+    assert "Last 12 months" in html

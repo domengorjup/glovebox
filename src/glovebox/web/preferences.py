@@ -1,7 +1,8 @@
-"""Routes that store UI preferences: app-bar vehicle and Timeline summary cards."""
+"""Routes that store UI preferences: app-bar vehicle, summary cards and periods."""
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Form, HTTPException, Request
@@ -47,4 +48,27 @@ def set_cards(
     preferences.set_summary_cards(session, card or [])
     if offered:
         preferences.update_hidden_summaries(session, offered, summary or [])
+    return redirect(request, safe_next(next))
+
+
+@router.post("/period")
+def set_period(
+    request: Request,
+    session: SessionDep,
+    owner: Annotated[str, Form()],
+    period: Annotated[str, Form()],
+    date_from: Annotated[str, Form()] = "",
+    date_to: Annotated[str, Form()] = "",
+    next: Annotated[str, Form()] = "/",
+):
+    """Store the period of one Timeline summary (a vehicle id or ``combined``)."""
+    try:
+        choice = preferences.PeriodChoice(
+            period,
+            date.fromisoformat(date_from) if date_from else None,
+            date.fromisoformat(date_to) if date_to else None,
+        )
+        preferences.set_period(session, owner, choice)
+    except ValueError as exc:
+        raise HTTPException(422, detail=str(exc)) from None
     return redirect(request, safe_next(next))

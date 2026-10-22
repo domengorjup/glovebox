@@ -21,7 +21,7 @@ def test_upgrade_creates_table_and_widens_columns() -> None:
     run_migrations(engine)
     inspector = inspect(engine)
     assert {c["name"] for c in inspector.get_columns("preset")} == {
-        "id", "slug", "name", "body", "created_at", "updated_at",
+        "id", "slug", "name", "body", "locked", "created_at", "updated_at",
     }
     for table, column in (("import_batch", "format"), ("refuel", "source"),
                           ("expense", "source")):

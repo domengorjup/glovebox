@@ -114,6 +114,13 @@ class Vehicle(Base):
     initial_odometer: Mapped[float | None] = mapped_column(Float)
     archived: Mapped[bool] = mapped_column(Boolean, default=False)
     notes: Mapped[str | None] = mapped_column(Text)
+    vin: Mapped[str | None] = mapped_column(String(30))
+    model_year: Mapped[int | None] = mapped_column(Integer)
+    engine: Mapped[str | None] = mapped_column(String(100))
+    tyre_size: Mapped[str | None] = mapped_column(String(50))
+    insurance_policy: Mapped[str | None] = mapped_column(String(100))
+    insurance_valid_until: Mapped[date | None] = mapped_column(Date)
+    registration_valid_until: Mapped[date | None] = mapped_column(Date)
 
 
 class Station(Base):
@@ -236,6 +243,10 @@ class Preset(Base):
     slug: Mapped[str] = mapped_column(String(100), unique=True)
     name: Mapped[str] = mapped_column(String(100))
     body: Mapped[str] = mapped_column(Text)
+    # Protects against edits, overwrite and deletion; not part of the TOML file.
+    locked: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("0")
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=_utc_now, onupdate=_utc_now

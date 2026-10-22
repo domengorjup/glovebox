@@ -483,7 +483,7 @@ def test_import_each_fixture_then_undo(
     # importing the same file again adds nothing, offers no import and writes no batch
     again = _preview_of(client, name, (fixtures_dir / name).read_bytes(), answers)
     assert "New refuels: <strong>0</strong>" in again
-    assert "Nothing new to import" in again and "Import now" not in again
+    assert "Nothing new to import" in again and ">Import now</button>" not in again
     forced = client.post("/import/commit", data=_merged(_form_fields(again), answers))
     assert forced.status_code == 422 and "Nothing new to import" in forced.text
     assert _counts(engine)[:2] == (refuels, expenses)
@@ -536,7 +536,7 @@ def test_drivvo_sections_guided_with_new_vehicle(
     # No vehicle exists yet: create one at the preview.
     new = {"default_vehicle": "new", "new_vehicle_name": "Passat"}
     preview = client.post("/import/preview", data=_merged(_form_fields(mapping), new)).text
-    assert 'value="new" selected' in preview and "Import now" in preview
+    assert 'value="new" selected' in preview and ">Import now</button>" in preview
     done = client.post("/import/commit", data=_merged(_form_fields(preview), new),
                        follow_redirects=False)
     assert _counts(engine) == (4, 0, 1)
@@ -574,6 +574,41 @@ def test_drivvo_sections_guided_with_new_vehicle(
     assert "New expenses: <strong>0</strong>" in again
 
 
+def test_known_file_opens_the_review_and_mapping_is_optional(
+    client: TestClient, fixtures_dir: Path
+) -> None:
+    data = (fixtures_dir / "drivvo_en_sections.csv").read_bytes()
+    page = client.get(_upload(client, "d.csv", data)).text
+    assert "Map columns" not in page and 'name="src.' not in page
+    assert _selected_option(page, "preset") == "drivvo-refuelling"
+    assert "Choose the vehicle, or add a new one." in page
+    assert "New refuels: <strong>" in page and "Adjust mapping" in page
+    assert ">Import now</button>" not in page  # a vehicle is needed first
+
+    # switching the preset updates the review in place
+    switched = client.post("/import/preview", data=_merged(
+        _form_fields(page), {"preset": "drivvo-services"})).text
+    assert _selected_option(switched, "preset") == "drivvo-services"
+    assert "Zero-cost items become notes" in switched and "Map columns" not in switched
+
+    # the mapping is one button away and returns to the review
+    mapping = client.post("/import/mapping", data=_merged(_form_fields(page), {}))
+    assert "Map columns" in mapping.text and "Back to review" in mapping.text
+    assert 'class="key">odometer_km</span>' in mapping.text and "Odometer" in mapping.text
+    back = client.post("/import/preview", data=_merged(
+        _form_fields(mapping.text), {"default_vehicle": "new", "new_vehicle_name": "Passat"}))
+    assert "Map columns" not in back.text and ">Import now</button>" in back.text
+
+
+def test_file_no_preset_fits_opens_the_mapping(
+    client: TestClient, fixtures_dir: Path
+) -> None:
+    data = (fixtures_dir / "drivvo_unknown_headers.csv").read_bytes()
+    page = client.get(_upload(client, "f.csv", data)).text
+    assert "Map columns" in page and "No preset fits this file" in page
+    assert page.count(">Back to review</button>") == 2  # at the top and at the bottom
+
+
 def test_new_vehicle_at_import_needs_a_free_name(
     client: TestClient, engine: Engine, fixtures_dir: Path
 ) -> None:
@@ -584,7 +619,7 @@ def test_new_vehicle_at_import_needs_a_free_name(
                            ("Golf", "already exists")):
         preview = _preview_of(client, name, data,
                               {"default_vehicle": "new", "new_vehicle_name": typed})
-        assert message in preview and "Import now" not in preview
+        assert message in preview and ">Import now</button>" not in preview
     assert _counts(engine)[2] == 1
 
 
@@ -606,7 +641,8 @@ def test_mapping_page_labels_fit_and_header_row_is_enabled(
     client: TestClient, fixtures_dir: Path
 ) -> None:
     name = "fuelly_import_metric.csv"
-    page = client.get(_upload(client, name, (fixtures_dir / name).read_bytes())).text
+    location = _upload(client, name, (fixtures_dir / name).read_bytes())
+    page = client.get(location.replace("/import/preview?", "/import/mapping?")).text
     assert "Auto (UTF-8)" in page and "Detected" not in page
     header_row = re.search(r'<input id="i-header_row"[^>]*>', page).group(0)
     assert "disabled" not in header_row and "readonly" not in header_row
@@ -641,7 +677,7 @@ def test_vehicle_question_is_not_shown_as_failure(
     html = _preview_of(client, "f.csv", data)
     assert "Which vehicle do these records belong to?" in html
     assert "Choose a target vehicle" not in html
-    assert 'class="alert error' not in html and "Import now" not in html
+    assert 'class="alert error' not in html and ">Import now</button>" not in html
 
 
 def test_unknown_headers_open_the_mapping_and_block_the_import(
@@ -652,7 +688,7 @@ def test_unknown_headers_open_the_mapping_and_block_the_import(
     assert "Map columns" in page and "Datum" in page
     assert _selected_option(page, "preset") == ""  # "Custom mapping"
     html = _preview_of(client, "f.csv", data)
-    assert "Import now" not in html and "Fix the points above" in html
+    assert ">Import now</button>" not in html and "or adjust the mapping" in html
 
 
 def test_choosing_new_vehicle_when_name_is_taken_is_reported(
@@ -664,7 +700,7 @@ def test_choosing_new_vehicle_when_name_is_taken_is_reported(
     name = re.search(r'name="names" value="([^"]+)"', first).group(1)
     _post(client, "/vehicles/new", {"name": name})
     html = _preview_of(client, "f.csv", data, {"maps": "new"})
-    assert "already exists" in html and "Import now" not in html
+    assert "already exists" in html and ">Import now</button>" not in html
 
 
 def test_user_preset_saved_from_the_mapping_is_detected_next_time(
@@ -886,7 +922,7 @@ def test_whole_flow_under_ingress_prefix(
     location = client.post(
         "/import/upload", files={"file": ("f.csv", data)}, follow_redirects=False
     ).headers["location"]
-    assert location.startswith(f"{PREFIX}/import/mapping?")
+    assert location.startswith(f"{PREFIX}/import/preview?")
     mapping = client.get(location.removeprefix(PREFIX))
     _assert_prefixed(mapping.text)
     fields = _merged(_form_fields(mapping.text), {"default_vehicle": str(vid)})
@@ -1007,7 +1043,10 @@ def test_vehicle_full_lifecycle_through_the_forms(client: TestClient, engine: En
     assert "Golf 7" in client.get("/").text.split("</header>")[0]
 
     confirm = client.get(f"/vehicles/{vid}/delete").text
-    assert "<strong>1</strong> refuels" in confirm
+    assert "<strong>1</strong> refuels" in confirm and "cannot be undone" in confirm
+    assert 'formaction="/export/backup"' in confirm and "Download full backup" in confirm
+    backup = client.post("/export/backup")
+    assert backup.status_code == 200 and backup.headers["content-type"] == "application/zip"
     gone = client.post(f"/vehicles/{vid}/delete", data={"confirm": "1"}, follow_redirects=False)
     assert gone.status_code == 303 and _counts(engine) == (0, 0, 0)
 
@@ -1149,3 +1188,320 @@ def test_import_undo_after_moving_a_station_keeps_the_target(
     batch_id = int(re.search(r"/import/(\d+)/undo", client.get("/import").text).group(1))
     _post(client, f"/import/{batch_id}/undo", {})
     assert _station_refuel_counts(engine) == {"Keep": 1}
+
+
+def test_preset_lock_unlock_and_duplicate_through_the_forms(client: TestClient) -> None:
+    toml = 'name = "Bank"\nnote = "first"\n[fields]\ndate = { column = "when" }\n'
+    client.post("/presets/upload", files={"file": ("bank.toml", toml.encode())})
+    pid = "user-bank"
+    assert "<textarea" in client.get(f"/presets/{pid}").text
+
+    _post(client, f"/presets/{pid}/lock", {"locked": "1"})
+    locked = client.get(f"/presets/{pid}").text
+    assert "<textarea" not in locked and "Locked. Unlock it to edit" in locked
+    assert "Unlock" in locked and "Duplicate" in locked and "Locked" in client.get("/presets").text
+    assert client.post(f"/presets/{pid}/edit", data={"note": "x"}).status_code == 403
+    refused = client.post(f"/presets/{pid}/delete")
+    assert refused.status_code == 422 and "locked" in refused.text
+    assert "Bank" in client.get("/presets").text
+
+    _post(client, f"/presets/{pid}/duplicate", {})
+    _post(client, f"/presets/{pid}/duplicate", {})
+    listing = client.get("/presets").text
+    assert "Bank (copy)" in listing and "Bank (copy 2)" in listing
+    assert "<textarea" in client.get("/presets/user-bank-copy").text  # copy is unlocked
+    _post(client, "/presets/user-bank-copy/edit", {"note": "changed"})
+    assert "changed" in client.get("/presets/user-bank-copy/download").text
+    assert "first" in client.get(f"/presets/{pid}/download").text
+
+    _post(client, f"/presets/{pid}/lock", {"locked": "0"})
+    assert "<textarea" in client.get(f"/presets/{pid}").text
+    _post(client, f"/presets/{pid}/delete", {})
+    assert client.get(f"/presets/{pid}").status_code == 404
+
+
+def test_shipped_preset_can_be_duplicated_but_not_locked_or_changed(client: TestClient) -> None:
+    assert client.post("/presets/glovebox/lock", data={"locked": "0"}).status_code == 403
+    assert client.post("/presets/glovebox/delete").status_code == 422
+    _post(client, "/presets/glovebox/duplicate", {})
+    copy = client.get("/presets/user-glovebox-copy").text
+    assert "<textarea" in copy and "Your preset" in copy
+
+
+# --- Timeline summary period ------------------------------------------------
+
+
+def _cards(html: str, group: int = 0) -> dict[str, dict[str, str]]:
+    """Label, value and hint of each shown card of the n-th summary grid."""
+    grid = html.split('class="summary-grid')[group + 1].split('<div class="chips">')[0]
+    cards = {}
+    for tag, key, label, value, hint in re.findall(
+        r'(<div class="card stat" data-card="(\w+)"[^>]*>)\s*'
+        r'<div class="label">(.*?)</div>\s*<div class="value">(.*?)</div>\s*'
+        r'<div class="hint">(.*?)</div>',
+        grid, re.S,
+    ):
+        if "hidden" not in tag:
+            cards[key] = {"label": _text(label), "value": _text(value), "hint": _text(hint)}
+    return cards
+
+
+def _chip(html: str, nth: int = 0) -> str:
+    """Label of the n-th period chip."""
+    return _text(re.findall(r'<summary class="chip period-chip[^>]*>(.*?)</summary>', html, re.S)[nth])
+
+
+def _period_post(client: TestClient, owner: str, period: str, **dates: str) -> None:
+    _post(client, "/preferences/period", {"owner": owner, "period": period, **dates})
+
+
+def test_period_defaults_to_last_12_months(client: TestClient) -> None:
+    _two_vehicles(client)
+    assert _chip(client.get("/").text) == "Last 12 months"
+
+
+def test_cards_for_a_custom_range_match_hand_computation(client: TestClient) -> None:
+    vid = _build_scenario(client)
+    _post(client, "/preferences/vehicle", {"vehicle": str(vid)})
+    _period_post(client, str(vid), "custom", date_from="2025-01-01", date_to="2025-05-31")
+    html = client.get("/").text
+    assert _chip(html) == "1 Jan – 31 May"
+    cards = _cards(html)
+    # fuel 209.50 + service 100 + insurance 151 days at 1.00
+    assert cards["cost_month"]["label"] == "Cost"
+    assert cards["cost_month"]["value"] == "460.50 €"
+    assert cards["cost_month"]["hint"] == "No full earlier period to compare"
+    assert cards["consumption"]["value"].startswith("5.56")
+    assert cards["consumption"]["hint"] == "1 Jan – 31 May 2025"
+    assert cards["cost_km"]["hint"] == "All costs, 1 Jan – 31 May 2025"
+    _post(client, "/preferences/cards", {"card": ["avg_price"]})
+    # 209.50 EUR for 140 L
+    assert _cards(client.get("/").text)["avg_price"]["value"].startswith("1.496")
+
+
+def test_cost_card_compares_with_the_preceding_range(client: TestClient) -> None:
+    vid = _build_scenario(client)
+    _post(client, "/preferences/vehicle", {"vehicle": str(vid)})
+    _add_expense(client, vid, date(2024, 11, 15), category="other", title="Early", amount="5")
+    _period_post(client, str(vid), "custom", date_from="2025-03-01", date_to="2025-05-31")
+    cost = _cards(client.get("/").text)["cost_month"]
+    # 49 + 22.50 + 30 fuel, 92 insurance, 100 service = 293.50; before: 108 + 59 = 167
+    assert cost["value"] == "293.50 €"
+    assert cost["hint"] == "+126.50 € vs previous 92 days"
+
+
+def test_period_without_refuelling_shows_dashes(client: TestClient) -> None:
+    vid = _build_scenario(client)
+    _post(client, "/preferences/vehicle", {"vehicle": str(vid)})
+    _post(client, "/preferences/cards", {"card": ["cost_month", "consumption",
+          "last_refuel", "cost_km", "avg_price"]})
+    _period_post(client, str(vid), "month")  # nothing in the current month
+    cards = _cards(client.get("/").text)
+    assert cards["cost_month"]["label"] == "Cost this month"
+    for key in ("consumption", "cost_km", "avg_price"):
+        assert cards[key]["value"] == "–"
+        assert cards[key]["hint"] == "No refuelling in period"
+    assert cards["last_refuel"]["value"] != "–"  # ignores the period
+
+
+def test_period_is_remembered_per_vehicle_and_across_views(client: TestClient) -> None:
+    golf, clio = _two_vehicles(client)
+    _period_post(client, str(golf), "30d")
+    _period_post(client, "combined", "all")
+    html = client.get("/").text  # All vehicles: combined chip, then Clio, then Golf (by name)
+    assert [_chip(html, i) for i in range(3)] == ["All time", "Last 12 months", "Last 30 days"]
+    _post(client, "/preferences/vehicle", {"vehicle": str(golf)})
+    assert _chip(client.get("/").text) == "Last 30 days"
+    _post(client, "/preferences/vehicle", {"vehicle": str(clio)})
+    assert _chip(client.get("/").text) == "Last 12 months"
+
+
+def test_period_survives_a_restart(
+    settings: Settings, engine: Engine, client: TestClient
+) -> None:
+    golf, _ = _two_vehicles(client)
+    _period_post(client, str(golf), "custom", date_from="2025-06-01", date_to="2025-06-30")
+    with TestClient(create_app(settings, engine)) as restarted:
+        _post(restarted, "/preferences/vehicle", {"vehicle": str(golf)})
+        assert _chip(restarted.get("/").text) == "1 Jun – 30 Jun"
+
+
+def test_period_form_validation(client: TestClient) -> None:
+    golf, _ = _two_vehicles(client)
+    for data in (
+        {"owner": "x", "period": "30d"},
+        {"owner": str(golf), "period": "week"},
+        {"owner": str(golf), "period": "custom"},
+        {"owner": str(golf), "period": "custom", "date_from": "nope", "date_to": "2025-01-01"},
+    ):
+        assert client.post("/preferences/period", data=data).status_code == 422, data
+
+
+def test_period_redirects_back_and_ignores_external_next(client: TestClient) -> None:
+    response = client.post(
+        "/preferences/period",
+        data={"owner": "combined", "period": "year", "next": "https://evil.example/"},
+        follow_redirects=False,
+    )
+    assert response.status_code in (302, 303) and response.headers["location"] == "/"
+
+
+def test_no_comparison_when_the_earlier_period_is_only_partly_covered(client: TestClient) -> None:
+    vid = _build_scenario(client)  # first record 2025-01-10
+    _post(client, "/preferences/vehicle", {"vehicle": str(vid)})
+    # earlier period 2024-12-01 .. 2025-02-28 starts before the first record
+    _period_post(client, str(vid), "custom", date_from="2025-03-01", date_to="2025-05-31")
+    assert _cards(client.get("/").text)["cost_month"]["hint"] == "No full earlier period to compare"
+    # earlier period 2025-01-10 .. 2025-02-28 starts on the first record: full coverage
+    _period_post(client, str(vid), "custom", date_from="2025-03-01", date_to="2025-04-19")
+    hint = _cards(client.get("/").text)["cost_month"]["hint"]
+    assert hint.endswith("vs previous 50 days") and hint[0] in "+-"
+
+
+# --- Vehicle details ----------------------------------------------------------
+
+DETAILS = {
+    "name": "Golf", "vin": "wvwzzz1kz6w000001", "model_year": "2018",
+    "engine": "1.5 TSI, 96 kW", "tyre_size": "205/55 R16",
+    "insurance_policy": "POL-2026-0042", "insurance_valid_until": "2027-03-14",
+    "registration_valid_until": "2027-05-30",
+}  # fmt: skip
+
+
+def _fold_of(html: str) -> str:
+    """The opening tag and summary text of the "More details" card."""
+    match = re.search(r'<details class="card fold"([^>]*)>\s*<summary>(.*?)</summary>', html, re.S)
+    assert match, "More details card not found"
+    return f"{match.group(1)}|{_text(match.group(2))}"
+
+
+def test_vehicle_form_stores_details_and_keeps_them_folded(client: TestClient) -> None:
+    _post(client, "/vehicles/new", DETAILS)
+    vehicle_id = _vehicle_id(client, "Golf")
+    form = client.get(f"/vehicles/{vehicle_id}/edit").text
+    assert 'value="WVWZZZ1KZ6W000001"' in form
+    assert 'value="2027-03-14"' in form
+    assert 'data-copy="i-vin"' in form
+    folded, summary = _fold_of(form).split("|")
+    assert "open" not in folded
+    assert summary == "More details 7 filled"
+
+    row = client.get("/vehicles").text
+    assert "2018 · 1.5 TSI, 96 kW · 205/55 R16" in _text(row)
+    assert "Insurance until 14 Mar 2027 · Registration until 30 May 2027" in _text(row)
+    assert "WVWZZZ1KZ6W000001" not in row
+
+
+def test_vehicle_form_without_details_says_nothing_filled(client: TestClient) -> None:
+    _post(client, "/vehicles/new", {"name": "Golf"})
+    form = client.get(f"/vehicles/{_vehicle_id(client, 'Golf')}/edit").text
+    assert _fold_of(form).endswith("|More details")
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [{"model_year": "19xx"}, {"model_year": "1700"}, {"insurance_valid_until": "2027-13-40"}],
+)
+def test_vehicle_form_error_opens_details_and_keeps_input(
+    client: TestClient, bad: dict
+) -> None:
+    response = client.post("/vehicles/new", data={**DETAILS, **bad})
+    assert response.status_code == 422
+    folded, _ = _fold_of(response.text).split("|")
+    assert "open" in folded
+    assert 'value="205/55 R16"' in response.text
+    assert list(bad.values())[0] in response.text
+
+
+def test_other_form_error_leaves_details_folded(client: TestClient) -> None:
+    response = client.post("/vehicles/new", data={**DETAILS, "name": ""})
+    assert response.status_code == 422
+    assert "open" not in _fold_of(response.text).split("|")[0]
+
+
+def test_backup_with_details_restores_them(
+    client: TestClient, second_app: tuple[TestClient, Engine]
+) -> None:
+    _post(client, "/vehicles/new", DETAILS)
+    exported = _backup(client)
+    tables = _tables(exported)
+    assert "vin,model_year,engine,tyre_size" in tables["vehicles.csv"]
+    assert "WVWZZZ1KZ6W000001,2018,\"1.5 TSI, 96 kW\",205/55 R16,POL-2026-0042,2027-03-14,2027-05-30" in tables["vehicles.csv"]
+    assert '"name": "registration_valid_until"' in zipfile.ZipFile(io.BytesIO(exported)).read("datapackage.json").decode()
+
+    other, other_engine = second_app
+    _import_file(other, "backup.zip", exported)
+    with Session(other_engine) as session:
+        golf = session.scalar(select(Vehicle))
+        assert (golf.vin, golf.model_year, golf.engine, golf.tyre_size) == (
+            "WVWZZZ1KZ6W000001", 2018, "1.5 TSI, 96 kW", "205/55 R16",
+        )
+        assert golf.insurance_policy == "POL-2026-0042"
+        assert golf.insurance_valid_until == date(2027, 3, 14)
+        assert golf.registration_valid_until == date(2027, 5, 30)
+    assert _tables(_backup(other)) == tables
+
+
+OLD_BACKUP_RECORDS = (
+    "type,vehicle,date,odometer_km,fuel_l,price_per_l,total,station,station_location\n"
+    "refuel,Golf,2025-01-10,10000,40,1.5,60.00,Alpha,Celje\n"
+)
+
+
+def _zip_of(members: dict[str, str]) -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for member, content in members.items():
+            archive.writestr(member, content)
+    return buffer.getvalue()
+
+
+def test_backup_from_before_vehicle_details_still_restores(
+    client: TestClient, engine: Engine
+) -> None:
+    old = _zip_of({
+        "records.csv": OLD_BACKUP_RECORDS,
+        "vehicles.csv": (
+            "name,make,model,plate,fuel_type,initial_odometer_km,archived,notes\n"
+            "Golf,VW,Golf VII,LJ AB-123,Diesel,85000,false,Company car\n"
+        ),
+        "stations.csv": "name,location,brand\nAlpha,Celje,OMV\n",
+        "datapackage.json": '{"name": "glovebox-standard-format", "resources": []}',
+    })
+    html = _import_file(client, "old.zip", old)
+    assert "Rows with errors" not in html
+    with Session(engine) as session:
+        golf = session.scalar(select(Vehicle))
+        assert (golf.make, golf.initial_odometer, golf.notes) == ("VW", 85000, "Company car")
+        assert golf.vin is None and golf.model_year is None
+
+
+def test_unreadable_vehicle_detail_is_a_row_error_not_a_failure(
+    client: TestClient, engine: Engine
+) -> None:
+    broken = _zip_of({
+        "records.csv": OLD_BACKUP_RECORDS,
+        "vehicles.csv": (
+            "name,vin,model_year,insurance_valid_until\nGolf,WVWZZZ1KZ6W000001,abcd,soon\n"
+        ),
+    })
+    html = _import_file(client, "broken.zip", broken)
+    assert "model_year" in html and "insurance_valid_until" in html
+    with Session(engine) as session:
+        golf = session.scalar(select(Vehicle))
+        assert golf.vin == "WVWZZZ1KZ6W000001"
+        assert golf.model_year is None and golf.insurance_valid_until is None
+
+
+def test_existing_vehicle_is_only_completed_with_details(
+    client: TestClient, engine: Engine
+) -> None:
+    _post(client, "/vehicles/new", {"name": "Golf", "vin": "KEEPME"})
+    data = _zip_of({
+        "records.csv": OLD_BACKUP_RECORDS,
+        "vehicles.csv": "name,vin,tyre_size\nGolf,OTHER,205/55 R16\n",
+    })
+    _import_file(client, "fill.zip", data)
+    with Session(engine) as session:
+        golf = session.scalar(select(Vehicle))
+        assert (golf.vin, golf.tyre_size) == ("KEEPME", "205/55 R16")

@@ -78,6 +78,13 @@ Optional. Vehicle details; see [Optional tables](#optional-tables-vehicles-and-s
 | `initial_odometer_km` | number | `km` | no | Odometer when tracking started. | `85000` |
 | `archived` | boolean |  | no | The vehicle is archived. Empty means `false`. | `false` |
 | `notes` | string |  | no | Free text. | `Company car` |
+| `vin` | string |  | no | Vehicle identification number. | `WVWZZZ1KZ6W000001` |
+| `model_year` | integer |  | no | Year of manufacture or model year. | `2018` |
+| `engine` | string |  | no | Engine, free text. | `1.5 hybrid, 92 kW` |
+| `tyre_size` | string |  | no | Tyre size, free text. | `205/55 R16` |
+| `insurance_policy` | string |  | no | Insurance policy number. | `POL-2026-0042` |
+| `insurance_valid_until` | date |  | no | Last day the current insurance is valid, YYYY-MM-DD. | `2027-03-14` |
+| `registration_valid_until` | date |  | no | Last day the current registration is valid, YYYY-MM-DD. | `2027-05-30` |
 
 ## `stations.csv`
 

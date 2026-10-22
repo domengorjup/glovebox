@@ -7,8 +7,8 @@
 
 {# Filled text field. `calc` marks the three price fields the page script keeps in step. #}
 {% macro field(label, name, value='', type='text', suffix=None, inputmode=None, step=None,
-               required=False, calc=None, list=None, placeholder=None) %}
-  <div class="field{{ ' has-suffix' if suffix }}"{% if calc %} data-calc="{{ calc }}"{% endif %}>
+               required=False, calc=None, list=None, placeholder=None, copy=False) %}
+  <div class="field{{ ' has-suffix' if suffix }}{{ ' has-copy' if copy }}"{% if calc %} data-calc="{{ calc }}"{% endif %}>
     <label for="i-{{ name }}">{{ label }}</label>
     <input id="i-{{ name }}" name="{{ name }}" value="{{ value }}" type="{{ type }}"
       {%- if inputmode %} inputmode="{{ inputmode }}"{% endif %}
@@ -17,13 +17,14 @@
       {%- if placeholder %} placeholder="{{ placeholder }}"{% endif %}
       {%- if required %} required{% endif %}>
     {% if suffix %}<span class="suffix">{{ suffix }}</span>{% endif %}
+    {% if copy %}<button type="button" class="icon-btn field-copy" data-copy="i-{{ name }}" aria-label="Copy {{ label }}" hidden>{{ icon('content-copy', 20) }}</button>{% endif %}
   </div>
 {% endmacro %}
 
-{% macro textarea(label, name, value='') %}
+{% macro textarea(label, name, value='', rows=2) %}
   <div class="field">
     <label for="i-{{ name }}">{{ label }}</label>
-    <textarea id="i-{{ name }}" name="{{ name }}" rows="2">{{ value }}</textarea>
+    <textarea id="i-{{ name }}" name="{{ name }}" rows="{{ rows }}">{{ value }}</textarea>
   </div>
 {% endmacro %}
 

@@ -9,7 +9,7 @@ import io
 import json
 import zipfile
 from collections.abc import Sequence
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import select, text
@@ -88,8 +88,19 @@ def _vehicle_row(v: Vehicle, name: str) -> list[str]:
         "initial_odometer_km": odometer,
         "archived": "true" if v.archived else "false",
         "notes": v.notes,
+        "vin": v.vin,
+        "model_year": v.model_year,
+        "engine": v.engine,
+        "tyre_size": v.tyre_size,
+        "insurance_policy": v.insurance_policy,
+        "insurance_valid_until": _iso(v.insurance_valid_until),
+        "registration_valid_until": _iso(v.registration_valid_until),
     }
-    return [values[f.name] or "" for f in VEHICLE_FIELDS]
+    return [str(values[f.name] or "") for f in VEHICLE_FIELDS]
+
+
+def _iso(day: date | None) -> str:
+    return day.isoformat() if day else ""
 
 
 def _metadata(session: Session, settings: Settings) -> dict[str, str | None]:

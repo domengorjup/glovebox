@@ -18,6 +18,10 @@
   <input type="hidden" name="new_vehicle_name" value="{{ carry.new_vehicle }}">
   {% for s in carry.seen %}<input type="hidden" name="seen" value="{{ s }}">{% endfor %}
 
+  <div class="actions top">
+    <button type="submit" class="btn primary" formaction="{{ url(request, '/import/preview') }}">Back to review</button>
+  </div>
+
   <h2>Preset</h2>
   <div class="card card-pad stack">
     <div class="field">
@@ -27,9 +31,7 @@
         {% for p in presets %}<option value="{{ p.id }}" {{ 'selected' if p.id == selected }}>{{ p.name }}{{ '' if p.verified else ' (unverified)' }}</option>{% endfor %}
       </select>
     </div>
-    {% if preset.note %}<p class="help flush">{{ preset.note }}</p>{% endif %}
-    {% if preset.steps %}<ol class="steps">{% for step in preset.steps %}<li>{{ step }}</li>{% endfor %}</ol>{% endif %}
-    <p class="help flush">Changing the preset replaces the mapping below. Your edits are kept when you press Update or Preview.</p>
+    <p class="help flush">Changing the preset replaces the mapping below. Your edits are kept when you press Update columns or Back to review.</p>
   </div>
 
   <details class="card fold" {{ 'open' if file_open }}>
@@ -93,7 +95,7 @@
     <div class="map-item">
       <div class="grid2 map-row">
         <div class="field">
-          <label for="i-src-{{ r.name }}" title="{{ r.description }}">{{ r.name }}{{ ' - ' ~ r.required if r.required }}</label>
+          <label for="i-src-{{ r.name }}" title="{{ r.description }}{{ ' (' ~ r.required ~ ')' if r.required }}">{{ r.label }}{{ ' *' if r.required }} <span class="key">{{ r.name }}</span></label>
           <select id="i-src-{{ r.name }}" name="src.{{ r.name }}">
             <option value="" {{ 'selected' if not r.source }}>Not mapped</option>
             <option value="=" {{ 'selected' if r.source == '=' }}>Constant value</option>
@@ -116,7 +118,7 @@
       <details class="map-opts" {{ 'open' if r.has_options }}>
         <summary>Options</summary>
         <div class="stack">
-          <p class="help flush">{{ r.description }}</p>
+          <p class="help flush">{{ r.description }}{{ ' ' ~ r.required ~ '.' if r.required }}</p>
           {% if r.enum %}
           <div class="field">
             <label for="i-map-{{ r.name }}">Value map (one line per value: target = source, source)</label>
@@ -161,7 +163,7 @@
   <div class="actions">
     <a class="btn" href="{{ url(request, '/import') }}">Cancel</a>
     <button type="submit" class="btn outline">Update columns</button>
-    <button type="submit" class="btn primary" formaction="{{ url(request, '/import/preview') }}">Preview</button>
+    <button type="submit" class="btn primary" formaction="{{ url(request, '/import/preview') }}">Back to review</button>
   </div>
 </form>
 {% endblock %}

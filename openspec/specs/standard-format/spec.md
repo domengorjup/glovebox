@@ -45,11 +45,15 @@ Exporting all records in the standard format and importing that file into an emp
 - **THEN** the two standard files are identical
 
 ### Requirement: Backup tables
-The standard format SHALL also define `vehicles.csv` (`name`, `make`, `model`, `plate`, `fuel_type`, `initial_odometer_km`, `archived`, `notes`) and `stations.csv` (`name`, `location`, `brand`), with the same file and value conventions. Records SHALL refer to vehicles by name and to stations by name and location.
+The standard format SHALL also define `vehicles.csv` (`name`, `make`, `model`, `plate`, `fuel_type`, `initial_odometer_km`, `archived`, `notes`, `vin`, `model_year`, `engine`, `tyre_size`, `insurance_policy`, `insurance_valid_until`, `registration_valid_until`) and `stations.csv` (`name`, `location`, `brand`), with the same file and value conventions. The columns added after `notes` are optional. Records SHALL refer to vehicles by name and to stations by name and location.
 
 #### Scenario: Unused station listed
 - **WHEN** a station has no refuels and a full backup is made
 - **THEN** `stations.csv` contains it
+
+#### Scenario: Vehicle details in a backup
+- **WHEN** a vehicle with a VIN and an insurance date is backed up
+- **THEN** `vehicles.csv` has them in the `vin` and `insurance_valid_until` columns, and the data package descriptor lists the columns
 
 ### Requirement: Single definition of the standard format
 The standard format SHALL be defined once in code. For each field the definition SHALL give the name, type, unit, which record types it applies to, whether it is required, the default, allowed values, the export precision, a description and an example. The import mapping targets, the export columns, the generated documentation and the machine-readable description SHALL all be derived from this definition.

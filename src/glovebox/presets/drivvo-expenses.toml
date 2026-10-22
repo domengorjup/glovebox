@@ -17,10 +17,9 @@
 name = "Drivvo (expenses)"
 note = "Tested with Drivvo Android exports, October 2026. Unknown expense types become 'other'."
 steps = [
-  "Map your own types under Categories.",
-  "E.g. your insurance type: Insurance.",
+  "Your own types: Adjust mapping → Categories.",
+  "E.g. your insurance type → Insurance.",
   "Save as your own preset to reuse.",
-  "Preview, then Import.",
 ]
 verified = true
 export = false

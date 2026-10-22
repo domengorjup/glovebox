@@ -20,6 +20,16 @@ Press the button above, or add the repository by hand:
 
 Home Assistant has already logged you in, so Glovebox has no login of its own. Anyone who can open the sidebar entry can use the app.
 
+### Open Glovebox from your phone's home screen
+
+With the Home Assistant Android app you can open Glovebox in one tap, which is handy at the pump:
+
+1. In the app, open **Settings → Companion app → Manage shortcuts**.
+2. Add a shortcut of type **Dashboard** with the path `/dc7a9428_glovebox` and a label such as "Glovebox".
+3. Long-press the Home Assistant app icon: the shortcut is in its menu. Drag it onto the home screen to keep it there.
+
+The path is the part after your Home Assistant address when Glovebox is open in the sidebar. See the [companion app docs](https://companion.home-assistant.io/docs/integrations/android-shortcuts/) for details.
+
 ### Options
 
 | Option | Default | Meaning |

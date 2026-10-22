@@ -10,8 +10,8 @@ It runs as a Home Assistant add-on or as a standalone Docker container.
 ![Stats](assets/screenshots/stats-top-desktop-dark.png)
 *Consumption and costs over time, in HA's dark theme.*
 
-![Import](assets/screenshots/import-mapping-top-desktop-light.png)
-*Map any CSV once, then save it as a preset.*
+![Import](assets/screenshots/import-review-desktop-light.png)
+*Upload a file, check the review, import. The column mapping stays out of the way.*
 
 - **Using Glovebox?** Start with the [user guide](user/overview.md), or go straight to [Install](user/install.md).
 - **Working on Glovebox?** See the [developer guide](dev/architecture.md).

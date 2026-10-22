@@ -2,20 +2,19 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import date, timedelta
+from dataclasses import dataclass, replace
+from datetime import date
 from itertools import groupby
 
 from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from glovebox.models import Expense, ExpenseCategory, Refuel, Vehicle
-from glovebox.services import preferences, records, stats
+from glovebox.services import periods, preferences, records, stats
 from glovebox.services.stats import LastRefuel, Segment, StatsFilter
 from glovebox.web import formatting
 from glovebox.web.common import Chrome, SessionDep, load_chrome, render, view_filter
 from glovebox.web.formatting import (
-    MONTH_NAMES,
     NBSP,
     format_milli,
     money,
@@ -28,10 +27,11 @@ from glovebox.web.refuels import consumption_by_refuel
 router = APIRouter()
 
 DASH = "–"
+NO_FULL_EARLIER = "No full earlier period to compare"
 CONSUMPTION_UNIT = "L/100" + NBSP + "km"
 TYPES = ("all", "refuel", "service", "expense")
 CARD_LABELS = {
-    "cost_month": "Cost this month",
+    "cost_month": "Cost",
     "consumption": "Avg consumption",
     "last_refuel": "Last refuel",
     "cost_km": "Cost per km",
@@ -74,74 +74,115 @@ class Card:
     hint: str = ""
 
 
-@dataclass
-class _Figures:
-    """Numbers of one vehicle behind the summary cards (last 12 months)."""
+@dataclass(frozen=True)
+class Summary:
+    """One summary block: its heading owner, period and cards."""
 
-    vehicle: Vehicle
-    summary: stats.VehicleSummary
-    previous_month_cents: int
-    window: stats.CostPerKm
-    segments: list[Segment] = field(default_factory=list)
-    fuel_cents: int = 0
-    litres_milli: int = 0
-
-
-def _window_start(today: date) -> date:
-    """First day of the 12-month window, as in the vehicle summary."""
-    try:
-        return today.replace(year=today.year - 1) + timedelta(days=1)
-    except ValueError:  # 29 February
-        return today.replace(year=today.year - 1, day=28) + timedelta(days=1)
+    owner: str  # vehicle id as text, or "combined"
+    name: str
+    choice: preferences.PeriodChoice
+    period: periods.Period
+    chip_label: str
+    cards: dict[str, Card]
 
 
-def _previous_month(today: date) -> tuple[date, date]:
-    last = today.replace(day=1) - timedelta(days=1)
-    return last.replace(day=1), last
+def long_date(day: date) -> str:
+    """Return ``5 May 2026``."""
+    return f"{short_date(day)} {day.year}"
 
 
-def _figures(session: Session, vehicle: Vehicle, today: date) -> _Figures:
-    start = _window_start(today)
-    only = StatsFilter(vehicles=(vehicle.id,))
-    first, last = _previous_month(today)
-    history = records.list_refuels(session, only)
-    in_window = [r for r in history if start <= r.date <= today]
-    return _Figures(
-        vehicle=vehicle,
-        summary=stats.vehicle_summary(session, vehicle.id, today),
-        previous_month_cents=stats.cost_breakdown(
-            session, StatsFilter(vehicles=(vehicle.id,), date_from=first, date_to=last)
-        ).total_cents,
-        window=stats.cost_per_km(
-            session, StatsFilter(vehicles=(vehicle.id,), date_from=start, date_to=today)
-        ),
-        segments=[
-            s for s in stats.segments(history) if start <= s.end_date <= today
-        ],
-        fuel_cents=sum(r.total_cents for r in in_window),
-        litres_milli=sum(r.litres_milli for r in in_window),
+def range_text(start: date, end: date) -> str:
+    """Return ``1 Nov 2025 – 20 Oct 2026`` (no year on the start within a year)."""
+    first = short_date(start) if start.year == end.year else long_date(start)
+    return f"{first} {DASH} {long_date(end)}"
+
+
+def _chip_label(period: periods.Period) -> str:
+    """Name of the period; a custom range shows its dates, short."""
+    if period.key != periods.CUSTOM:
+        return dict(periods.PERIODS)[period.key]
+    if period.start.year == period.end.year:
+        return f"{short_date(period.start)} {DASH} {short_date(period.end)}"
+    return (
+        f"{short_date(period.start)} {period.start:%y} {DASH} "
+        f"{short_date(period.end)} {period.end:%y}"
     )
 
 
-def _per_km(figures: list[_Figures]) -> float | None:
-    distance = sum(f.window.distance_km or 0 for f in figures)
-    if distance <= 0:
-        return None
-    return sum(f.window.total_cents for f in figures) / 100 / distance
+def _first_record(session: Session, ids: tuple[int, ...]) -> date | None:
+    """Date of the earliest refuelling or expense of the vehicles."""
+    flt = StatsFilter(vehicles=ids)
+    days = [r.date for r in records.list_refuels(session, flt)]
+    days += [e.date for e in records.list_expenses(session, flt)]
+    return min(days, default=None)
 
 
-def _latest_refuel(figures: list[_Figures]) -> tuple[LastRefuel, str] | None:
-    found = [(f.summary.last_refuel, f.vehicle.name) for f in figures]
+def _in_period_figures(
+    session: Session, ids: tuple[int, ...], period: periods.Period
+) -> dict:
+    """Numbers behind the cards that follow the period."""
+    flt = StatsFilter(vehicles=ids, date_from=period.start, date_to=period.end)
+    segments: list[Segment] = []
+    fuel_cents = litres_milli = 0
+    for vehicle_id in ids:
+        history = records.list_refuels(session, StatsFilter(vehicles=(vehicle_id,)))
+        inside = [r for r in history if period.start <= r.date <= period.end]
+        segments += [
+            s for s in stats.segments(history)
+            if period.start <= s.end_date <= period.end
+        ]
+        fuel_cents += sum(r.total_cents for r in inside)
+        litres_milli += sum(r.litres_milli for r in inside)
+    previous_cents = None
+    if period.previous:
+        before = replace(flt, date_from=period.previous[0], date_to=period.previous[1])
+        previous_cents = stats.cost_breakdown(session, before).total_cents
+    return {
+        "cost_cents": stats.cost_breakdown(session, flt).total_cents,
+        "previous_cents": previous_cents,
+        "per_km": stats.cost_per_km(session, flt).per_km,
+        "consumption": stats.avg_consumption(segments),
+        "fuel_cents": fuel_cents,
+        "litres_milli": litres_milli,
+    }
+
+
+def _cost_hint(
+    period: periods.Period, cost_cents: int, previous_cents: int | None, currency: str,
+    first_record: date | None,
+) -> str:
+    """
+    Comparison with the earlier period, or the range when there is none.
+
+    The comparison is made only when the earliest record of the shown vehicles
+    lies on or before the start of the earlier period, so a period that data
+    covers only in part is never compared.
+    """
+    if period.previous is None or previous_cents is None:
+        return range_text(period.start, period.end)
+    if first_record is None or first_record > period.previous[0]:
+        return NO_FULL_EARLIER
+    diff = cost_cents - previous_cents
+    sign = "+" if diff >= 0 else "-"
+    return f"{sign}{money(abs(diff), currency)} vs {period.previous_text}"
+
+
+def _latest_refuel(
+    summaries: list[tuple[Vehicle, stats.VehicleSummary]],
+) -> tuple[LastRefuel, str] | None:
+    found = [(s.last_refuel, v.name) for v, s in summaries]
     found = [(last, name) for last, name in found if last is not None]
     return max(found, key=lambda pair: pair[0].date) if found else None
 
 
-def _odometer_text(figures: list[_Figures]) -> tuple[str, str, str]:
+def _odometer_text(
+    summaries: list[tuple[Vehicle, stats.VehicleSummary]],
+) -> tuple[str, str, str]:
     """Value, unit and hint of the odometer card (initial reading as fallback)."""
-    readings = [f.summary.last_odometer_km for f in figures]
+    readings = [s.last_odometer_km for _, s in summaries]
     hint = "Latest entry"
     if not any(r is not None for r in readings):
-        readings = [f.vehicle.initial_odometer for f in figures]
+        readings = [v.initial_odometer for v, _ in summaries]
         hint = "Initial odometer"
     readings = [r for r in readings if r is not None]
     if not readings:
@@ -151,42 +192,53 @@ def _odometer_text(figures: list[_Figures]) -> tuple[str, str, str]:
     return " / ".join(f"{r / 1000:.1f}k" for r in readings), "", hint
 
 
-def build_cards(figures: list[_Figures], today: date, currency: str) -> dict[str, Card]:
-    """All summary cards for the given vehicles (combined if several)."""
-    this_month = sum(f.summary.cost_this_month_cents for f in figures)
-    last_month = sum(f.previous_month_cents for f in figures)
-    diff = this_month - last_month
-    previous = MONTH_NAMES[_previous_month(today)[0].month - 1]
-    sign = "+" if diff >= 0 else "-"
-    consumption = stats.avg_consumption([s for f in figures for s in f.segments])
-    per_km = _per_km(figures)
-    litres = sum(f.litres_milli for f in figures)
-    fuel = sum(f.fuel_cents for f in figures)
-    latest = _latest_refuel(figures)
-    odometer, odometer_unit, odometer_hint = _odometer_text(figures)
-    no_fuel = "" if latest else "No refuelling yet"
+def build_cards(
+    session: Session, vehicles: list[Vehicle], period: periods.Period, today: date,
+    currency: str, first_record: date | None = None,
+) -> dict[str, Card]:
+    """
+    All summary cards for the vehicles (combined if several).
+
+    Cost, consumption, cost per km and average price follow ``period``; last
+    refuel and odometer are current values.
+    """
+    ids = tuple(v.id for v in vehicles)
+    summaries = [(v, stats.vehicle_summary(session, v.id, today)) for v in vehicles]
+    fig = _in_period_figures(session, ids, period)
+    when = range_text(period.start, period.end)
+    latest = _latest_refuel(summaries)
+    odometer, odometer_unit, odometer_hint = _odometer_text(summaries)
+    no_fuel = "" if fig["litres_milli"] else "No refuelling in period"
+    consumption, per_km = fig["consumption"], fig["per_km"]
 
     def card(key: str, value: str | None, unit: str, hint: str) -> Card:
         shown = DASH if value is None else value
-        return Card(key, CARD_LABELS[key], shown, "" if value is None else unit, hint)
+        label = CARD_LABELS[key]
+        if key == "cost_month" and period.key == periods.MONTH:
+            label = "Cost this month"
+        return Card(key, label, shown, "" if value is None else unit, hint)
 
     cards = {
         "cost_month": card(
-            "cost_month", money(this_month, currency), "",
-            f"{sign}{money(abs(diff), currency)} vs {previous}",
+            "cost_month", money(fig["cost_cents"], currency), "",
+            _cost_hint(
+                period, fig["cost_cents"], fig["previous_cents"], currency, first_record
+            ),
         ),
         "consumption": card(
             "consumption",
             None if consumption is None else formatting.format_consumption(consumption),
-            CONSUMPTION_UNIT, no_fuel or "Last 12 months",
+            CONSUMPTION_UNIT, no_fuel or when,
         ),
         "cost_km": card(
             "cost_km", None if per_km is None else f"{per_km:.2f}",
-            f"{currency}/km", "All costs, last 12 months",
+            f"{currency}/km", no_fuel or f"All costs, {when}",
         ),
         "avg_price": card(
-            "avg_price", f"{fuel * 10 / litres:.3f}" if litres else None,
-            f"{currency}/L", no_fuel or "Last 12 months",
+            "avg_price",
+            f"{fig['fuel_cents'] * 10 / fig['litres_milli']:.3f}"
+            if fig["litres_milli"] else None,
+            f"{currency}/L", no_fuel or when,
         ),
         "odometer": card("odometer", odometer, odometer_unit, odometer_hint),
     }
@@ -194,12 +246,26 @@ def build_cards(figures: list[_Figures], today: date, currency: str) -> dict[str
         cards["last_refuel"] = card("last_refuel", None, "", "No refuelling yet")
     else:
         last, name = latest
-        where = f"{name} · " if len(figures) > 1 else ""
+        where = f"{name} · " if len(vehicles) > 1 else ""
         cards["last_refuel"] = card(
             "last_refuel", format_milli(last.litres_milli, 2), "L",
             f"{where}{short_date(last.date)} · {money(last.total_cents, currency)}",
         )
     return cards
+
+
+def build_summary(
+    session: Session, vehicles: list[Vehicle], owner: str, name: str, today: date,
+    currency: str,
+) -> Summary:
+    """Resolve the stored period of ``owner`` and compute the cards for it."""
+    choice = preferences.get_period(session, owner)
+    first = _first_record(session, tuple(v.id for v in vehicles))
+    period = periods.resolve(choice.key, today, first, choice.date_from, choice.date_to)
+    return Summary(
+        owner, name, choice, period, _chip_label(period),
+        build_cards(session, vehicles, period, today, currency, first),
+    )
 
 
 def _refuel_entry(
@@ -291,12 +357,14 @@ def timeline(request: Request, session: SessionDep, type: str = "all"):
     everyone = chrome.vehicles + chrome.archived
     combined = not chrome.selected_ids
     shown = everyone if combined else [v for v in everyone if v.id == chrome.selected_ids[0]]
-    figures = [_figures(session, v, today) for v in shown]
+    title = "All vehicles" if combined else shown[0].name
+    owner = preferences.COMBINED if combined else str(shown[0].id)
+    summary = build_summary(session, shown, owner, title, today, currency) if shown else None
     groups = []
     if combined and len(chrome.vehicles) > 1:
         groups = [
-            (str(f.vehicle.id), f.vehicle.name, build_cards([f], today, currency))
-            for f in figures if not f.vehicle.archived
+            build_summary(session, [v], str(v.id), v.name, today, currency)
+            for v in chrome.vehicles
         ]
     return render(
         request,
@@ -304,21 +372,23 @@ def timeline(request: Request, session: SessionDep, type: str = "all"):
         chrome=chrome,
         section="timeline",
         type=type,
-        cards=build_cards(figures, today, currency) if figures else {},
+        summary=summary,
+        cards=summary.cards if summary else {},
         card_order=list(preferences.CARD_KEYS),
         card_labels=CARD_LABELS,
         chosen_cards=preferences.get_summary_cards(session),
         vehicle_groups=groups,
+        period_options=periods.PERIODS,
         summary_options=(
             [(preferences.ALL_VEHICLES, "All vehicles (combined)")]
-            + [(key, name) for key, name, _ in groups]
+            + [(g.owner, g.name) for g in groups]
             if groups else []
         ),
         hidden_summaries=preferences.get_hidden_summaries(session),
         warnings=_flash_warnings(preferences.pop_flash(session)),
         months=group_by_month(build_entries(session, chrome, type)),
         has_vehicles=bool(everyone),
-        title="All vehicles" if combined else shown[0].name,
+        title=title,
     )
 
 

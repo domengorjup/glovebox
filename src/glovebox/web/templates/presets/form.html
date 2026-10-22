@@ -1,0 +1,47 @@
+{% extends layout %}
+{% from "_macros.html" import messages, textarea, dialog_head with context %}
+{% set dialog_page = true %}
+{% block title %}{{ preset.name }} - Glovebox{% endblock %}
+{% macro post(path) %}formaction="{{ url(request, '/presets/' ~ preset.id ~ path) }}"{% endmacro %}
+{% block content %}
+<div class="scrim" data-scrim>
+<form class="dialog form" method="post" role="dialog" aria-label="{{ preset.name }}"
+      action="{{ url(request, '/presets/' ~ preset.id ~ '/edit') }}">
+  {{ dialog_head(request, preset.name, '/presets') }}
+  <div class="dialog-body">
+    {{ messages(errors) }}
+    {% if locked %}
+    <div class="help">{{ 'Shipped presets are always locked. Duplicate it and edit the copy.' if preset.shipped else 'Locked. Unlock it to edit, or duplicate it and edit the copy.' }}</div>
+    <div>
+      <h2>Note</h2>
+      <p class="note-text">{{ preset.note or 'No note.' }}</p>
+    </div>
+    {% else %}
+    {{ textarea('Note', 'note', note, rows=6) }}
+    <div class="actions top">
+      <button type="submit" class="btn outline" formnovalidate name="locked" value="1" {{ post('/lock') }}>Lock</button>
+      <button type="submit" class="btn outline" formnovalidate {{ post('/duplicate') }}>Duplicate</button>
+    </div>
+    {% endif %}
+    <div class="facts">{{ 'Shipped' if preset.shipped else ('Your preset, locked' if locked else 'Your preset') }} · {{ 'Verified' if preset.verified else 'Unverified' }}{{ ' · Import and export' if preset.export else ' · Import only' }}</div>
+    {% if preset.steps %}
+    <div>
+      <h2>Steps</h2>
+      <ol class="steps">{% for step in preset.steps %}<li>{{ step }}</li>{% endfor %}</ol>
+    </div>
+    {% endif %}
+  </div>
+  <div class="dialog-foot">
+    {% if not locked %}
+    <button type="submit" class="btn danger" formnovalidate data-confirm="Delete the preset {{ preset.name }}?" {{ post('/delete') }}>Delete</button>
+    <a class="btn" href="{{ url(request, '/presets') }}" data-close>Cancel</a>
+    <button type="submit" class="btn primary">Save</button>
+    {% else %}
+    {% if not preset.shipped %}<button type="submit" class="btn" formnovalidate name="locked" value="0" {{ post('/lock') }}>Unlock</button>{% endif %}
+    <button type="submit" class="btn" formnovalidate {{ post('/duplicate') }}>Duplicate</button>
+    <a class="btn primary" href="{{ url(request, '/presets') }}" data-close>Close</a>
+    {% endif %}
+  </div>
+</form>
+</div>
+{% endblock %}

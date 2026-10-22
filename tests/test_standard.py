@@ -21,7 +21,8 @@ def test_record_field_order() -> None:
 def test_backup_table_columns() -> None:
     assert [f.name for f in standard.VEHICLE_FIELDS] == [
         "name", "make", "model", "plate", "fuel_type", "initial_odometer_km",
-        "archived", "notes",
+        "archived", "notes", "vin", "model_year", "engine", "tyre_size",
+        "insurance_policy", "insurance_valid_until", "registration_valid_until",
     ]
     assert [f.name for f in standard.STATION_FIELDS] == ["name", "location", "brand"]
 
@@ -39,7 +40,7 @@ def test_every_field_is_documented() -> None:
     for fields in standard.TABLES.values():
         for f in fields:
             assert f.description and f.example, f.name
-            assert f.type in {"string", "number", "date", "time", "boolean", "enum"}
+            assert f.type in {"string", "number", "integer", "date", "time", "boolean", "enum"}
             if f.type == "enum":
                 assert f.enum, f.name
             if f.type == "number":

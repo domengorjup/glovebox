@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass, field
+from datetime import date
 
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
@@ -344,7 +345,9 @@ def _read_vehicles(table: SourceTable | None, plan: _Plan) -> list[str]:
         name: find_column([name], table.headers)
         for name in (
             "name", "make", "model", "plate", "fuel_type",
-            "initial_odometer_km", "archived", "notes",
+            "initial_odometer_km", "archived", "notes", "vin", "model_year",
+            "engine", "tyre_size", "insurance_policy", "insurance_valid_until",
+            "registration_valid_until",
         )
     }  # fmt: skip
     if column["name"] is None:
@@ -357,9 +360,13 @@ def _read_vehicles(table: SourceTable | None, plan: _Plan) -> list[str]:
             continue
         details: dict = {
             attribute: value
-            for attribute in ("make", "model", "plate", "fuel_type", "notes")
+            for attribute in (
+                "make", "model", "plate", "fuel_type", "notes", "vin", "engine",
+                "tyre_size", "insurance_policy",
+            )
             if (value := _cell(row, column[attribute]))
         }
+        _read_vehicle_numbers_and_dates(row, column, line, details, plan)
         odometer = _cell(row, column["initial_odometer_km"])
         if odometer:
             try:
@@ -376,6 +383,30 @@ def _read_vehicles(table: SourceTable | None, plan: _Plan) -> list[str]:
         if name not in names:
             names.append(name)
     return names
+
+
+def _read_vehicle_numbers_and_dates(
+    row: list[str], column: dict, line: int, details: dict, plan: _Plan
+) -> None:
+    """Add the model year and the two dates of a ``vehicles.csv`` row, if valid."""
+    parsers = {
+        "model_year": int,
+        "insurance_valid_until": date.fromisoformat,
+        "registration_valid_until": date.fromisoformat,
+    }
+    for attribute, parse in parsers.items():
+        text = _cell(row, column[attribute])
+        if not text:
+            continue
+        try:
+            details[attribute] = parse(text)
+        except ValueError:
+            plan.preview.row_errors.append(
+                RowError(
+                    line, attribute, text,
+                    "vehicles.csv: not a valid value; the vehicle is imported without it.",
+                )
+            )  # fmt: skip
 
 
 def _read_stations(table: SourceTable | None, plan: _Plan) -> None:
@@ -398,7 +429,11 @@ def _read_stations(table: SourceTable | None, plan: _Plan) -> None:
             )
 
 
-_VEHICLE_DETAILS = ("make", "model", "plate", "fuel_type", "initial_odometer", "notes")
+_VEHICLE_DETAILS = (
+    "make", "model", "plate", "fuel_type", "initial_odometer", "notes", "vin",
+    "model_year", "engine", "tyre_size", "insurance_policy",
+    "insurance_valid_until", "registration_valid_until",
+)  # fmt: skip
 
 
 def _plan_companions(session: Session, plan: _Plan) -> None:

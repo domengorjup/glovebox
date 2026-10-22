@@ -3,15 +3,20 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
+from datetime import date
 
 from sqlalchemy.orm import Session
 
 from glovebox.models import Setting
+from glovebox.services import periods
 
 SELECTED_VEHICLE = "selected_vehicle"
 LAST_VEHICLE = "last_vehicle"
 SUMMARY_CARDS = "summary_cards"
 HIDDEN_SUMMARIES = "hidden_summaries"
+PERIOD_PREFIX = "summary_period:"
+COMBINED = "combined"
 
 FLASH = "flash"
 
@@ -121,3 +126,62 @@ def update_hidden_summaries(
     valid = [n for n in others + now_hidden if n == ALL_VEHICLES or n.isdigit()]
     set_setting(session, HIDDEN_SUMMARIES, json.dumps(valid))
     return valid
+
+
+@dataclass(frozen=True)
+class PeriodChoice:
+    """A stored summary period: its name and, for "custom", the two dates."""
+
+    key: str = periods.DEFAULT_PERIOD
+    date_from: date | None = None
+    date_to: date | None = None
+
+
+def is_period_owner(owner: str) -> bool:
+    """True for ``"combined"`` or a vehicle id (as text)."""
+    return owner == COMBINED or owner.isdigit()
+
+
+def get_period(session: Session, owner: str) -> PeriodChoice:
+    """
+    The summary period of a vehicle (id as text) or of the combined summary.
+
+    A missing or unreadable value gives the default, "Last 12 months".
+    """
+    raw = get_setting(session, PERIOD_PREFIX + owner)
+    if raw is None:
+        return PeriodChoice()
+    try:
+        data = json.loads(raw)
+        key = data["key"]
+        if key not in periods.PERIOD_KEYS:
+            return PeriodChoice()
+        if key != periods.CUSTOM:
+            return PeriodChoice(key)
+        return PeriodChoice(
+            key, date.fromisoformat(data["from"]), date.fromisoformat(data["to"])
+        )
+    except (TypeError, KeyError, ValueError):
+        return PeriodChoice()
+
+
+def set_period(session: Session, owner: str, choice: PeriodChoice) -> None:
+    """
+    Store the period for ``owner``.
+
+    Raises
+    ------
+    ValueError
+        If the owner or the period name is unknown, or "custom" lacks dates.
+    """
+    if not is_period_owner(owner):
+        raise ValueError(f"unknown summary '{owner}'")
+    if choice.key not in periods.PERIOD_KEYS:
+        raise ValueError(f"unknown period '{choice.key}'")
+    data: dict[str, str] = {"key": choice.key}
+    if choice.key == periods.CUSTOM:
+        if choice.date_from is None or choice.date_to is None:
+            raise ValueError("a custom range needs both dates")
+        data["from"] = choice.date_from.isoformat()
+        data["to"] = choice.date_to.isoformat()
+    set_setting(session, PERIOD_PREFIX + owner, json.dumps(data))

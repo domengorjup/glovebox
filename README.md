@@ -17,8 +17,8 @@
 ![Stats](docs/assets/screenshots/stats-top-desktop-dark.png)
 *Consumption and costs over time, in HA's dark theme.*
 
-![Import](docs/assets/screenshots/import-mapping-top-desktop-light.png)
-*Map any CSV once, then save it as a preset.*
+![Import](docs/assets/screenshots/import-review-desktop-light.png)
+*Upload a file, check the review, import. The column mapping stays out of the way.*
 
 ## Features
 
@@ -26,7 +26,7 @@
 - Statistics: consumption between full tanks, cost per km, monthly costs, price comparison by gas station and brand.
 - Configurable CSV import: a column mapping step with presets (Fuelly, Fuelio, Drivvo, your own), a preview before anything is written, and undo per import.
 - A documented standard CSV format, a Fuelly-compatible export and a full backup ZIP.
-- Looks like Home Assistant and follows its light and dark theme; opens in the sidebar through Ingress, no separate login.
+- Looks like Home Assistant and follows its light and dark theme; opens in the sidebar through Ingress, no separate login, and from a one-tap shortcut in the HA Android app.
 - Read-only stats API for Home Assistant sensors.
 - Runs as a Home Assistant add-on or as a standalone Docker container; the data is one SQLite file.
 

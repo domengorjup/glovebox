@@ -9,6 +9,29 @@
   <div class="hint">{{ c.hint }}</div>
 </div>
 {% endmacro %}
+{% macro period_picker(s, toggle=False, hidden=False) %}
+<details class="customise period" {% if toggle %}data-summary="all" {{ 'hidden' if hidden }}{% endif %}>
+  <summary class="chip period-chip{{ ' active' if s.choice.key == 'custom' }}" aria-label="Period: {{ s.chip_label }}">{{ s.chip_label }}{{ icon('menu-down', 18) }}</summary>
+  <form class="popover period-pop" method="post" action="{{ url(request, '/preferences/period') }}">
+    <input type="hidden" name="owner" value="{{ s.owner }}">
+    <input type="hidden" name="next" value="{{ location }}">
+    <div class="pop-head"><h3>Period</h3><button type="button" class="btn" data-close-customise>Done</button></div>
+    <div class="pop-title">Cost, consumption, price</div>
+    {% for value, label in period_options %}
+    <label class="check-row">
+      <input type="radio" name="period" value="{{ value }}" {{ 'checked' if s.choice.key == value }} data-autosubmit data-autosubmit-skip="custom">{{ label }}
+    </label>
+    {% endfor %}
+    <div class="pop-custom">
+      <div class="pop-dates">
+        <div class="field"><label for="from-{{ s.owner }}">From</label><input id="from-{{ s.owner }}" type="date" name="date_from" value="{{ s.period.start.isoformat() }}"></div>
+        <div class="field"><label for="to-{{ s.owner }}">To</label><input id="to-{{ s.owner }}" type="date" name="date_to" value="{{ s.period.end.isoformat() }}"></div>
+      </div>
+      <div class="pop-apply"><button type="submit" class="btn primary">Apply</button></div>
+    </div>
+  </form>
+</details>
+{% endmacro %}
 {% block content %}
 {{ messages(None, warnings) }}
 {% if not has_vehicles %}
@@ -19,8 +42,10 @@
 {% else %}
 <div class="summary-head">
   <h2>{{ title }} · summary</h2>
+  <div class="head-tools">
+  {{ period_picker(summary, summary_options | length > 0, 'all' in hidden_summaries) }}
   <details class="customise">
-    <summary class="btn with-icon">{{ icon('tune-variant', 18) }}Customise</summary>
+    <summary class="btn with-icon" aria-label="Customise">{{ icon('tune-variant', 18) }}<span class="cust-txt">Customise</span></summary>
     <form class="popover" method="post" action="{{ url(request, '/preferences/cards') }}" data-cards-form>
       <input type="hidden" name="next" value="{{ location }}">
       <div class="pop-head"><h3>Customise</h3><button type="button" class="btn" data-close-customise>Done</button></div>
@@ -42,6 +67,7 @@
       <button type="submit" class="btn primary no-js-only">Apply</button>
     </form>
   </details>
+  </div>
 </div>
 <div class="summary-grid" data-summary="all" {{ 'hidden' if 'all' in hidden_summaries and summary_options }}>
   {% for key in card_order %}
@@ -50,11 +76,15 @@
   {% endfor %}
 </div>
 
-{% for id, name, group in vehicle_groups %}
-<h3 class="veh-head" data-summary="{{ id }}" {{ 'hidden' if id in hidden_summaries }}>{{ name }}</h3>
+{% for g in vehicle_groups %}
+{% set id = g.owner %}
+<div class="veh-head-row" data-summary="{{ id }}" {{ 'hidden' if id in hidden_summaries }}>
+  <h3 class="veh-head">{{ g.name }}</h3>
+  {{ period_picker(g) }}
+</div>
 <div class="summary-grid compact" data-vehicle-group data-summary="{{ id }}" {{ 'hidden' if id in hidden_summaries }}>
   {% for key in card_order %}
-  {% set c = group[key] %}
+  {% set c = g.cards[key] %}
   {{ stat_card(key, c) }}
   {% endfor %}
 </div>

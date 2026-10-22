@@ -21,7 +21,7 @@ name = "Drivvo (services)"
 note = "Tested with Drivvo Android exports, October 2026. One maintenance expense per priced service item."
 steps = [
   "Zero-cost items become notes on the visit.",
-  "Preview, then Import.",
+  "Import now.",
 ]
 zero_amount = "note"
 verified = true

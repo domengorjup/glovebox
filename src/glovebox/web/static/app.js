@@ -15,6 +15,7 @@
     bindCalc(overlay);
     bindStationSelect(overlay);
     bindOdometerHint(overlay);
+    bindCopy(overlay);
   }
 
   function openDialog(href) {
@@ -60,19 +61,21 @@
       event.preventDefault();
       openDialog(opener.href);
     }
-    var pop = document.querySelector("details.customise[open]");
-    if (pop && (!pop.contains(event.target) || event.target.closest("[data-close-customise]"))) { pop.removeAttribute("open"); }
+    document.querySelectorAll("details.customise[open]").forEach(function (pop) {
+      if (!pop.contains(event.target) || event.target.closest("[data-close-customise]")) { pop.removeAttribute("open"); }
+    });
   });
 
   document.addEventListener("keydown", function (event) {
     if (event.key !== "Escape") { return; }
     closeOverlay();
-    var pop = document.querySelector("details.customise[open]");
-    if (pop) { pop.removeAttribute("open"); }
+    document.querySelectorAll("details.customise[open]").forEach(function (pop) { pop.removeAttribute("open"); });
   });
 
   document.addEventListener("submit", function (event) {
     var form = event.target;
+    // A download button submits natively: a fetch would swallow the file.
+    if (event.submitter && event.submitter.hasAttribute("data-download")) { return; }
     if (overlay && overlay.contains(form)) {
       event.preventDefault();
       submitDialog(form, event.submitter);
@@ -182,6 +185,28 @@
       }
       select.addEventListener("change", sync);
       sync();
+    });
+  }
+
+  /* A button with data-copy="<input id>" copies that input's text. It is hidden
+     in the markup and shown here, because without JavaScript it would do nothing.
+     The clipboard API needs a secure page; plain HTTP falls back to execCommand. */
+  function bindCopy(root) {
+    root.querySelectorAll("[data-copy]").forEach(function (button) {
+      var input = document.getElementById(button.getAttribute("data-copy"));
+      if (!input || button.dataset.bound) { return; }
+      button.dataset.bound = "1";
+      button.hidden = false;
+      button.addEventListener("click", function () {
+        function done() { toast("Copied"); }
+        function fallback() {
+          input.select();
+          if (document.execCommand("copy")) { done(); } else { toast("Could not copy"); }
+        }
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(input.value).then(done, fallback);
+        } else { fallback(); }
+      });
     });
   }
 
@@ -354,6 +379,7 @@
   bindCalc(document);
   bindStationSelect(document);
   bindRevealSelect(document);
+  bindCopy(document);
   drawCharts();
   var resizeTimer;
   window.addEventListener("resize", function () {

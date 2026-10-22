@@ -46,6 +46,14 @@ Section headings are plain `<h2>`; a heading with an action on the right uses `.
 
 Always visible. Brand, a vehicle dropdown (active vehicles plus "All vehicles"), and on desktop the tabs. The select posts to `/preferences/vehicle` and submits on change (`data-autosubmit`); a "Show" button appears without JavaScript. The `data-autosubmit` handler lives in `theme.js` (loaded in the head), not in the deferred `app.js`, so a choice made while the page script is still loading is not lost. Archived vehicles are never listed. It lives in `base.html`; do not copy it.
 
+### Version label
+
+`span.app-version` at the right end of the app bar, after `span.spacer`: "v" plus the installed package version, 12px, secondary text colour. The value is the Jinja global `app_version`, read once from `importlib.metadata` in `templating.py`; never hard-code it. On phones the spacer is hidden so the vehicle select keeps its width. Written once in `base.html`.
+
+### Download button inside a dialog
+
+A dialog form is submitted with `fetch`, which would swallow a file. A button that downloads (delete-vehicle confirm: "Download full backup") is a secondary `.btn.with-icon` with `formaction` pointing at the download endpoint and the attribute `data-download`; `app.js` then lets the browser submit natively and the dialog stays open.
+
 ### Tabs and bottom nav
 
 Desktop: `.tabs` with `a.tab` (active tab has `.active`). Phone: `.bottom-nav` with icon pills. Both are written once in `base.html` and must list the same three sections: Timeline, Stats, Manage. Add a section there, nowhere else.
@@ -68,7 +76,7 @@ A grid of stat cards: label, big value with a small unit, and a hint line. `.sum
 ```html
 <div class="summary-grid">
   <div class="card stat" data-card="cost_month">
-    <div class="label">Cost this month</div>
+    <div class="label">Cost</div>
     <div class="value">90.88&nbsp;&euro;</div>
     <div class="hint">-53.48&nbsp;&euro; vs September</div>
   </div>
@@ -91,7 +99,18 @@ A card containing rows. A row is a whole-row link or button with a round badge, 
 </div>
 ```
 
+A row whose text must be read in full (presets) wraps its note with `.detail.wrap`; the row then holds an `a.row-link` plus icon buttons, and the link opens a detail dialog.
+
 Badge colours: `t-refuel`, `t-service`, `t-expense`. A row that also needs a checkbox (stations, export vehicles) is a `.row` containing `label.pick` and `a.row-link`; do not add other row variants.
+
+### Period chip
+
+A small chip in a summary heading (`details.customise.period` > `summary.chip.period-chip` with a `menu-down` icon) that opens a picker. The picker reuses the Customise popover: a small dropdown under the chip on desktop and the same bottom sheet on phones (title "Period", Done, 48px rows). It is a form (`form.popover.period-pop`, `POST /preferences/period`) with a radio per fixed period; picking one submits at once (`data-autosubmit`, skipped for `custom`). "Custom range" reveals `.pop-dates` (From / To `.field`s) and an Apply button; without JavaScript the dates and Apply are always shown. A custom range makes the chip `.active` and shows the dates as its label. Put the chip on the right of a heading row: `.summary-head` > `.head-tools` for the main summary, `.veh-head-row` for the per-vehicle ones. On phones the Customise button is icon-only (`.cust-txt` hidden) so heading, chip and button fit one row.
+
+```html
+<details class="customise period"><summary class="chip period-chip">Last 12 months ...icon</summary>
+  <form class="popover period-pop" method="post" action=".../preferences/period"> ... </form></details>
+```
 
 ### Filter chips
 
@@ -178,6 +197,10 @@ A native `<details>` with a `<summary>`; no custom widget. Used for the archived
 <details class="archived"><summary>Archived (1)</summary> ...list card... </details>
 ```
 
+### Field with a copy button
+
+A text field whose value is often copied (the VIN) gets `copy=True` in the `field` macro: `.field.has-copy` with a `button.icon-btn.field-copy[data-copy="i-<name>"]` inside the field, right-aligned. The button is `hidden` in the markup and `app.js` (`bindCopy`) shows it, since without JavaScript it would do nothing. It uses the clipboard API and falls back to `execCommand("copy")` on plain HTTP, then shows a toast.
+
 ### Tables and charts
 
 `table.tbl` in `.card.card-pad.table-scroll` for the price table; numeric cells have `.num`, columns that are dropped on phones have `.wide`. Charts are inline SVG drawn by `app.js` from the `#chart-data` JSON into `[data-chart]` inside `.card.chart-card`, with a `.legend` below (swatches `.swatch-<key>`).
@@ -194,13 +217,14 @@ A native `<details>` with a `<summary>`; no custom widget. Used for the archived
 
 These pages reuse existing elements; the only new classes are listed under "Mapping row layout".
 
-- **Mapping field** (import mapping): a `.map-item` inside one `.card.card-pad.map-list` (items separated by hairlines): a `.grid2.map-row` of two filled fields (source select, constant value) and a `details.map-opts` "Options" block that starts with the description as `.help.flush`, then the value map, true/false values, missing values and default. The select's first options are "Not mapped" and "Constant value", then the file's headers. The description is also the label's `title`.
-- **Folded settings card** (`details.card.fold`, import mapping: File, Value formats): a card whose summary row shows a title (`.fold-title`), a one-line summary of the current values (`.fold-sum`, right-aligned, wraps) and a chevron; the body is `.fold-body.stack`. Collapsed by default so the mapping page is short on a phone; the inputs stay in the form and are submitted. It opens by itself when the file could not be read, a file setting is explicit or there is an error. Use it for any settings block that is correct most of the time.
+- **Mapping field** (import mapping): a `.map-item` inside one `.card.card-pad.map-list` (items separated by hairlines): a `.grid2.map-row` of two filled fields (source select, constant value) and a `details.map-opts` "Options" block that starts with the description as `.help.flush`, then the value map, true/false values, missing values and default. The select's first options are "Not mapped" and "Constant value", then the file's headers. The label is the human name of the field followed by the standard key in `span.key` (small monospace secondary text), with `*` for a required field. The description is also the label's `title`.
+- **Folded settings card** (`details.card.fold`, import mapping: File, Value formats; also "More details" in the vehicle dialog, with "N filled" as its summary): a card whose summary row shows a title (`.fold-title`), a one-line summary of the current values (`.fold-sum`, right-aligned, wraps) and a chevron; the body is `.fold-body.stack`. Collapsed by default so the mapping page is short on a phone; the inputs stay in the form and are submitted. It opens by itself when the file could not be read, a file setting is explicit or there is an error. Use it for any settings block that is correct most of the time.
 - **Preset steps** (`ol.steps`): a small numbered list in secondary text with a primary-coloured number, directly under the preset select and its one-line note. Its items come from the preset's `steps` (about 8 words each, at most 5). Use it for short "what to do" lists inside a card.
 - **New vehicle choice** (import preview): the vehicle select ends with "New vehicle..."; a `.new-vehicle` block with a filled name field follows and is shown only while that option is selected (`data-reveal-select` on the select, `data-reveal="new"` on the block; without JavaScript it stays visible). The select and the name field carry `data-autosubmit` (the select with `data-autosubmit-skip="new"`, since "New vehicle..." must wait for the name), so the preview updates in one step.
+- **Import review** (the page after the upload): one `form.stack` with a `.card.card-pad.stack` holding the preset select (`data-autosubmit`), the `ol.steps`, any questions (radio groups with `data-autosubmit`) and the vehicle choice; below it a `.actions` row with an outlined "Adjust mapping" and the primary "Import now" (the Import button must be visible without scrolling on a 390x844 phone for the common case, so it comes before the counts); then the one-row counts card. The default first submit button is the harmless "Update" (`no-js-only`). The mapping page carries a primary "Back to review" at the top (`.actions.top`) and at the bottom.
 - **Next section** (import result): after the `.alert.success`, an `.alert.next-section` (same flex layout as `.alert.success`, neutral border) names the remaining sections and holds a primary `a.btn.primary.with-icon` "Import next section: <section>".
 - **Mapping row layout** (new class `map-row` on the `.grid2`, `map-const` on the constant field): the constant-value field is hidden until "Constant value" is chosen in the source select (CSS `:has()`, no script), so a row is one select and the Options link on a phone. Fields that are mapped, have options or are required come first; the others sit in a collapsed "Fields not mapped (N)" block (`details.more-fields`), still in the form.
-- **Step state**: mapping, preview and confirm are one `form.stack`; the edited mapping travels as hidden fields (`base_toml`, `selected_preset`, `preset_id`) plus the mapping inputs. Buttons switch the step with `formaction`; the default (first) submit button must be the harmless one.
+- **Step state**: mapping, review and confirm are one `form.stack`; the edited mapping travels as hidden fields (`base_toml`, `selected_preset`, `preset_id`) plus the mapping inputs. Buttons switch the step with `formaction`; the default (first) submit button must be the harmless one.
 - **Questions**: a `.filter-line` with `span.lbl` and a `.seg` of radio labels.
 - **Row errors**: `table.tbl` in `.card.card-pad.table-scroll`; the heading gives the total and how many are shown.
 - **Vehicle picker** (export): `.list-card` rows with `label.pick` and a `label.body` for the name.

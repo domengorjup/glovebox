@@ -20,10 +20,9 @@
 name = "Drivvo (refuelling)"
 note = "Tested with Drivvo Android exports, October 2026. Only the first fuel is read; Discount is ignored."
 steps = [
-  "In Drivvo: History, Export, CSV, per vehicle.",
-  "Upload it here; this preset is picked.",
+  "In Drivvo: History → Export → CSV, per vehicle.",
   "Choose the vehicle, or add a new one.",
-  "Preview, then Import.",
+  "Import now.",
   "Then: Import next section (expenses, services).",
 ]
 verified = true

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from importlib.metadata import version
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -58,10 +59,13 @@ def query_url(request: Request, **changes: str | None) -> str:
 
 
 templates.env.globals["url"] = url
+# Read once at import; the installed metadata is the single source of the version.
+templates.env.globals["app_version"] = version("glovebox")
 templates.env.globals["query_url"] = query_url
 templates.env.globals["icon"] = _icon
 templates.env.filters["money"] = _money
 templates.env.filters["short_date"] = formatting.short_date
+templates.env.filters["full_date"] = formatting.full_date
 templates.env.filters["litres"] = lambda milli: formatting.format_milli(milli, 2)
 templates.env.filters["price"] = _price
 templates.env.filters["km"] = formatting.format_km

@@ -8,13 +8,19 @@
       action="{{ url(request, '/vehicles/%d/delete' % vehicle.id) }}">
   <h3>Delete {{ vehicle.name }}?</h3>
   {% if counts.refuels or counts.expenses %}
-  <p>This permanently deletes the vehicle and also <strong>{{ counts.refuels }}</strong> refuels
-  and <strong>{{ counts.expenses }}</strong> expenses. This cannot be undone. To keep the history, archive the
-  vehicle instead.</p>
+  <p>This permanently deletes {{ vehicle.name }} and also <strong>{{ counts.refuels }}</strong> refuels
+  and <strong>{{ counts.expenses }}</strong> expenses. This cannot be undone. Download a full backup first if you
+  may need them, or archive the vehicle to keep the history.</p>
   {% else %}
   <p>This vehicle has no records. It will be deleted permanently.</p>
   {% endif %}
   <input type="hidden" name="confirm" value="1">
+  {% if counts.refuels or counts.expenses %}
+  <div class="actions top">
+    <button type="submit" class="btn with-icon" formnovalidate data-download
+            formaction="{{ url(request, '/export/backup') }}">{{ icon('download', 18) }}Download full backup</button>
+  </div>
+  {% endif %}
   <div class="dialog-foot">
     <a class="btn" href="{{ url(request, '/vehicles') }}" data-close>Cancel</a>
     <button type="submit" class="btn danger-fill">Delete permanently</button>

@@ -285,6 +285,48 @@
             "type": "string",
             "description": "Free text.",
             "example": "Company car"
+          },
+          {
+            "name": "vin",
+            "type": "string",
+            "description": "Vehicle identification number.",
+            "example": "WVWZZZ1KZ6W000001"
+          },
+          {
+            "name": "model_year",
+            "type": "integer",
+            "description": "Year of manufacture or model year.",
+            "example": "2018"
+          },
+          {
+            "name": "engine",
+            "type": "string",
+            "description": "Engine, free text.",
+            "example": "1.5 hybrid, 92 kW"
+          },
+          {
+            "name": "tyre_size",
+            "type": "string",
+            "description": "Tyre size, free text.",
+            "example": "205/55 R16"
+          },
+          {
+            "name": "insurance_policy",
+            "type": "string",
+            "description": "Insurance policy number.",
+            "example": "POL-2026-0042"
+          },
+          {
+            "name": "insurance_valid_until",
+            "type": "date",
+            "description": "Last day the current insurance is valid, YYYY-MM-DD.",
+            "example": "2027-03-14"
+          },
+          {
+            "name": "registration_valid_until",
+            "type": "date",
+            "description": "Last day the current registration is valid, YYYY-MM-DD.",
+            "example": "2027-05-30"
           }
         ],
         "missingValues": [

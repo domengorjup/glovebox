@@ -1,9 +1,9 @@
 {% extends layout %}
 {% from "_macros.html" import messages, page_head, field with context %}
-{% block title %}Import preview - Glovebox{% endblock %}
+{% block title %}Import - Glovebox{% endblock %}
 {% block content %}
-{{ page_head(request, 'Import preview', '/import', 'Import') }}
-<p class="help flush">File: <strong>{{ sub.filename }}</strong> - preset: <strong>{{ preset.name }}</strong>{{ '' if preset.verified else ' (unverified)' }}</p>
+{{ page_head(request, 'Import', '/import', 'Import') }}
+<p class="help flush">File: <strong>{{ sub.filename }}</strong></p>
 {{ messages(errors, warnings) }}
 {% for note in notes %}<p class="help flush">{{ note }}</p>{% endfor %}
 
@@ -15,31 +15,39 @@
   <input type="hidden" name="preset_id" value="{{ preset.id }}">
   {% for s in sub.seen %}<input type="hidden" name="seen" value="{{ s }}">{% endfor %}
 
-  {% if questions %}
-  <h2>Questions</h2>
   <div class="card card-pad stack">
+    {% if not preview.is_backup %}
+    <div class="field">
+      <label for="i-preset">Preset{{ '' if preset.verified else ' (unverified)' }}</label>
+      <select id="i-preset" name="preset" data-autosubmit>
+        {% if not sub.selected %}<option value="" selected>Custom mapping</option>{% endif %}
+        {% for p in presets %}<option value="{{ p.id }}" {{ 'selected' if p.id == sub.selected }}>{{ p.name }}{{ '' if p.verified else ' (unverified)' }}</option>{% endfor %}
+      </select>
+    </div>
+    {% else %}
+    <p class="help flush">Preset: <strong>{{ preset.name }}</strong></p>
+    {% endif %}
+    {% if preset.steps %}<ol class="steps">{% for step in preset.steps %}<li>{{ step }}</li>{% endfor %}</ol>{% endif %}
+
+    {% if questions %}
     {% for q in questions %}
     <div class="filter-line">
       <span class="lbl">{{ q.message }}</span>
       <div class="seg">
         {% for value, text in q.options %}
-        <label><input type="radio" name="ans_{{ q.kind }}" value="{{ value }}" {{ 'checked' if q.answer == value }}>{{ text }}</label>
+        <label><input type="radio" name="ans_{{ q.kind }}" value="{{ value }}" data-autosubmit {{ 'checked' if q.answer == value }}>{{ text }}</label>
         {% endfor %}
       </div>
     </div>
     {% endfor %}
-    <p class="help flush">Press Update preview after answering.</p>
-  </div>
-  {% endif %}
+    {% endif %}
 
-  <h2>Vehicles</h2>
-  <div class="card card-pad stack">
     {% if preview.vehicle_names %}
       {% for name in preview.vehicle_names %}
       <div class="field">
         <label for="i-maps-{{ loop.index }}">"{{ name }}" in the file goes to</label>
         <input type="hidden" name="names" value="{{ name }}">
-        <select id="i-maps-{{ loop.index }}" name="maps">
+        <select id="i-maps-{{ loop.index }}" name="maps" data-autosubmit>
           <option value="new" {{ 'selected' if selection[name] == 'new' }}>Create new vehicle</option>
           {% for v in vehicles %}<option value="{{ v.id }}" {{ 'selected' if selection[name] == v.id | string }}>{{ v.name }}</option>{% endfor %}
         </select>
@@ -64,17 +72,25 @@
     {% endif %}
   </div>
 
-  <h2>What will happen</h2>
+  <div class="actions">
+    <button type="submit" class="btn outline no-js-only">Update</button>
+    {% if not preview.is_backup %}<button type="submit" class="btn outline" formaction="{{ url(request, '/import/mapping') }}">Adjust mapping</button>{% endif %}
+    {% if not blocked and not nothing_new %}
+    <button type="submit" class="btn primary" formaction="{{ url(request, '/import/commit') }}">Import now</button>
+    {% endif %}
+  </div>
   <div class="card list-card">
-    <div class="row"><span class="body"><span class="title">New refuels: <strong>{{ preview.new_refuels }}</strong></span>
-      <span class="detail">already present, skipped: {{ preview.duplicate_refuels }}</span></span></div>
-    <div class="row"><span class="body"><span class="title">New expenses: <strong>{{ preview.new_expenses }}</strong></span>
-      <span class="detail">already present, skipped: {{ preview.duplicate_expenses }}</span></span></div>
+    <div class="row"><span class="body"><span class="title">New refuels: <strong>{{ preview.new_refuels }}</strong> · New expenses: <strong>{{ preview.new_expenses }}</strong></span>
+      <span class="detail">already present, skipped: {{ preview.duplicate_refuels }} refuels · {{ preview.duplicate_expenses }} expenses</span></span></div>
     {% if skipped or row_error_total %}
     <div class="row"><span class="body"><span class="title">Rows not imported: <strong>{{ skipped + row_error_total }}</strong></span>
       <span class="detail">skipped by the preset: {{ skipped }} · with errors: {{ row_error_total }}</span></span></div>
     {% endif %}
   </div>
+
+  {% if blocked %}
+  <p class="help">{% if questions %}Answer the questions{% else %}Choose the vehicle{% endif %} above before importing{% if not preview.is_backup %}, or adjust the mapping{% endif %}.</p>
+  {% endif %}
 
   {% if preview.companion_changes %}
   <h2>Vehicles and stations from the file</h2>
@@ -100,18 +116,6 @@
     </table>
   </div>
   <p class="help flush">These rows are left out. The other rows can still be imported.</p>
-  {% endif %}
-
-  <div class="actions">
-    <a class="btn" href="{{ url(request, '/import') }}">Cancel</a>
-    <button type="submit" class="btn outline">Update preview</button>
-    <button type="submit" class="btn outline" formaction="{{ url(request, '/import/mapping') }}">Edit mapping</button>
-    {% if not blocked and not nothing_new %}
-    <button type="submit" class="btn primary" formaction="{{ url(request, '/import/commit') }}">Import now</button>
-    {% endif %}
-  </div>
-  {% if blocked %}
-  <p class="help">Fix the points above (answer the questions or edit the mapping) before importing.</p>
   {% endif %}
 
   <details class="archived">

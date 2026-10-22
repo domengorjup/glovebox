@@ -2,20 +2,20 @@
 
 Go to **Manage → Import**.
 
-![Import preview](../assets/screenshots/import-mapping-desktop-light.png)
+![Import review](../assets/screenshots/import-review-desktop-light.png)
 
 Every import works the same way: a **preset** says which column of your file feeds which Glovebox field and how dates, numbers and units are written. Glovebox ships presets for several apps and for its own [standard CSV format](standard-format.md). You can adjust a preset for a single import and save the result as your own preset. See [Presets](presets.md) for the list and for every key of the preset file.
 
 ## Steps
 
-1. **Upload**: choose a CSV file, or a ZIP of CSV files, and press **Upload and map**. Glovebox reads it and selects the best-fitting preset. It changes nothing yet.
-2. **Map columns.** (Screenshot above.) Check the preset: below it, a short list of **steps** says what to do for that preset (for example Drivvo). The **File** settings (encoding, delimiter, header row, section) and the **Value formats** (date pattern, decimal and thousands separators, units) are folded into one line each; tap to open them when something looks wrong. Each Glovebox field takes a column of your file, a constant value, or nothing. Fields that are not mapped are folded under **Fields not mapped**; open it to map one. A file that no preset fits starts as a custom mapping; the required fields (`type`, `date`, and `odometer_km` for refuels, `total` and `title` for expenses) must be mapped before you can go on.
-3. **Preview.** (Screenshot below.) It shows the preset and its note, record counts, the vehicles found, duplicates, rows that are left out and why, and warnings. Nothing is written yet. For a file without vehicle names, choose the vehicle here: an existing one, or **New vehicle...** and a name. The new vehicle is created when you press **Import now** (undoing the import keeps it).
-4. **Answer questions** if there are any (see below), then press **Import now**. All records are added together as one **import batch**. The Import page then shows how many were added, with an **Undo** button. If every row is already present, the preview says so and offers no **Import now**; no empty batch is created.
+1. **Upload**: choose a CSV file, or a ZIP of CSV files, and press **Upload**. Glovebox reads it and selects the best-fitting preset. It changes nothing yet.
+2. **Review.** (Screenshot below.) You land here for any file that a preset fits. It shows the preset (pick another from the select; its short **steps** are listed below it), the vehicle question, and what will happen. For a file without vehicle names, choose the vehicle: an existing one, or **New vehicle...** and a name. The new vehicle is created when you import (undoing the import keeps it). Record counts, duplicates, rows that are left out and warnings are on this page. Changing the preset, the vehicle or an answer updates it at once. Nothing is written yet.
+3. **Import now.** Answer the questions if there are any (see below), then press **Import now**. All records are added together as one **import batch**. The Import page then shows how many were added, with an **Undo** button. If every row is already present, the review says so and offers no **Import now**; no empty batch is created.
+4. **Adjust mapping** (only when needed). If the review looks wrong, press **Adjust mapping**. A file that no preset fits, or that a preset reads with errors, opens this page directly. Each Glovebox field shows a plain label, its standard key (for example `odometer_km`) in small type, and the column of your file that feeds it, a constant value, or nothing. Options are folded under each field, and fields that are not mapped under **Fields not mapped**. The **File** settings (encoding, delimiter, header row, section) and the **Value formats** (date pattern, decimal and thousands separators, units) are folded into one line each; tap to open them. The required fields (`type`, `date`, and `odometer_km` for refuels, `total` and `title` for expenses) must be mapped. **Back to review** (at the top and at the bottom) returns to the review.
 
-![Import preview](../assets/screenshots/import-preview-desktop-light.png)
+![Mapping page](../assets/screenshots/import-mapping-desktop-light.png)
 
-Standard files and full backups: a file in the standard format picks the **Glovebox** preset; a full backup (a ZIP with a `datapackage.json`) goes straight to the preview.
+Standard files and full backups: a file in the standard format picks the **Glovebox** preset; a full backup (a ZIP with a `datapackage.json`) goes straight to the review.
 
 ![Import done](../assets/screenshots/import-done-desktop-light.png)
 
@@ -33,7 +33,7 @@ Standard files and full backups: a file in the standard format picks the **Glove
 
 ### Files with several sections (Drivvo, Fuelio)
 
-Some apps write several tables into one file, each after a section line. Glovebox keeps the file after you import one section: the result page says which sections are left and offers **Import next section: ...**. It opens the mapping for that section with the right preset and the vehicle you used before, so you only check and press **Preview** and **Import now**. Records already imported are skipped. These files carry no vehicle name, so choose the vehicle (or a new one) once, for the first section.
+Some apps write several tables into one file, each after a section line. Glovebox keeps the file after you import one section: the result page says which sections are left and offers **Import next section: ...**. It opens the review for that section with the right preset and the vehicle you used before, so you only check and press **Import now**. Records already imported are skipped. These files carry no vehicle name, so choose the vehicle (or a new one) once, in the review of the first section.
 
 - **Drivvo**: in the Android app open **History** with one vehicle selected and export CSV. The file holds `##Refuelling`, `##Expense` and `##Service`; Glovebox picks **Drivvo (refuelling)** first, then offers **Drivvo (expenses)** and **Drivvo (services)**. Drivvo writes one service row per item, so a service visit becomes several maintenance expenses on the same day. Items without a price are not expenses: their names are added to the note of the first priced item of the same visit (same date and odometer) as `Also: Oil filter, Air filter`; a free item with no priced item in its visit is skipped and counted. Expense types Glovebox does not know (for example ones you created yourself) become *other*: add them to the category map in the mapping step and save your own preset. The web app's export holds the same records but is not covered by a shipped preset; use the phone export.
 - **Fuelio**: the backup holds fill-ups (`## Log`) and costs (`## Costs`); import it with **Fuelio (fill-ups)** and then **Fuelio (costs)**.
@@ -55,7 +55,7 @@ A ZIP can hold `vehicles.csv` and/or `stations.csv` next to the records, with or
 
 ## Save a mapping as a preset
 
-Under the preview, **Save this mapping as a preset** stores it under a name you choose. Next time a file with the same columns is uploaded, your preset is selected. Shipped presets are never changed: editing one and saving creates your own copy. Presets can be downloaded, uploaded and deleted on the **Presets** page (**Manage → Presets**, or the **Presets** button on the Import page).
+Under the preview, **Save this mapping as a preset** stores it under a name you choose. Next time a file with the same columns is uploaded, your preset is selected. Shipped presets are never changed: editing one and saving creates your own copy. Presets can be opened (to read the full note and steps), downloaded, uploaded and deleted on the **Presets** page, where you can also edit the note of your own presets. Shipped presets are always locked; **Duplicate** gives you an editable copy. Your own presets have a **Lock** switch: a locked preset cannot be edited or deleted until you unlock it (**Manage → Presets**, or the **Presets** button on the Import page).
 
 ![Presets page](../assets/screenshots/presets-desktop-light.png)
 

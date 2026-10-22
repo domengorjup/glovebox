@@ -26,10 +26,11 @@ from starlette.datastructures import FormData
 from glovebox.importers import engine, pipeline
 from glovebox.importers.engine import find_column, match_header
 from glovebox.importers.base import Answers
-from glovebox.importers.pipeline import CHOOSE_VEHICLE_MESSAGE, NOTHING_NEW_MESSAGE, VehicleMapping
+from glovebox.importers.pipeline import (
+    CHOOSE_VEHICLE_MESSAGE, NEW_VEHICLE_NAME_MESSAGE, NOTHING_NEW_MESSAGE, VehicleMapping,
+)
 from glovebox.models import ImportBatch
 from glovebox.importers.presets import (
-    STANDARD_ID,
     FieldMapping,
     FileSettings,
     FormatSettings,
@@ -68,6 +69,18 @@ ANSWER_LABELS = {
     "dmy": "Day first (31/12/2025)", "mdy": "Month first (12/31/2025)",
     "km": "Kilometres", "mi": "Miles",
     "l": "Litres", "gal_us": "US gallons", "gal_uk": "UK gallons",
+}
+# Human labels of the standard fields for the mapping page; the key follows as small text.
+FIELD_LABELS = {
+    "type": "Record type", "date": "Date", "time": "Time", "vehicle": "Vehicle",
+    "odometer_km": "Odometer", "fuel_l": "Fuel quantity", "price_per_l": "Price per litre",
+    "total": "Total price", "full": "Full tank", "missed_previous": "Missed fill-up before",
+    "station": "Gas station", "category": "Category", "title": "Title", "notes": "Notes",
+    "currency": "Currency", "station_location": "Station location",
+    "station_brand": "Station brand", "coverage_start": "Coverage start",
+    "coverage_end": "Coverage end", "derived": "Derived figure",
+    "odometer_estimated": "Odometer is estimated", "source": "Source",
+    "source_ref": "Source reference",
 }
 ANSWER_KEYS = ("date_order", "distance_unit", "volume_unit")
 
@@ -311,7 +324,7 @@ def import_home(
     if sections and _TOKEN.match(token) and (_upload_dir(request) / f"{token}.upload").is_file():
         query = [("token", token), ("filename", filename), ("section", sections[0]),
                  ("vehicle", vehicle), *[("seen", s) for s in seen]]
-        next_url = f"/import/mapping?{urlencode(query)}"
+        next_url = f"/import/preview?{urlencode(query)}"
     return render(
         request,
         "import/index.html",
@@ -326,7 +339,7 @@ def import_home(
 
 @router.post("/upload")
 def import_upload(request: Request, file: Annotated[UploadFile, File()]):
-    """Store the file temporarily and go to its mapping (nothing is imported)."""
+    """Store the file temporarily and go to its review (nothing is imported)."""
     directory = _upload_dir(request)
     directory.mkdir(parents=True, exist_ok=True)
     _remove_old_uploads(directory)
@@ -334,9 +347,8 @@ def import_upload(request: Request, file: Annotated[UploadFile, File()]):
     data = file.file.read()
     (directory / f"{token}.upload").write_bytes(data)
     query = urlencode({"token": token, "filename": file.filename or "upload"})
-    # A full backup has nothing to map: it goes straight to the preview.
-    target = "preview" if engine.read_file(data).is_backup else "mapping"
-    return redirect(request, f"/import/{target}?{query}")
+    # The review page sends the file on to the mapping if no preset fits.
+    return redirect(request, f"/import/preview?{query}")
 
 
 def _detected_preset(session: Session, data: bytes) -> Preset:
@@ -360,6 +372,7 @@ def _field_rows(preset: Preset, headers: list[str]) -> list[dict]:
                 source, missing_column = KEEP, mapping.columns[0]
         rows.append({
             "name": target.name,
+            "label": FIELD_LABELS.get(target.name, target.name),
             "shown": bool(source or _required_text(target) or mapping and (
                 mapping.map or mapping.true_values or mapping.false_values
                 or mapping.missing_values or mapping.default)),
@@ -422,6 +435,10 @@ def _mapping_page(
     warnings = []
     if table is not None and unmapped:
         warnings.append("Map the required fields before the preview: " + ", ".join(unmapped) + ".")
+    if table is not None:
+        warnings += _preview_problems(session, data, preset, bool(unmapped))
+    if not selected and table is not None:
+        warnings.insert(0, "No preset fits this file: map its columns below.")
     rows = _field_rows(preset, headers)
     explicit = any((preset.file.encoding, preset.file.delimiter, preset.file.header_row))
     return render(
@@ -448,6 +465,22 @@ def _mapping_page(
         errors=all_errors,
         warnings=warnings,
     )
+
+
+def _preview_problems(
+    session: Session, data: bytes, preset: Preset, skip_errors: bool
+) -> list[str]:
+    """What is wrong when the file is read with this mapping (for the mapping page)."""
+    preview = pipeline.preview_import(session, data, preset=preset)
+    own = (CHOOSE_VEHICLE_MESSAGE, NEW_VEHICLE_NAME_MESSAGE)
+    problems = [] if skip_errors else [e for e in preview.errors if e not in own]
+    if preview.row_errors:
+        first = preview.row_errors[0]
+        problems.append(
+            f"{len(preview.row_errors)} rows have errors with this mapping, e.g. line "
+            f"{first.line}: {first.field}: {first.message}"
+        )
+    return problems
 
 
 def _file_summary(table, preset: Preset) -> str:
@@ -578,6 +611,7 @@ def _preview_page(
         base_toml=write_preset(sub.preset),
         preview=preview,
         vehicles=vehicles,
+        presets=list_presets(session),
         selection=selection,
         vehicle_choice=sub.default_vehicle or (NEW_VEHICLE if not vehicles else ""),
         blocked=bool(preview.errors or questions),
@@ -615,17 +649,42 @@ def _question_rows(questions: list, answers: dict[str, str]) -> list[dict]:
     return rows
 
 
+def _preset_failed(preview: pipeline.ImportPreview) -> bool:
+    """True if the preset does not read the file well: errors or rows with errors."""
+    own = (CHOOSE_VEHICLE_MESSAGE, NEW_VEHICLE_NAME_MESSAGE)
+    return bool(preview.row_errors or [e for e in preview.errors if e not in own])
+
+
 @router.get("/preview")
 def import_preview(
-    request: Request, session: SessionDep, token: str, filename: str = "upload"
+    request: Request, session: SessionDep, token: str, filename: str = "upload",
+    preset: str = "", section: str = "", vehicle: str = "",
+    seen: Annotated[list[str], Query()] = [],
 ):
-    """Preview of a full backup; every other file goes through the mapping first."""
+    """
+    Review of the stored upload with the detected (or chosen) preset: the page
+    where the import is confirmed. A file that no preset fits, or that the preset
+    reads with errors, goes to the mapping instead.
+    """
     data = _upload_path(request, token).read_bytes()
-    if not engine.read_file(data).is_backup:
-        query = urlencode({"token": token, "filename": filename})
-        return redirect(request, f"/import/mapping?{query}")
-    sub = Submitted(token, filename, get_preset(session, STANDARD_ID), Answers(), [], [], "",
-                    STANDARD_ID)
+    to_mapping = redirect(request, "/import/mapping?" + urlencode(
+        [("token", token), ("filename", filename), ("preset", preset), ("section", section),
+         ("vehicle", vehicle), *[("seen", v) for v in seen]]))
+    try:
+        if preset:
+            chosen = get_preset(session, preset)
+        else:
+            chosen = pipeline.detect_preset(session, data, section or None)
+    except NotFoundError as exc:
+        raise HTTPException(404, detail=str(exc)) from None
+    if chosen is None:
+        return to_mapping
+    sub = Submitted(token, filename, chosen, Answers(), [], [], vehicle, chosen.id,
+                    seen=tuple(seen))
+    if not engine.read_file(data).is_backup and _preset_failed(
+        pipeline.preview_import(session, data, preset=chosen, mapping=sub.mapping)
+    ):
+        return to_mapping
     return _preview_page(request, session, sub)
 
 
@@ -633,12 +692,19 @@ def import_preview(
 async def import_preview_post(request: Request, session: SessionDep):
     """Preview of the mapping from the form; changes no data."""
     form = await request.form()
-    if form.get("preset") and form.get("preset") != form.get("selected_preset"):
-        return await mapping_post(request, session)  # another preset was picked
+    picked = str(form.get("preset", ""))
+    if picked and picked != form.get("selected_preset") and form.get("edited"):
+        return await mapping_post(request, session)  # the mapping page's own select
     try:
         sub = _submitted(request, form)
     except PresetError as exc:
         return _mapping_from_error(request, session, form, exc)
+    if picked and picked != sub.selected:  # another preset was picked on the review
+        try:
+            sub.preset = get_preset(session, picked)
+        except NotFoundError as exc:
+            raise HTTPException(404, detail=str(exc)) from None
+        sub.selected = picked
     return _preview_page(request, session, sub)
 
 

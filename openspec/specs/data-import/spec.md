@@ -4,17 +4,28 @@
 TBD - created by archiving change add-autotracker-v1. Update Purpose after archive.
 ## Requirements
 ### Requirement: Import with preview and explicit commit
-The system SHALL import a file in four steps:
+The system SHALL import a file in three steps:
 1. **Upload:** the file is read and the best-matching preset is selected.
-2. **Mapping:** the user can review and adjust the mapping and value formats.
-3. **Preview:** shows the preset used, record counts per type, vehicles found in the file, the vehicles and stations that will be created or filled, duplicates, skipped rows, per-row errors, warnings and the preset's note. It changes no data.
-4. **Commit:** writes the records only after the user confirms.
+2. **Review:** one page shows the preset (with its steps and a select to switch it), the vehicle choice for a file without vehicle names, record counts per type, vehicles found in the file, the vehicles and stations that will be created or filled, duplicates, skipped rows, per-row errors, warnings, the preset's note and the questions to answer. The Import button is on this page, above the counts. Changing the preset, the vehicle or an answer SHALL update the page in place when JavaScript is available. The review changes no data. The column mapping and value formats are adjusted in a secondary step ("Adjust mapping") that returns to the review.
+3. **Commit:** writes the records only after the user confirms.
+
+The upload SHALL open the review directly when a preset is detected or the file is a standard or backup file, and the mapping when no preset fits or the preset reads the file with errors (required fields unmapped, or rows with errors).
 
 All records of one commit SHALL be written in a single transaction and tagged with an import batch, so that the batch can later be undone. The batch SHALL record the id of the preset used.
 
 #### Scenario: Preview does not write
-- **WHEN** the user uploads a file and stops at the mapping or the preview
+- **WHEN** the user uploads a file and stops at the review or the mapping
 - **THEN** no records are added
+
+#### Scenario: Known file opens the review
+- **WHEN** the user uploads a Drivvo Android export
+- **THEN** the review page opens with "Drivvo (refuelling)" selected, its steps listed and no column mapping shown
+- **AND** choosing the vehicle (or a new one) makes the Import button appear
+
+#### Scenario: Unknown file opens the mapping
+- **WHEN** the user uploads a file that no preset fits
+- **THEN** the mapping page opens with a notice that no preset fits
+- **AND** its primary button "Back to review" is at the top and at the bottom
 
 #### Scenario: Undo an import batch
 - **WHEN** the user undoes an import batch
@@ -220,7 +231,7 @@ Imports SHALL create stations by name and location when they do not exist. They 
 - **THEN** one station "OMV Celje" is created, linked to all three, and belongs to the import batch
 
 ### Requirement: User presets
-The system SHALL store user presets in the database as TOML text. A presets page SHALL list user and shipped presets, and SHALL let the user download any preset, upload a preset file (validated as on load), and delete a user preset. Shipped presets SHALL NOT be changeable in place; saving a changed shipped preset SHALL create a user preset. A user preset whose name clashes with an existing preset SHALL be rejected with a message.
+The system SHALL store user presets in the database as TOML text. A presets page SHALL list user and shipped presets, and SHALL let the user download any preset, upload a preset file (validated as on load), and delete a user preset. A preset SHALL open in a dialog that shows its full note and its steps; the note SHALL also wrap in the list. Shipped presets SHALL always be locked. A user preset SHALL have a lock, off by default, that the user can switch on and off. A locked preset SHALL NOT be edited, deleted or overwritten; its dialog SHALL show it read-only with a duplicate action, and with an unlock action when it is a user preset. The user SHALL be able to edit the note of an unlocked user preset in its dialog. Any preset SHALL be duplicable into a new, unlocked user preset. Saving a changed shipped preset SHALL create a user preset. A user preset whose name clashes with an existing preset SHALL be rejected with a message.
 
 #### Scenario: Saved preset is detected next time
 - **WHEN** the user saves a mapping as preset "My app" and later uploads another file with the same headers
@@ -230,11 +241,30 @@ The system SHALL store user presets in the database as TOML text. A presets page
 - **WHEN** the user changes the "Fuelly (metric)" mapping and saves it
 - **THEN** a new user preset is created and "Fuelly (metric)" is unchanged
 
+#### Scenario: Note of an own preset edited
+- **WHEN** the user changes the note of a user preset in its dialog and saves
+- **THEN** the preset keeps its name and mapping and has the new note
+
+#### Scenario: Shipped preset locked
+- **WHEN** the user opens a shipped preset
+- **THEN** the dialog shows its note and steps without an edit field and offers Duplicate
+- **AND** a request to change, lock or delete it is refused
+
+#### Scenario: Own preset locked
+- **WHEN** the user locks a user preset
+- **THEN** its dialog is read-only and says it is locked, with Unlock and Duplicate
+- **AND** requests to edit or delete it are refused until it is unlocked
+
+#### Scenario: Duplicate
+- **WHEN** the user duplicates a preset named "Bank"
+- **THEN** an unlocked user preset "Bank (copy)" exists with the same mapping, and "Bank" is unchanged
+
 ### Requirement: Vehicles and stations tables in an import
-A normal import SHALL accept `vehicles.csv` and/or `stations.csv` next to the records, in a ZIP (with or without `datapackage.json`) or in a ZIP of several CSV files. These two tables have the fixed layout of the standard format and are read without the preset. A ZIP member is taken as one of them when its name is `vehicles` or `stations`, it has a `name` column and it has no `date` column. The preset is applied to the other CSV files.
-- A vehicle in `vehicles.csv` that does not exist SHALL be created with all its details.
+A normal import SHALL accept `vehicles.csv` and/or `stations.csv` next to the records, in a ZIP (with or without `datapackage.json`) or in a ZIP of several CSV files. These two tables have the fixed layout of the standard format and are read without the preset. A ZIP member is taken as one of them when its name is `vehicles` or `stations`, it has a `name` column and it has no `date` column. The preset is applied to the other CSV files. Columns of `vehicles.csv` other than `name` MAY be missing, so that files made by earlier versions are accepted.
+- A vehicle in `vehicles.csv` that does not exist SHALL be created with all its details, including VIN, model year, engine, tyre size, insurance policy and the two valid-until dates.
 - A station in `stations.csv` that does not exist SHALL be created with its location and brand, also when it has no refuels.
 - A vehicle that exists (matched by name, after the vehicle mapping) and a station that exists (matched by name and location) SHALL only be completed: empty details are filled, and no existing value is overwritten.
+- A model year or date that cannot be read SHALL be reported as a row error, and the vehicle SHALL be imported without that value.
 - The preview SHALL list each vehicle and station that will be created, or filled with which details. Nothing is written before the user confirms.
 - Stations created by the import belong to its batch and are removed by undo when no other record uses them. Details filled into existing vehicles and stations are not reverted by undo.
 - `vehicles.csv` or `stations.csv` alone (without records) SHALL be accepted.
@@ -253,6 +283,18 @@ A normal import SHALL accept `vehicles.csv` and/or `stations.csv` next to the re
 - **WHEN** station "A" in X has brand "Old" and `stations.csv` gives it brand "New"
 - **THEN** the brand stays "Old"
 - **AND** the station is not listed in the preview
+
+#### Scenario: Backup from an earlier version
+- **WHEN** a full backup made before vehicle details existed (no detail columns in `vehicles.csv`) is imported
+- **THEN** it is restored with the vehicles' basic details and no error
+
+#### Scenario: Vehicle details restored
+- **WHEN** a backup whose `vehicles.csv` has a VIN, a model year and an insurance date is imported into an empty database
+- **THEN** the vehicle has them after the commit
+
+#### Scenario: Unreadable detail
+- **WHEN** `vehicles.csv` gives model year "abcd" for "Golf"
+- **THEN** the preview lists a row error for it and "Golf" is imported without a model year
 
 #### Scenario: Station without refuels
 - **WHEN** `stations.csv` lists a station that no record uses
@@ -293,11 +335,11 @@ Every shipped preset file SHALL start with an `# Export:` comment saying how to 
 - **THEN** each has an `# Export:` header comment
 
 ### Requirement: Multi-section files continue without re-upload
-After a commit of one section of a file that has further sections, the result SHALL offer a primary button "Import next section: <section>" for the first section not yet imported in this sequence. The button SHALL continue with the same uploaded file, which the server keeps until the last section is imported or the upload expires. The mapping of that section SHALL start from the best-matching preset whose section is the chosen one, and the vehicle used for the previous section (including one created by it) SHALL be pre-selected in the preview. Records already imported SHALL stay skipped as duplicates. The result SHALL list the remaining sections.
+After a commit of one section of a file that has further sections, the result SHALL offer a primary button "Import next section: <section>" for the first section not yet imported in this sequence. The button SHALL continue with the same uploaded file, which the server keeps until the last section is imported or the upload expires. It SHALL open the review of that section with the best-matching preset whose section is the chosen one, and with the vehicle used for the previous section (including one created by it) pre-selected. Records already imported SHALL stay skipped as duplicates. The result SHALL list the remaining sections.
 
 #### Scenario: Three sections in turn
 - **WHEN** the user imports the refuelling section of a Drivvo file into a new vehicle and presses "Import next section: Expense"
-- **THEN** the mapping shows the Drivvo expenses preset and the preview has that vehicle selected
+- **THEN** the review shows the Drivvo expenses preset and has that vehicle selected
 - **AND** after that commit the result offers "Import next section: Service"
 
 #### Scenario: Last section
@@ -317,18 +359,22 @@ A preset with `zero_amount = "note"` SHALL NOT report expense rows with an amoun
 - **THEN** it is skipped and counted in the preview
 
 ### Requirement: Preset steps
-A preset MAY have `steps`, a list of strings. The mapping page SHALL show them as an ordered list directly under the preset select, for the selected preset, whether detected or chosen. A preset whose import needs more than "upload, preview, import" (a multi-section file, a category map to extend, a special export path) SHALL have steps. Each step SHALL be short and phone-friendly (about 8 words at most) and a preset SHOULD have at most 5. The shipped Drivvo presets SHALL have steps; the `note` stays one short line. Own presets keep the `steps` of the preset file they were saved from or uploaded as.
+A preset MAY have `steps`, a list of strings. The review page SHALL show them as an ordered list directly under the preset select, for the selected preset, whether detected or chosen. A preset whose import needs more than "upload, review, import" (a multi-section file, a category map to extend, a special export path) SHALL have steps. Each step SHALL be short and phone-friendly (about 8 words at most) and a preset SHOULD have at most 5. The shipped Drivvo presets SHALL have steps; the `note` stays one short line. Own presets keep the `steps` of the preset file they were saved from or uploaded as.
 
 #### Scenario: Steps follow the selected preset
-- **WHEN** the mapping page opens for a Drivvo refuelling file
+- **WHEN** the review page opens for a Drivvo refuelling file
 - **THEN** the steps of "Drivvo (refuelling)" are listed under the preset select
 - **AND** choosing another preset shows that preset's steps, or none
 
 ### Requirement: Compact mapping page
-The mapping page SHALL fold the File settings (encoding, delimiter, header row, section) and the Value formats into collapsed blocks that each show a one-line summary, and SHALL open the File block when the file could not be read or when the encoding, delimiter or header row is set explicitly instead of detected, and both blocks when there is an error. Each column row SHALL take little vertical space on a phone, and fields that are not mapped and have no options SHALL be folded into one collapsed block. No setting SHALL be removed.
+The mapping page SHALL fold the File settings (encoding, delimiter, header row, section) and the Value formats into collapsed blocks that each show a one-line summary, and SHALL open the File block when the file could not be read or when the encoding, delimiter or header row is set explicitly instead of detected, and both blocks when there is an error. Each column row SHALL show a human label with the standard field key as small secondary text and the chosen column; options stay folded. Fields that are not mapped and have no options SHALL be folded into one collapsed block. The page SHALL list what is wrong with the current mapping (rows with errors, required fields unmapped). No setting SHALL be removed.
 
 #### Scenario: Detection worked
 - **WHEN** a readable file is mapped with a preset that detects encoding, delimiter and header row
 - **THEN** the File block is collapsed and its summary names the detected encoding, delimiter and section
 - **AND** all File settings are still in the form and are submitted with it
+
+#### Scenario: Labelled rows
+- **WHEN** the mapping page lists the field `odometer_km`
+- **THEN** its row shows the label "Odometer" with `odometer_km` as secondary text
 
