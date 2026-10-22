@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3
+
+- Import: preset steps, new vehicle while importing, next section without re-upload, zero-cost service items kept as notes, shorter mapping page on phones. Delete a gas station and move its refuels to another. Customise opens as a bottom sheet on phones. Fix: average price per litre card was 1000x too small.
+
 ## 0.2.2
 
 - Drivvo presets verified against real Android exports; equal expenses in one file are no longer merged as duplicates; contributing guide.
