@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.4
+
+- Import opens a short review page (preset steps, vehicle choice, Import now); column mapping only when needed. Timeline summaries: period picker per vehicle (this month, 30 days, this year, 12 months, all time, custom) with fair comparisons. Vehicle details (VIN, year, engine, tyres, insurance and registration dates) in a folded section. Presets: full notes, editable notes, lock and duplicate. Vehicle delete offers a backup download. Version shown in the app bar.
+
 ## 0.2.3
 
 - Import: preset steps, new vehicle while importing, next section without re-upload, zero-cost service items kept as notes, shorter mapping page on phones. Delete a gas station and move its refuels to another. Customise opens as a bottom sheet on phones. Fix: average price per litre card was 1000x too small.
