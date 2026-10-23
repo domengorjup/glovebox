@@ -82,6 +82,10 @@
   <div class="card list-card">
     <div class="row"><span class="body"><span class="title">New refuels: <strong>{{ preview.new_refuels }}</strong> · New expenses: <strong>{{ preview.new_expenses }}</strong></span>
       <span class="detail">already present, skipped: {{ preview.duplicate_refuels }} refuels · {{ preview.duplicate_expenses }} expenses</span></span></div>
+    {% if preview.new_reminders or preview.duplicate_reminders %}
+    <div class="row"><span class="body"><span class="title">New reminders: <strong>{{ preview.new_reminders }}</strong></span>
+      <span class="detail">already present, skipped: {{ preview.duplicate_reminders }} reminders</span></span></div>
+    {% endif %}
     {% if skipped or row_error_total %}
     <div class="row"><span class="body"><span class="title">Rows not imported: <strong>{{ skipped + row_error_total }}</strong></span>
       <span class="detail">skipped by the preset: {{ skipped }} · with errors: {{ row_error_total }}</span></span></div>

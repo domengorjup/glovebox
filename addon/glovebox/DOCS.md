@@ -59,6 +59,16 @@ rest:
 
 Check the field names against `/api/v1/vehicles/1/summary` before relying on them.
 
+## Home Assistant API access
+
+The add-on asks for Home Assistant API access (`homeassistant_api: true`). Glovebox uses it for reminders only: it lists your calendars, and creates, updates and deletes events in the one calendar you choose on the Reminders page. It reads and changes nothing else in Home Assistant. Without choosing a calendar it does nothing with the API.
+
+Glovebox sends no notifications itself. To get them on your phone, import the blueprint and create an automation from it:
+
+[![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fdomengorjup%2Fglovebox%2Fblob%2Fmaster%2Fblueprints%2Fautomation%2Fglovebox%2Freminders.yaml)
+
+Fill in the calendar, the time of day and the notify action (for example `notify.mobile_app_my_phone`). See the Reminders page of the documentation for details.
+
 ## Data and backups
 
 The SQLite database is stored in the add-on's `/data` folder, which survives restarts and upgrades and is included in Home Assistant backups. Database migrations run automatically at startup. You can also use the full backup in the app as a backup that does not depend on Home Assistant.

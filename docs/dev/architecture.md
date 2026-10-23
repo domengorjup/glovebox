@@ -48,3 +48,16 @@ The UI remembers the selected vehicle, the choice of Timeline summary cards and 
 ## Database
 
 SQLite at `$DATA_DIR/glovebox.db`, WAL mode. Alembic runs `upgrade head` at startup, so upgrades need no manual step.
+
+## Home Assistant Core API client
+
+Reminders are written to a Home Assistant calendar by a small client for the Core API. It uses only the standard library, so it adds no dependency, and it is written so another add-on can copy it.
+
+- **Files:** `src/glovebox/services/ha_calendar.py` is the client (`HaClient`, with its own error classes). `src/glovebox/services/reminder_sync.py` decides what to write for each reminder.
+- **Access:** the add-on sets `homeassistant_api: true`. Requests go to `http://supervisor/core/api` with the `SUPERVISOR_TOKEN` environment variable as Bearer token. REST is enough to list calendars, read states, list events and call `calendar.create_event`.
+- **Websocket:** changing and deleting an event exists only as websocket commands (`calendar/event/update`, `calendar/event/delete`). A minimal websocket client (handshake, auth message, masked text frames, one command per connection, no TLS, no fragmentation) talks to `ws://supervisor/core/websocket`. This URL is **not yet verified inside a running add-on** (task 0.1 of the reminders change). If it needs more than the small client offers, the fallback is the `websockets` package.
+- **Timeouts and threads:** every call has a 10 s timeout and runs in a worker thread, so a slow Home Assistant never blocks a request. A failure never undoes saving; it sets a state and a plain message on the reminder.
+- **Retry:** one background task in the app lifespan, guarded by a lock, retries every 15 minutes and once at startup. "Sync now" runs the same pass.
+- **No duplicates:** `calendar.create_event` returns no uid. Before creating, the sync looks for an existing event by a marker line in the description, in a date window around the due date. Retries and restores therefore do not create a second event.
+- **Adapting:** the code reads only the calendar's `supported_features` (create, delete, update) and does nothing per calendar provider. A missing feature turns into a message ("edit it there"), not an error.
+- **Standalone:** there is no token, so the client is `None` and sync is skipped. Everything else works.

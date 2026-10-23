@@ -1,5 +1,5 @@
 {% extends layout %}
-{% from "_macros.html" import messages, field, textarea, dialog_head, vehicle_select with context %}
+{% from "_macros.html" import messages, field, textarea, dialog_head, vehicle_select, remind_switch with context %}
 {% set dialog_page = true %}
 {% set last_placeholder = (last_odometer.km | km_grouped) if (last_odometer and not expense_id) else None %}
 {% macro odometer_hint() %}
@@ -52,6 +52,12 @@
         {{ field('Coverage end', 'coverage_end', f.coverage_end, type='date') }}
       </div>
       <div class="help">Coverage is optional (both dates or none). It lets Stats spread the cost over the days it covers; the stored amount stays the full price.</div>
+      {% if not expense_id %}{{ remind_switch('remind', 'Remind me before it runs out', f.remind == '1', f.remind_days) }}{% endif %}
+    {% endif %}
+    {% if expense_id %}
+    <div class="actions">
+      <a class="btn outline with-icon" href="{{ url(request, '/reminders/new?expense=%d' % expense_id) }}" data-dialog>{{ icon('bell-outline', 18) }}Remind me</a>
+    </div>
     {% endif %}
     {{ textarea('Notes', 'notes', f.notes) }}
   </div>

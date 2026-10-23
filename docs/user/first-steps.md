@@ -4,7 +4,7 @@
 
 Go to **Manage → Vehicles** and press **Add vehicle**. Only the name is essential. Make, model, plate, fuel type and initial odometer are optional.
 
-Open the folded **More details** card for facts you want at hand: VIN (the copy button next to it copies it), model year, engine, tyre size, insurance policy number, and the dates insurance and registration are valid until. All are optional, and the card says how many are filled. The vehicle list shows them under the vehicle. Glovebox only stores and shows the two dates; it does not send reminders. The details are part of the full backup.
+Open the folded **More details** card for facts you want at hand: VIN (the copy button next to it copies it), model year, engine, tyre size, insurance policy number, and the dates insurance and registration are valid until. All are optional, and the card says how many are filled. The vehicle list shows them under the vehicle. Each date can also create a [reminder](reminders.md) that moves with it. The details are part of the full backup.
 
 ![Vehicles](../assets/screenshots/vehicles-desktop-light.png)
 

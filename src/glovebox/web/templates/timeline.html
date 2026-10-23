@@ -1,5 +1,5 @@
 {% extends layout %}
-{% from "_macros.html" import messages with context %}
+{% from "_macros.html" import messages, reminder_rows with context %}
 {% block title %}Timeline - Glovebox{% endblock %}
 {% set kind_icons = {'refuel': 'gas-station', 'service': 'wrench', 'expense': 'file-document-outline'} %}
 {% macro stat_card(key, c) %}
@@ -40,6 +40,15 @@
   <a class="btn primary" href="{{ url(request, '/vehicles/new') }}" data-dialog>Add a vehicle</a>
 </div>
 {% else %}
+{% if due_rows %}
+<div class="card list-card due-card">
+  <div class="due-head">
+    <h2>Due soon</h2>
+    <a class="btn with-icon" href="{{ url(request, '/reminders') }}">{{ icon('bell-outline', 18) }}<span class="all-txt">All reminders</span></a>
+  </div>
+  {{ reminder_rows(request, due_rows, location) }}
+</div>
+{% endif %}
 <div class="summary-head">
   <h2>{{ title }} · summary</h2>
   <div class="head-tools">

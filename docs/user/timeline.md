@@ -42,11 +42,15 @@ Click **Customise** (the sliders icon on phones) next to the summary title and t
 
 ![Customise open](../assets/screenshots/timeline-customise-desktop-light.png)
 
+## Due soon
+
+When a [reminder](reminders.md) is due, the **Due soon** card appears above the summary cards. It lists open reminders whose notify date has arrived, overdue ones first. Tap a row to edit it, **Done** to dismiss it, or **All reminders** to open the Reminders page. The card is hidden when nothing is due.
+
 ## Filters
 
 Under the cards, the chips **All · Refuelling · Service · Expense** limit the list to one record type.
 
-Click a record to edit or delete it.
+Click a record to edit or delete it. The **+** button also offers **Reminder** to add a [reminder](reminders.md).
 
 ## All vehicles
 

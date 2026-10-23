@@ -87,3 +87,34 @@
       {%- if confirm_text %} data-confirm="{{ confirm_text }}"{% endif %}>{{ label }}</button>
   </form>
 {% endmacro %}
+
+{# Rows of reminders. Each row opens the edit dialog; open ones have a Done button. #}
+{% macro reminder_rows(request, rows, next_path, open=True) %}
+  {% for r in rows %}
+  <div class="row">
+    <a class="row-link" href="{{ url(request, '/reminders/%d/edit' % r.id) }}?next={{ next_path | urlencode }}" data-dialog>
+      <span class="badge {{ 't-service' if r.category.value == 'maintenance' else 't-expense' }}">{{ icon(r.icon, 22) }}</span>
+      <span class="body">
+        <span class="title">{{ r.title }}{% if chrome.selected == 'all' %}<span class="veh-tag">{{ r.vehicle }}</span>{% endif %}</span>
+        <span class="detail{{ ' overdue' if r.overdue }}">{{ r.detail }}</span>
+        {% if r.message %}<span class="detail wrap">{{ r.message }}</span>{% endif %}
+      </span>
+      {% if not open %}<span class="chev">{{ icon('chevron-right', 24) }}</span>{% endif %}
+    </a>
+    {% if open %}
+    <form method="post" action="{{ url(request, '/reminders/%d/done' % r.id) }}">
+      <input type="hidden" name="next" value="{{ next_path }}">
+      <button type="submit" class="icon-btn" aria-label="Mark {{ r.title }} done" title="Done">{{ icon('check', 24) }}</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+{% endmacro %}
+
+{# "Remind me" switch with the lead days next to it (shown only while on, without script too). #}
+{% macro remind_switch(name, label, checked, days) %}
+  <div class="remind-block">
+    {{ switch(name, label, '', checked) }}
+    <div class="remind-days">{{ field('Notify', name ~ '_days', days, suffix='days before', inputmode='numeric') }}</div>
+  </div>
+{% endmacro %}

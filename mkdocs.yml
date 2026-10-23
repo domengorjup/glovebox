@@ -50,6 +50,7 @@ nav:
       - Timeline: user/timeline.md
       - Adding and editing records: user/records.md
       - Statistics: user/statistics.md
+      - Reminders: user/reminders.md
       - Gas stations: user/stations.md
       - Import: user/import.md
       - Export and backup: user/export.md

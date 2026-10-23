@@ -298,13 +298,17 @@ def suggest_from_expense(
 ) -> ReminderInput:
     """
     The "Remind me" suggestion for an expense: its vehicle and category, the
-    title "<title> renewal", due at the coverage end, else a year after the
+    title "<title> renewal" (not repeated when it already ends in "renewal"), due at the coverage end, else a year after the
     expense date.
     """
     title = (expense.title or "").strip()
+    if not title:
+        title = "Renewal"
+    elif not title.casefold().endswith("renewal"):
+        title = f"{title} renewal"
     return ReminderInput(
         vehicle_id=expense.vehicle_id,
-        title=f"{title} renewal" if title else "Renewal",
+        title=title,
         category=expense.category.value,
         due_date=expense.coverage_end or _one_year_later(expense.date),
         lead_days=lead_days,

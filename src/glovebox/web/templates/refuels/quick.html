@@ -2,6 +2,7 @@
 {% from "_macros.html" import messages, field, textarea, switch, dialog_head with context %}
 {% set dialog_page = true %}
 {% set choice = f.station_choice or default_choice %}
+{% set litres_label %}Litres{% if fuel_type %} <span class="fuel-type">· {{ fuel_type }}</span>{% endif %}{% endset %}
 {% block title %}Refuel - Glovebox{% endblock %}
 {% block content %}
 <div class="scrim" data-scrim>
@@ -30,7 +31,7 @@
     </div>
     <div data-price-fields class="qprice">
       <div class="grid2 qpair">
-        {{ field('Litres', 'litres', f.litres, suffix='L', inputmode='decimal', calc='litres', required=True, placeholder='0.0', big=True) }}
+        {{ field(litres_label, 'litres', f.litres, suffix='L', inputmode='decimal', calc='litres', required=True, placeholder='0.0', big=True) }}
         {{ field('Total', 'total', f.total, suffix=currency, inputmode='decimal', calc='total', required=True, placeholder='0.00', big=True) }}
       </div>
       {{ field('Price / litre (calculated, or type it)', 'price_per_litre', f.price_per_litre, suffix=currency ~ '/L', inputmode='decimal', calc='price_per_litre', placeholder='0.000') }}

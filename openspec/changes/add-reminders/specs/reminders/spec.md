@@ -36,7 +36,7 @@ A reminder MAY record the expense it was created from. Deleting that expense SHA
 ### Requirement: Remind me from an expense
 The expense edit dialog SHALL offer "Remind me", which SHALL open the reminder form pre-filled with:
 - the expense's vehicle and category;
-- the title "<expense title> renewal";
+- the title "<expense title> renewal", without repeating "renewal" when the expense title already ends with it (case-insensitive);
 - the due date: the expense's coverage end when set, otherwise the expense date plus one year;
 - 30 lead days.
 
@@ -45,6 +45,10 @@ The add-expense form SHALL offer a "Remind me before it runs out" switch, off by
 #### Scenario: Insurance with coverage end
 - **WHEN** the user opens "Remind me" on the insurance expense "Annual policy" with coverage 2026-03-01 to 2027-02-28
 - **THEN** the form shows title "Annual policy renewal", category insurance, due 2027-02-28 and 30 days before
+
+#### Scenario: Title already ends in renewal
+- **WHEN** the user opens "Remind me" on the expense "Registration renewal"
+- **THEN** the form shows title "Registration renewal"
 
 #### Scenario: Expense without coverage
 - **WHEN** the user opens "Remind me" on a service expense dated 2026-05-10 without coverage dates

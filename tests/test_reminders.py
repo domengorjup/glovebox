@@ -318,3 +318,13 @@ def test_event_text(session: Session, golf) -> None:
     assert reminders.event_description(reminder).splitlines() == [
         "Bring papers", "Notify 14 days before", f"Glovebox reminder {reminder.uid}",
     ]
+
+
+@pytest.mark.parametrize("title, expected", [
+    ("Registration renewal", "Registration renewal"),
+    ("Insurance RENEWAL", "Insurance RENEWAL"),
+    ("Policy", "Policy renewal"),
+])
+def test_suggested_title_does_not_repeat_renewal(session: Session, golf, title, expected) -> None:
+    expense = _expense(session, golf.id, category=ExpenseCategory.INSURANCE, title=title)
+    assert reminders.suggest_from_expense(expense).title == expected

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Request
 
-from glovebox.services import records
+from glovebox.services import records, reminders
 from glovebox.web.common import SessionDep, render
 
 router = APIRouter()
@@ -23,4 +23,5 @@ def manage(request: Request, session: SessionDep):
         vehicle_names=", ".join(v.name for v in vehicles if not v.archived),
         station_count=len(stations),
         brand_count=len(brands),
+        open_reminders=reminders.count_open(session),
     )

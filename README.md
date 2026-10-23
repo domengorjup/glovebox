@@ -26,6 +26,7 @@
 - Statistics: consumption between full tanks, cost per km, monthly costs, price comparison by gas station and brand.
 - Configurable CSV import: a column mapping step with presets (Fuelly, Fuelio, Drivvo, your own), a preview before anything is written, and undo per import.
 - A documented standard CSV format, a Fuelly-compatible export and a full backup ZIP.
+- Date reminders per vehicle (insurance, registration, service) on the Timeline, in a Home Assistant calendar of your choice, as an .ics file for any calendar, and as phone notifications through a ready-made blueprint.
 - Looks like Home Assistant and follows its light and dark theme; opens in the sidebar through Ingress, no separate login, and from a one-tap shortcut in the HA Android app.
 - Read-only stats API for Home Assistant sensors.
 - Runs as a Home Assistant add-on or as a standalone Docker container; the data is one SQLite file.

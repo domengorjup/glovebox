@@ -1,5 +1,5 @@
 {% extends layout %}
-{% from "_macros.html" import messages, field, textarea, dialog_head with context %}
+{% from "_macros.html" import messages, field, textarea, dialog_head, remind_switch with context %}
 {% set dialog_page = true %}
 {% set v = entered if entered is defined else {
   'name': vehicle.name if vehicle else '',
@@ -49,10 +49,10 @@
         </div>
         {{ field('Engine', 'engine', v.engine, placeholder='e.g. 1.5 hybrid, 92 kW') }}
         {{ field('Insurance policy number', 'insurance_policy', v.insurance_policy) }}
-        <div class="grid2">
-          {{ field('Insurance valid until', 'insurance_valid_until', v.insurance_valid_until, type='date') }}
-          {{ field('Registration valid until', 'registration_valid_until', v.registration_valid_until, type='date') }}
-        </div>
+        {{ field('Insurance valid until', 'insurance_valid_until', v.insurance_valid_until, type='date') }}
+        {{ remind_switch('insurance_remind', 'Remind me before it ends', remind.insurance_remind == '1', remind.insurance_remind_days) }}
+        {{ field('Registration valid until', 'registration_valid_until', v.registration_valid_until, type='date') }}
+        {{ remind_switch('registration_remind', 'Remind me before it ends', remind.registration_remind == '1', remind.registration_remind_days) }}
       </div>
     </details>
     {{ textarea('Notes', 'notes', v.notes) }}

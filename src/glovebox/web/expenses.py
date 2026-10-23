@@ -12,12 +12,13 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from glovebox.models import Expense, ExpenseCategory
-from glovebox.services import preferences, records
+from glovebox.services import preferences, records, reminders
 from glovebox.services.records import ExpenseInput, ValidationError
 from glovebox.services.stats import StatsFilter
 from glovebox.web import formatting
 from glovebox.web.common import SessionDep, load_chrome, redirect, render
 from glovebox.web.formatting import parse_decimal, to_scaled_int
+from glovebox.web.reminders import sync_after_save
 
 router = APIRouter(prefix="/expenses")
 # The phone-first /quick-service and /quick-expense pages share the code below.
@@ -39,6 +40,9 @@ class ExpenseForm(BaseModel):
     coverage_start: str = ""
     coverage_end: str = ""
     notes: str = ""
+    # "Remind me before it runs out" on the add forms ("1" = on).
+    remind: str = ""
+    remind_days: str = str(reminders.DEFAULT_LEAD_DAYS)
 
 
 def _form_from_expense(expense: Expense) -> dict[str, str]:
@@ -176,6 +180,16 @@ def _parse_form(form: ExpenseForm) -> ExpenseInput:
     )
 
 
+def _create_reminder(session: Session, expense: Expense, lead_text: str) -> None:
+    """Create the reminder asked for by the add form's switch."""
+    try:
+        lead_days = int(lead_text)
+    except ValueError:
+        raise ValueError("Remind me: enter a whole number of days") from None
+    suggestion = reminders.suggest_from_expense(expense, lead_days)
+    reminders.create_reminder(session, suggestion)
+
+
 def _save(request: Request, session: Session, form: ExpenseForm, expense_id: int | None,
           quick: bool = False):
     """Validate and save; on problems show the form again with messages."""
@@ -194,6 +208,8 @@ def _save(request: Request, session: Session, form: ExpenseForm, expense_id: int
                 notice = ("estimated", last.km)
         if expense_id is None:
             created = records.create_expense(session, data)
+            if form.remind == "1":
+                _create_reminder(session, created, form.remind_days)
         else:
             records.update_expense(session, expense_id, data)
     except (ValueError, ValidationError) as exc:
@@ -205,6 +221,8 @@ def _save(request: Request, session: Session, form: ExpenseForm, expense_id: int
         _flash_saved(request, session, created, notice)
     elif notice is not None:
         preferences.set_flash(session, *notice)
+    session.commit()
+    sync_after_save(request)  # writes a new reminder to the calendar
     return redirect(request, "/")
 
 

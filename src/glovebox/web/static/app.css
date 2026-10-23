@@ -536,3 +536,17 @@ a.choice { color: inherit; } .choice .t, .choice .s { display: block; }
   .snackbar { left: var(--ha-space-2); right: var(--ha-space-2); bottom: 72px; max-width: none; }
   body:has(.snackbar) .fab { bottom: 140px; }
 }
+
+/* Reminders: the lead-days field follows its switch (CSS only, so it works without script). */
+.remind-block .remind-days { display: none; }
+.remind-block:has(input[type="checkbox"]:checked) .remind-days { display: block; margin-top: var(--ha-space-2); }
+.row .detail.overdue { color: var(--error-color); }
+.row > form { margin: 0; display: flex; align-items: center; }
+.dialog-body .actions { justify-content: flex-start; margin-top: var(--ha-space-2); }
+.due-card { margin-bottom: var(--ha-space-5); }
+.due-head { display: flex; align-items: center; justify-content: space-between; gap: var(--ha-space-2); padding: 4px 8px 4px var(--ha-space-4); min-height: 48px; }
+.due-head h2 { margin: 0; color: var(--primary-text-color); font-size: 16px; }
+.row > form .icon-btn { color: var(--primary-color); }
+
+/* Fuel type read from the vehicle, shown in the Litres label (not editable). */
+.field label .fuel-type { font-weight: 500; }

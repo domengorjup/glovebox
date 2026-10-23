@@ -86,6 +86,8 @@ def _form_page(request, session, entered, refuel_id=None, status=200, quick=Fals
     if selected and not any(str(v.id) == selected for v in vehicles):
         vehicles.append(records.get_vehicle(session, int(selected)))
     stations = records.list_stations(session)
+    # Read-only display: the fuel type belongs to the vehicle, not to the refuel.
+    fuel_types = {str(v.id): v.fuel_type for v in vehicles if v.fuel_type}
     if quick:
         extra.update(_quick_context(session, entered, stations))
     return render(
@@ -97,6 +99,8 @@ def _form_page(request, session, entered, refuel_id=None, status=200, quick=Fals
         f=entered,
         refuel_id=refuel_id,
         vehicles=vehicles,
+        fuel_types=fuel_types,
+        fuel_type=fuel_types.get(selected, ""),
         stations=stations,
         brands=sorted({s.brand for s in stations if s.brand}),
         errors=extra.pop("errors", []),

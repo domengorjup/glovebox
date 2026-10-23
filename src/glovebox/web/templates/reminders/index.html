@@ -1,0 +1,45 @@
+{% extends layout %}
+{% from "_macros.html" import messages, page_head, reminder_rows, select with context %}
+{% block title %}Reminders - Glovebox{% endblock %}
+{% block content %}
+{{ page_head(request, 'Reminders') }}
+{% if status.available %}
+<h2>Calendar</h2>
+<form class="card card-pad stack" method="post" action="{{ url(request, '/reminders/calendar') }}">
+  <input type="hidden" name="next" value="/reminders">
+  {% if status.problem %}<p class="alert warning" role="alert">{{ status.problem }}</p>{% endif %}
+  {% if listing_problem %}<p class="alert warning" role="alert">{{ listing_problem }}</p>{% endif %}
+  {{ select('Write open reminders to this calendar', 'entity_id', calendar_options, status.entity_id or '', autosubmit=True) }}
+  <p class="help">Each open reminder becomes an all-day event on its due date. Changes and removals are passed on where the calendar allows it; the label says what it can do.</p>
+  {% if status.left_behind %}
+  <p class="alert warning">{{ status.left_behind }} {{ 'event was' if status.left_behind == 1 else 'events were' }} left in {{ status.left_behind_entity }}; remove {{ 'it' if status.left_behind == 1 else 'them' }} there.</p>
+  {% endif %}
+  <div class="actions">
+    <button type="submit" class="btn primary no-js-only">Save</button>
+    <button type="submit" class="btn outline with-icon" formaction="{{ url(request, '/reminders/sync') }}">{{ icon('sync', 18) }}Sync now</button>
+  </div>
+</form>
+{% else %}
+<div class="card card-pad">
+  <p class="help flush">Calendar sync needs the Home Assistant add-on. Use Download .ics to add a reminder to any calendar.</p>
+</div>
+{% endif %}
+
+<div class="summary-head">
+  <h2>Open ({{ open_rows | length }})</h2>
+  <div class="head-tools">
+    <a class="btn primary with-icon" href="{{ url(request, '/reminders/new') }}" data-dialog>{{ icon('plus', 18) }}Add reminder</a>
+  </div>
+</div>
+<div class="card list-card">
+  {{ reminder_rows(request, open_rows, '/reminders') }}
+  {% if not open_rows %}<div class="empty">No open reminders.</div>{% endif %}
+</div>
+
+{% if done_rows %}
+<details class="archived">
+  <summary>Done ({{ done_rows | length }})</summary>
+  <div class="card list-card">{{ reminder_rows(request, done_rows, '/reminders', open=False) }}</div>
+</details>
+{% endif %}
+{% endblock %}

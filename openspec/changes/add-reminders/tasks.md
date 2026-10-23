@@ -21,22 +21,22 @@
 - [x] 1.2 `services/reminders.py`: create, edit, done, reopen, delete, the remind date, due-soon and overdue queries, the `revision` bump. Unit tests, including the "Due soon" boundaries.
 
 ## 2. UI (design iteration first)
-- [ ] 2.1 Add to `.mockups/ui-v2/`: the "Due soon" card, the Reminders page (with the calendar setting and status lines), the reminder dialog, "Remind me" in the expense dialog and form, the vehicle date switches. Desktop and phone, light and dark; record it in `NOTES.md`; get the user's feedback before 2.2.
-- [ ] 2.2 `web/reminders.py` and templates: Reminders page, reminder dialog (default 30 days), add-chooser entry, Manage row.
-- [ ] 2.3 Timeline "Due soon" card (`web/timeline.py`, `timeline.html`), filtered by the app-bar vehicle.
-- [ ] 2.4 "Remind me" on the expense dialog, and the switch on the add-expense form.
-- [ ] 2.5 New repeated elements added to `docs/dev/design.md`. Screenshots (desktop 1400x900, phone 390x844, light and dark) compared with the mockup.
+- [x] 2.1 (done 2026-10-23; the user has not reviewed the mockup yet) Add to `.mockups/ui-v2/`: the "Due soon" card, the Reminders page (with the calendar setting and status lines), the reminder dialog, "Remind me" in the expense dialog and form, the vehicle date switches. Desktop and phone, light and dark; record it in `NOTES.md`; get the user's feedback before 2.2.
+- [x] 2.2 `web/reminders.py` and templates: Reminders page, reminder dialog (default 30 days), add-chooser entry, Manage row.
+- [x] 2.3 Timeline "Due soon" card (`web/timeline.py`, `timeline.html`), filtered by the app-bar vehicle.
+- [x] 2.4 "Remind me" on the expense dialog, and the switch on the add-expense form.
+- [x] 2.5 New repeated elements added to `docs/dev/design.md`. Screenshots (desktop 1400x900, phone 390x844, light and dark) compared with the mockup.
 
 ## 3. .ics download
 - [x] 3.1 `ics.py` writer (D6) with tests: folding, escaping, the dates, `UID`/`SEQUENCE`, both alarms, and only the due-date alarm when lead days are 0.
-- [ ] 3.2 `GET /reminders/<id>.ics` and the download button; tests through Ingress-prefixed URLs. (Route and tests done in `web/reminders.py`; the button comes with the dialog.)
+- [x] 3.2 `GET /reminders/<id>.ics` and the download button; tests through Ingress-prefixed URLs. (Route and tests done in `web/reminders.py`; the button comes with the dialog.)
 
 ## 4. HA calendar sync
 - [x] 4.1 `config.py` reads `SUPERVISOR_TOKEN`; `homeassistant_api: true` goes into `addon/glovebox/config.yaml`.
 - [x] 4.2 `services/ha_calendar.py` (stdlib only, D8): list calendars with their features, create, look up by marker, update and delete over the minimal websocket client. Tests against a local fake HA server (REST and websocket), not monkeypatching.
 - [x] 4.3 Sync pass (D4), driven only by `supported_features`: find first, create, update or the "edit it there" message, delete on done or delete or the "remove it there" message, and moving to another calendar. Tests for features 7, 3, 5 and 1.
 - [x] 4.4 Failure states and messages (D5), the background retry task in the app lifespan with a lock, and "Sync now". Tests for timeout, 401, missing entity, lost create feature, and delayed listing.
-- [ ] 4.5 Calendar setting on the Reminders page: only calendars that can create events, with the capability labels; the standalone text (D11).
+- [x] 4.5 Calendar setting on the Reminders page: only calendars that can create events, with the capability labels; the standalone text (D11).
 
 ## 5. Notification blueprint
 - [x] 5.1 `blueprints/automation/glovebox/reminders.yaml` (from task 0.2) with `source_url` pointing to the file on `master`. Add a test that parses it, with a loader that knows `!input`, and checks the inputs.
@@ -45,21 +45,21 @@
 - [x] 6.1 `reminders.csv` in `standard.py`. Regenerate with `uv run python -m glovebox.formatdocs`; the descriptor gets four tables.
 - [x] 6.2 Full backup writes `reminders.csv`, respecting a vehicle selection.
 - [x] 6.3 Import pipeline reads `reminders.csv`: uid duplicates, errors, preview counts, undo. Round-trip test (backup, restore into an empty database, backup, compare).
-- [ ] 6.4 The vehicle delete confirmation counts reminders. (Service done: `RecordCounts.reminders`, `ConfirmationRequired.reminders`, reminders deleted with the vehicle; the template line is left.)
+- [x] 6.4 The vehicle delete confirmation counts reminders. (Service done: `RecordCounts.reminders`, `ConfirmationRequired.reminders`, reminders deleted with the vehicle; the template line is left.)
 
 ## 7. Reminders from vehicle dates (after the vehicle-details change has landed)
-- [ ] 7.1 The vehicle form switches for insurance and registration "valid until": create, move, delete, and a new reminder after done. Tests through the real forms.
+- [x] 7.1 The vehicle form switches for insurance and registration "valid until": create, move, delete, and a new reminder after done. Tests through the real forms.
 
 ## 8. Docs
-- [ ] 8.1 `docs/user/reminders.md` and its nav entry:
+- [x] 8.1 `docs/user/reminders.md` and its nav entry:
   - creating reminders and "Due soon";
   - choosing a calendar and what the capability labels mean;
   - the "edit it there" messages;
   - .ics for Outlook and other calendars (alarms may be ignored by some apps);
   - the blueprint-import badge and how to fill in its inputs;
   - standalone mode.
-- [ ] 8.2 Update `timeline.md`, `export.md`, `import.md`; the add-on `DOCS.md` (Core API use, the blueprint link); README Features. Write `docs/dev/architecture.md` notes on the HA Core API client (REST and websocket through the Supervisor, the token, timeouts) so that the sibling app can reuse them.
-- [ ] 8.3 `openspec validate add-reminders --strict`, full `uv run pytest`, `mkdocs build --strict`, `formatdocs --check`.
+- [x] 8.2 Update `timeline.md`, `export.md`, `import.md`; the add-on `DOCS.md` (Core API use, the blueprint link); README Features. Write `docs/dev/architecture.md` notes on the HA Core API client (REST and websocket through the Supervisor, the token, timeouts) so that the sibling app can reuse them.
+- [x] 8.3 `openspec validate add-reminders --strict`, full `uv run pytest`, `mkdocs build --strict`, `formatdocs --check`.
 
 ## 9. Verification on the test HA
 - [ ] 9.1 Deploy to `haos-test`. With the Local Calendar "Glovebox reminders":

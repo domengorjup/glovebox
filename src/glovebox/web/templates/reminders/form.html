@@ -1,0 +1,50 @@
+{% extends layout %}
+{% from "_macros.html" import messages, field, textarea, select, dialog_head, vehicle_select with context %}
+{% set dialog_page = true %}
+{% set heading = 'Edit reminder' if reminder else 'New reminder' %}
+{% block title %}{{ heading }} - Glovebox{% endblock %}
+{% block content %}
+<div class="scrim" data-scrim>
+<form class="dialog form" method="post" role="dialog" aria-label="{{ heading }}"
+      action="{{ url(request, ('/reminders/%d/edit' % reminder.id) if reminder else '/reminders/new') }}">
+  {{ dialog_head(request, heading, f.next) }}
+  <div class="dialog-body">
+    {{ messages(errors) }}
+    <input type="hidden" name="next" value="{{ f.next }}">
+    <input type="hidden" name="expense_id" value="{{ f.expense_id }}">
+    {{ vehicle_select(vehicles, f.vehicle_id) }}
+    {{ field('Title', 'title', f.title, required=True, placeholder='e.g. Registration') }}
+    {{ select('Category', 'category', categories, f.category) }}
+    <div class="grid2">
+      {{ field('Due date', 'due_date', f.due_date, type='date', required=True) }}
+      {{ field('Notify', 'lead_days', f.lead_days, suffix='days before', inputmode='numeric', required=True) }}
+    </div>
+    {{ textarea('Notes', 'notes', f.notes) }}
+    {% if source %}<div class="help">Created from: {{ source.title }}</div>{% endif %}
+    {% if reminder %}
+    {% if calendar_line %}<div class="help">{{ calendar_line }}</div>{% endif %}
+    {% if reminder.status.value == 'done' %}<div class="help">Done. It no longer shows in Due soon.</div>{% endif %}
+    <div class="actions">
+      <a class="btn outline with-icon" href="{{ url(request, '/reminders/%d.ics' % reminder.id) }}" download>{{ icon('download', 18) }}Download .ics</a>
+      {% if reminder.status.value == 'done' %}
+      <button type="submit" class="btn outline with-icon" formnovalidate formaction="{{ url(request, '/reminders/%d/reopen' % reminder.id) }}">{{ icon('undo', 18) }}Reopen</button>
+      {% else %}
+      <button type="submit" class="btn outline with-icon" formnovalidate formaction="{{ url(request, '/reminders/%d/done' % reminder.id) }}">{{ icon('check', 18) }}Mark done</button>
+      {% endif %}
+      {% if can_sync %}
+      <button type="submit" class="btn outline with-icon" formnovalidate formaction="{{ url(request, '/reminders/sync') }}">{{ icon('sync', 18) }}Sync now</button>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+  <div class="dialog-foot">
+    {% if reminder %}
+    <button type="submit" class="btn danger" formnovalidate formaction="{{ url(request, '/reminders/%d/delete' % reminder.id) }}"
+            data-confirm="Delete this reminder?">Delete</button>
+    {% endif %}
+    <a class="btn" href="{{ url(request, f.next) }}" data-close>Cancel</a>
+    <button type="submit" class="btn primary">Save</button>
+  </div>
+</form>
+</div>
+{% endblock %}

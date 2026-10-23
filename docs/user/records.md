@@ -1,6 +1,6 @@
 # Adding and editing records
 
-Tap **+** on the Timeline and choose the record type (**Refuelling**, **Service** or **Expense**). Every form has a **Vehicle** dropdown. It starts with the selected vehicle, or with the last specific vehicle when *All vehicles* is selected.
+Tap **+** on the Timeline and choose the record type (**Refuelling**, **Service**, **Expense** or **Reminder**; see [Reminders](reminders.md)). Every form has a **Vehicle** dropdown. It starts with the selected vehicle, or with the last specific vehicle when *All vehicles* is selected.
 
 ![Add menu on a phone](../assets/screenshots/add-chooser-phone-light.png){ width="260" }
 ![Add menu on a desktop](../assets/screenshots/add-chooser-desktop-light.png)
@@ -51,3 +51,11 @@ Insurance and registration usually cover a period, not just the payment day. Ent
 - Set both dates or neither. The end must not be before the start. Both days are included.
 - The amount is always the full price you paid. Coverage dates only change how [Statistics](statistics.md#spread-or-as-paid) divides the cost over months.
 - Coverage is allowed on any expense.
+
+### Reminders from an expense
+
+Open an expense and tap **Remind me** to make a [reminder](reminders.md) for its renewal. The due date is the coverage end, or the expense date plus one year when there is no coverage. On the add-expense forms, the switch **Remind me before it runs out** does the same when you save.
+
+## Vehicles
+
+In **More details** of the vehicle form, the insurance and registration *valid until* dates have a switch **Remind me before it ends** with a **Notify** field in days. The reminder moves when you change the date and is deleted when you clear it. Deleting a vehicle asks for confirmation and says how many records and reminders go with it.

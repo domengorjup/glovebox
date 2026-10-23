@@ -5,7 +5,7 @@
 {{ page_head(request, 'Import') }}
 {% if done %}
 <div class="alert success" role="status">
-  <span><strong>Imported {{ done.refuels_imported }} refuels and {{ done.expenses_imported }} expenses</strong> from {{ done.filename }}.
+  <span><strong>Imported {{ done.refuels_imported }} refuels and {{ done.expenses_imported }} expenses{% if done.reminders_imported %} and {{ done.reminders_imported }} reminders{% endif %}</strong> from {{ done.filename }}.
   {{ done.duplicates_skipped }} duplicates skipped.</span>
   {{ post_button(request, '/import/%d/undo' % done.id, 'Undo', 'Remove all records of this import?') }}
 </div>
@@ -40,7 +40,7 @@
     <span class="body">
       <span class="title">{{ b.filename }}</span>
       <span class="detail">{{ b.created_at.strftime('%Y-%m-%d %H:%M') }} · {{ preset_names.get(b.format, b.format) }}</span>
-      <span class="detail">{{ b.refuels_imported }} refuels · {{ b.expenses_imported }} expenses · {{ b.duplicates_skipped }} duplicates skipped</span>
+      <span class="detail">{{ b.refuels_imported }} refuels · {{ b.expenses_imported }} expenses{% if b.reminders_imported %} · {{ b.reminders_imported }} reminders{% endif %} · {{ b.duplicates_skipped }} duplicates skipped</span>
     </span>
     {{ post_button(request, '/import/%d/undo' % b.id, 'Undo', 'Remove all records of this import?') }}
   </div>

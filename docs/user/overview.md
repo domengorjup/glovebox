@@ -13,7 +13,7 @@ Glovebox is a small web app for the running costs of your cars. It looks like pa
 
 ## What it does not do
 
-No reminders, no receipts or photos, no electric charging records, no currency conversion. Values are stored in km and litres (imports convert miles and gallons).
+No receipts or photos, no electric charging records, no currency conversion. Values are stored in km and litres (imports convert miles and gallons).
 
 ## Screen layout
 

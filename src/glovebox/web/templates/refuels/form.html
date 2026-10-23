@@ -2,6 +2,7 @@
 {% from "_macros.html" import messages, field, textarea, switch, select, dialog_head, vehicle_select with context %}
 {% set dialog_page = true %}
 {% set heading = 'Edit refuelling' if refuel_id else 'New refuelling' %}
+{% set litres_label %}Litres <span class="fuel-type" data-fuel-types='{{ fuel_types | tojson }}'>{% if fuel_type %}· {{ fuel_type }}{% endif %}</span>{% endset %}
 {% block title %}{{ heading }} - Glovebox{% endblock %}
 {% block content %}
 <div class="scrim" data-scrim>
@@ -21,7 +22,7 @@
     </div>
     {{ field('Odometer', 'odometer_km', f.odometer_km, suffix='km', inputmode='decimal', required=True, placeholder='0') }}
     <div class="grid3" data-price-fields>
-      {{ field('Litres', 'litres', f.litres, suffix='L', inputmode='decimal', calc='litres') }}
+      {{ field(litres_label, 'litres', f.litres, suffix='L', inputmode='decimal', calc='litres') }}
       {{ field('Price / litre', 'price_per_litre', f.price_per_litre, suffix=currency, inputmode='decimal', calc='price_per_litre') }}
       {{ field('Total', 'total', f.total, suffix=currency, inputmode='decimal', calc='total') }}
     </div>

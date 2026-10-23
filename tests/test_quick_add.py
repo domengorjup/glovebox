@@ -281,3 +281,27 @@ def test_full_add_forms_suggest_the_last_odometer_only(client: TestClient):
     _post(client, "/expenses/new", {"vehicle_id": str(golf), "category": "other",
           "title": "x", "amount": "5", "date": date.today().isoformat(), "odometer_km": "1100"})
     assert 'placeholder="1,000"' not in client.get("/expenses/1/edit").text
+
+
+def _set_fuel(client: TestClient, vehicle: int, fuel: str) -> None:
+    _post(client, f"/vehicles/{vehicle}/edit", {"name": "Car", "fuel_type": fuel})
+
+
+def test_quick_shows_fuel_type_of_chosen_vehicle(client: TestClient):
+    diesel = _vehicle(client, "Car")
+    _set_fuel(client, diesel, "Diesel")
+    plain = _vehicle(client, "Bike")
+    assert "· Diesel" in client.get(f"/quick?vehicle={diesel}").text
+    assert 'class="fuel-type"' not in client.get(f"/quick?vehicle={plain}").text
+
+
+def test_full_form_embeds_fuel_types_per_vehicle(client: TestClient):
+    diesel = _vehicle(client, "Car")
+    _set_fuel(client, diesel, "Diesel")
+    plain = _vehicle(client, "Bike")
+    html = client.get(f"/refuels/new?vehicle={diesel}").text
+    assert f'data-fuel-types=\'{{"{diesel}": "Diesel"}}\'' in html
+    assert "· Diesel</span>" in html
+    html = client.get(f"/refuels/new?vehicle={plain}").text
+    assert "· Diesel</span>" not in html
+    assert "data-fuel-types" in html

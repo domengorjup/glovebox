@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from glovebox.models import Expense, ExpenseCategory, Refuel, Vehicle
-from glovebox.services import periods, preferences, records, stats
+from glovebox.services import periods, preferences, records, reminders, stats
 from glovebox.services.stats import LastRefuel, Segment, StatsFilter
 from glovebox.web import formatting
 from glovebox.web.common import Chrome, SessionDep, load_chrome, render, view_filter
@@ -23,6 +23,7 @@ from glovebox.web.formatting import (
     with_unit,
 )
 from glovebox.web.refuels import consumption_by_refuel
+from glovebox.web.reminders import build_rows
 
 router = APIRouter()
 
@@ -395,6 +396,9 @@ def timeline(request: Request, session: SessionDep, type: str = "all"):
         hidden_summaries=preferences.get_hidden_summaries(session),
         warnings=_flash_warnings(notice),
         saved=_flash_saved(notice),
+        due_rows=build_rows(
+            session, reminders.due_soon(session, today, chrome.selected_ids), today
+        ),
         months=group_by_month(build_entries(session, chrome, type)),
         has_vehicles=bool(everyone),
         title=title,

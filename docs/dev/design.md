@@ -163,11 +163,30 @@ Refuelling opens the quick-add page (`/quick`, see below), not the full form.
 - `.qchips`: chips of 40px height. Choice chips are `label.chip` around a hidden radio (`.qchips.stations`: two columns, name ellipsised, selected = tinted). `.qmore` holds two toggle chips (date, More) that tick the hidden `.qtoggle` checkbox after them and reveal `.qdate-panel` / `.qextra`; `.qother` is the station select shown by the "Other" radio.
 - `.big-btn`: full-width 56px primary button in `.qfoot`. A disabled `.btn.primary` is grey.
 - The vehicle choice is a `.seg.type-seg` of links (`?vehicle=`) and appears only with more than one active vehicle.
+- `.field label .fuel-type`: the vehicle's fuel type after the Litres label ("Litres · Diesel"), read-only, medium weight; nothing when the vehicle has none. Quick form: server-rendered, follows `?vehicle=`. Full form: also updated by `app.js` (`bindFuelType`) from `data-fuel-types` JSON on the span when the Vehicle select changes.
 - `.field.computed`: the value the page script calculated (any two of litres, price per litre, total) is drawn in the primary colour; typing in it removes the mark. The full refuelling form uses it too.
 
 **Quick service and expense** (`expenses/quick.html`, `/quick-service`, `/quick-expense`) use the same classes. They add: a title field with `.qchips.titles` chips under it (script-only: hidden in the markup, shown and wired by `app.js`; a chip fills the title; service starts with a fixed "Regular service", then the vehicle's recent titles, at most 4; expense shows the chips of the chosen type); the amount as a `.field.big`; an odometer field that starts empty with the last known reading as its placeholder and as the hint ("Last: 75,892 km on 9 Oct"); `.qhint.warn` (orange) while it is empty, "+N km since…" when higher, `.qhint.err` when lower. Left empty, the last reading is saved as an estimate (server side, no script needed). The full add forms show the same placeholder (updated with vehicle and date); edit forms do not. The expense type is the `.seg.type-seg` of radios; coverage dates and notes sit under More.
 
 **Deep link from the Android shortcut.** Home Assistant opens an add-on panel at its start page, but it serves `/<panel>/<anything>` as the same panel and the iframe can read the parent URL (same origin). `theme.js` therefore checks `window.parent.location.pathname` for `/<panel>/quick`, `/quick-service` or `/quick-expense`; it first rewrites the parent URL to `/<panel>` with `history.replaceState` (no popstate, so HA's router does not react, and a reload or Back does not loop) and then opens that page in the iframe, below the Ingress base taken from its own script URL. Anything unreadable (standalone, cross-origin) is ignored. Tested on the test VM only for the routing (the subpath serves the panel and the iframe sees it); the redirect itself is tested with a stand-in parent page.
+
+### Reminder rows and the Due soon card
+
+`reminder_rows(request, rows, next_path, open=True)` in `_macros.html` renders reminders as list rows: a `.row` holding an `a.row-link` (category badge `t-service` for Service, `t-expense` for the others, title, vehicle tag in the all-vehicles view, a `.detail` with "Due 5 Nov 2026 · in 13 days", and a `.detail.wrap` line with the calendar message when the reminder is not synced) and, for open reminders, a form with a primary-coloured check `icon-btn` (Done). The detail line gets `.overdue` (error colour) when the due date has passed. Done reminders have a chevron instead of the button. The link opens the reminder dialog with `?next=` so that it works without JavaScript.
+
+The Timeline "Due soon" card is a `.card.list-card.due-card` whose first child is `.due-head` (the `h2` and a text `.btn.with-icon` "All reminders"); rows follow. It sits above the summaries and is not rendered when nothing is due. The Reminders page lists open reminders under `.summary-head` ("Open (N)" and a primary "Add reminder") and the done ones in a `details.archived`.
+
+### Calendar setting card
+
+On the Reminders page (add-on mode only): a `form.card.card-pad.stack` with `.alert.warning` lines for problems, a `select` (autosubmit; "None" plus every calendar that can create events, each labelled with what it can do, plus the stored choice marked "not available" when it is gone), a `.help` line, optional `.alert.warning` for events left behind, and an `.actions` row with an outlined "Sync now" (`.btn.outline.with-icon`). In standalone mode the card is replaced by one `.help.flush` sentence in a `.card.card-pad`.
+
+### Remind me switch
+
+`remind_switch(name, label, checked, days)` in `_macros.html`: a `.remind-block` with a `switch` and, under it, `.remind-days` (a "Notify ... days before" `.field` named `<name>_days`). The days field is shown only while the switch is on, by CSS `:has()`, so it works without JavaScript. Used on the add-expense forms (full, and under More on the quick one) and next to the two valid-until dates in the vehicle dialog. On an expense that already exists the dialog has an outlined "Remind me" button (`.btn.outline.with-icon`, bell icon) that opens the reminder dialog pre-filled.
+
+### Buttons inside a dialog body
+
+A row of secondary actions in the body of a form dialog (reminder dialog: "Download .ics", "Mark done" or "Reopen", "Sync now"; expense dialog: "Remind me") is `.actions` inside `.dialog-body`, left-aligned. A file download is a plain `a.btn.outline.with-icon` with the `download` attribute (a GET), not a `data-download` submit button.
 
 ### Snackbar
 

@@ -15,6 +15,7 @@
     bindCalc(overlay);
     bindStationSelect(overlay);
     bindOdometerHint(overlay);
+    bindFuelType(overlay);
     bindCopy(overlay);
     bindQuick(overlay);
   }
@@ -351,6 +352,19 @@
     });
   }
 
+  /* ---------- refuel form: fuel type follows the vehicle choice ---------- */
+  function bindFuelType(root) {
+    var tag = root.querySelector("[data-fuel-types]");
+    var vehicle = root.querySelector("#i-vehicle_id");
+    if (!tag || !vehicle || tag.dataset.bound) { return; }
+    tag.dataset.bound = "1";
+    var types = {};
+    try { types = JSON.parse(tag.dataset.fuelTypes || "{}"); } catch (e) { return; }
+    vehicle.addEventListener("change", function () {
+      tag.textContent = types[vehicle.value] ? "\u00b7 " + types[vehicle.value] : "";
+    });
+  }
+
   /* ---------- expense form: last recorded odometer follows vehicle and date ---------- */
   var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -480,6 +494,7 @@
   });
 
   bindOdometerHint(document);
+  bindFuelType(document);
   bindQuick(document);
   bindCalc(document);
   bindStationSelect(document);
