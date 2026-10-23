@@ -152,6 +152,27 @@ Any button that destroys data carries `data-confirm="Question?"` (browser confir
 
 The round `+` (`a.fab`, `data-dialog`) appears on the Timeline only. It opens `/add`, a bottom sheet on phones and a small dialog on desktop, listing three `a.choice` rows: Refuelling, Service, Expense. The category mapping is fixed: Service is maintenance; Expense is insurance, registration or other.
 
+Refuelling opens the quick-add page (`/quick`, see below), not the full form.
+
+### Quick-add page
+
+`refuels/quick.html`, a `dialog_page` form (full screen on phones, 460px dialog on desktop) with a sticky foot. Everything works without JavaScript: the reveals are CSS-only (`:has()` on a hidden checkbox or radio), the script only adds the live hint, the enabled state of Save and the date text. New classes:
+
+- `.qgroup` (stack of a field and its hint), `.qlabel` (small label above chips), `.qhint` (help line under the odometer; `.err` turns it red).
+- `.field.big`: filled field with a 28px value (odometer, litres, total). The `field` macro takes `big=True` and `autofocus=True`.
+- `.qchips`: chips of 40px height. Choice chips are `label.chip` around a hidden radio (`.qchips.stations`: two columns, name ellipsised, selected = tinted). `.qmore` holds two toggle chips (date, More) that tick the hidden `.qtoggle` checkbox after them and reveal `.qdate-panel` / `.qextra`; `.qother` is the station select shown by the "Other" radio.
+- `.big-btn`: full-width 56px primary button in `.qfoot`. A disabled `.btn.primary` is grey.
+- The vehicle choice is a `.seg.type-seg` of links (`?vehicle=`) and appears only with more than one active vehicle.
+- `.field.computed`: the value the page script calculated (any two of litres, price per litre, total) is drawn in the primary colour; typing in it removes the mark. The full refuelling form uses it too.
+
+**Quick service and expense** (`expenses/quick.html`, `/quick-service`, `/quick-expense`) use the same classes. They add: a title field with `.qchips.titles` chips under it (script-only: hidden in the markup, shown and wired by `app.js`; a chip fills the title; service starts with a fixed "Regular service", then the vehicle's recent titles, at most 4; expense shows the chips of the chosen type); the amount as a `.field.big`; an odometer field that starts empty with the last known reading as its placeholder and as the hint ("Last: 75,892 km on 9 Oct"); `.qhint.warn` (orange) while it is empty, "+N km since…" when higher, `.qhint.err` when lower. Left empty, the last reading is saved as an estimate (server side, no script needed). The full add forms show the same placeholder (updated with vehicle and date); edit forms do not. The expense type is the `.seg.type-seg` of radios; coverage dates and notes sit under More.
+
+**Deep link from the Android shortcut.** Home Assistant opens an add-on panel at its start page, but it serves `/<panel>/<anything>` as the same panel and the iframe can read the parent URL (same origin). `theme.js` therefore checks `window.parent.location.pathname` for `/<panel>/quick`, `/quick-service` or `/quick-expense`; it first rewrites the parent URL to `/<panel>` with `history.replaceState` (no popstate, so HA's router does not react, and a reload or Back does not loop) and then opens that page in the iframe, below the Ingress base taken from its own script URL. Anything unreadable (standalone, cross-origin) is ignored. Tested on the test VM only for the routing (the subpath serves the panel and the iframe sees it); the redirect itself is tested with a stand-in parent page.
+
+### Snackbar
+
+Material snackbar for the result of an action that is already done and can be reversed ("Refuel saved · 38.4 L · 64.90 € · 8.8 L/100 km", Undo). Used by the quick refuelling, service and expense pages. Server-rendered on the page the user lands on, as `form.snackbar[data-snackbar]` with `.snackbar-text` and a text `.btn` that posts the undo, so it works without JavaScript; `app.js` removes it after 6 seconds. Fixed at the bottom (left on desktop, full width above the bottom nav on phones); while it is shown on a phone the floating button moves up (`body:has(.snackbar) .fab`) so they never overlap. The data comes from `preferences.set_flash` (`kind="refuel_saved"`), shown once. Use it for undoable results; failures stay `.alert.error` or `toast`.
+
 ### Dialog and confirm
 
 All forms open as a dialog: `.scrim` (click to close) containing `form.dialog.form` with `.dialog-head`, `.dialog-body` and `.dialog-foot`. The head has a close `icon-btn` (a real link, so it works without JavaScript). On phones the form dialog is full screen. A confirmation is `form.dialog.confirm` with an `h3`, one paragraph, optionally one `.field` (select) when the user must choose before confirming (delete station: where its refuellings move), and a foot with Cancel and the action.
@@ -207,7 +228,7 @@ A text field whose value is often copied (the VIN) gets `copy=True` in the `fiel
 
 ### Toast
 
-`toast(message)` in `app.js` shows a short `.toast` at the bottom of the screen for about three seconds. Use it only to report a background action that failed (for example saving the card choice); successful actions reload the page and need no toast.
+For a result the user can undo use the Snackbar above. `toast(message)` in `app.js` shows a short `.toast` at the bottom of the screen for about three seconds. Use it only to report a background action that failed (for example saving the card choice); successful actions reload the page and need no toast.
 
 ### Empty state
 

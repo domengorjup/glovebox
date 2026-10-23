@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
@@ -31,13 +31,18 @@ from glovebox.importers.base import (
 from glovebox.importers.engine import SourceTable, find_column
 from glovebox.importers.presets import STANDARD_ID, Preset, list_presets
 from glovebox.models import (
+    CalendarState,
     Expense,
     ExpenseCategory,
     ImportBatch,
     Refuel,
+    Reminder,
+    ReminderStatus,
     Station,
     Vehicle,
 )
+from glovebox.services import reminders as reminder_service
+from glovebox.services.reminder_sync import get_calendar_entity
 from glovebox.services.records import (
     DerivedFigures,
     NotFoundError,
@@ -54,7 +59,8 @@ DETECT_THRESHOLD = 0.5
 # each of its section presets; among tied shipped presets these (the fill-ups)
 # win. Tied user presets always win.
 PREFERRED_ON_TIE = ("fuelio-fillups", "drivvo-refuelling")
-_BACKUP_TABLES = ("records", "vehicles", "stations")
+_BACKUP_TABLES = ("records", "vehicles", "stations", "reminders")
+_REMINDER_VEHICLE_FIELDS = ("insurance_valid_until", "registration_valid_until")
 
 
 @dataclass(frozen=True)
@@ -99,11 +105,18 @@ class ImportPreview:
     is_backup: bool = False
     companion_changes: list[CompanionChange] = field(default_factory=list)
     needs_vehicle_choice: bool = False  # question for the user, not a file fault
+    new_reminders: int = 0
+    duplicate_reminders: int = 0  # uid already present
 
     @property
     def nothing_new(self) -> bool:
-        """True if a commit would create no record, vehicle or station."""
-        return not (self.new_refuels or self.new_expenses or self.companion_changes)
+        """True if a commit would create no record, reminder, vehicle or station."""
+        return not (
+            self.new_refuels
+            or self.new_expenses
+            or self.new_reminders
+            or self.companion_changes
+        )
 
 
 @dataclass(frozen=True)
@@ -132,6 +145,22 @@ class _StationRow:
     brand: str | None
 
 
+@dataclass(frozen=True)
+class _ReminderRow:
+    """A valid row of ``reminders.csv``."""
+
+    uid: str | None
+    vehicle: str
+    title: str
+    category: ExpenseCategory
+    due_date: date
+    lead_days: int
+    status: ReminderStatus
+    done_date: date | None
+    vehicle_field: str | None
+    notes: str | None
+
+
 @dataclass
 class _Plan:
     """Parsed, mapped and de-duplicated import, ready to preview or commit."""
@@ -146,6 +175,8 @@ class _Plan:
     new_default: str | None = None  # name of the vehicle created for unnamed records
     vehicle_details: dict[str, dict] = field(default_factory=dict)  # vehicles.csv
     stations: list[_StationRow] = field(default_factory=list)  # stations.csv
+    reminder_rows: list[_ReminderRow] = field(default_factory=list)  # reminders.csv
+    reminders: list[tuple[_ReminderRow, int | str]] = field(default_factory=list)
     vehicle_fills: dict[int, dict] = field(default_factory=dict)  # id -> empty fields to set
     station_fills: dict[tuple[str, str | None], str] = field(default_factory=dict)  # -> brand
 
@@ -261,7 +292,7 @@ def list_batches(session: Session) -> list[ImportBatch]:
 
 def undo_batch(session: Session, batch_id: int) -> None:
     """
-    Delete the batch's refuels, expenses and stations created only by it.
+    Delete the batch's refuels, expenses, reminders and stations created only by it.
 
     A station created by the batch survives if a refuel outside the batch
     uses it. Vehicles created by the import are kept.
@@ -271,6 +302,11 @@ def undo_batch(session: Session, batch_id: int) -> None:
         raise NotFoundError(f"Import batch {batch_id} not found")
     session.execute(delete(Refuel).where(Refuel.import_batch_id == batch_id))
     session.execute(delete(Expense).where(Expense.import_batch_id == batch_id))
+    for reminder in session.scalars(
+        select(Reminder).where(Reminder.import_batch_id == batch_id)
+    ):
+        reminder_service.leave_removal_note(session, reminder)  # the event goes too
+        session.delete(reminder)
     in_use = select(Refuel.station_id).where(Refuel.station_id.is_not(None))
     session.execute(
         delete(Station).where(
@@ -310,7 +346,9 @@ def _plan(
     )
     preview.preset_note = preset.note
     plan = _Plan(preview.format, preview)
-    has_companions = source.vehicles is not None or source.stations is not None
+    has_companions = any(
+        t is not None for t in (source.vehicles, source.stations, source.reminders)
+    )
     if source.is_backup and not source.tables:
         preview.errors.append("The backup has no records.csv.")
         return plan
@@ -321,9 +359,13 @@ def _plan(
     _collect(plan, result)
     names = _read_vehicles(source.vehicles, plan)
     _read_stations(source.stations, plan)
-    preview.vehicle_names = [*names, *(n for n in _vehicle_names(result) if n not in names)]
+    reminder_names = _read_reminders(source.reminders, plan)
+    preview.vehicle_names = list(dict.fromkeys(
+        [*names, *_vehicle_names(result), *reminder_names]
+    ))
     if not plan.blocked:
         _map_and_dedupe(session, result, mapping, plan)
+        _plan_reminders(session, plan)
         _plan_companions(session, plan)
     return plan
 
@@ -427,6 +469,99 @@ def _read_stations(table: SourceTable | None, plan: _Plan) -> None:
                     _cell(row, column["brand"]) or None,
                 )
             )
+
+
+def _read_reminders(table: SourceTable | None, plan: _Plan) -> list[str]:
+    """Read ``reminders.csv`` into ``plan.reminder_rows``; return the vehicle names."""
+    if table is None:
+        return []
+    names: list[str] = []
+    columns = {
+        name: find_column([name], table.headers)
+        for name in (
+            "uid", "vehicle", "title", "category", "due_date", "lead_days",
+            "status", "done_date", "vehicle_field", "notes",
+        )
+    }  # fmt: skip
+    for line, row in table.rows:
+        cells = {name: _cell(row, index) for name, index in columns.items()}
+        try:
+            parsed = _parse_reminder_row(cells)
+        except ValueError as error:
+            plan.preview.row_errors.append(
+                RowError(line, error.args[0], cells.get(error.args[0], ""),
+                         f"reminders.csv: {error.args[1]}")
+            )  # fmt: skip
+            continue
+        plan.reminder_rows.append(parsed)
+        if parsed.vehicle not in names:
+            names.append(parsed.vehicle)
+    return names
+
+
+def _parse_reminder_row(cells: dict[str, str]) -> _ReminderRow:
+    """A ``reminders.csv`` row; ``ValueError(field, message)`` for a bad one."""
+    if not cells["vehicle"]:
+        raise ValueError("vehicle", "the vehicle is missing.")
+    if not cells["title"]:
+        raise ValueError("title", "the title is missing.")
+    due = _reminder_date(cells["due_date"], "due_date", required=True)
+    done = _reminder_date(cells["done_date"], "done_date")
+    try:
+        category = ExpenseCategory(cells["category"] or "other")
+    except ValueError:
+        raise ValueError("category", "unknown category.") from None
+    try:
+        status = ReminderStatus(cells["status"] or "open")
+    except ValueError:
+        raise ValueError("status", "status must be open or done.") from None
+    try:
+        lead_days = int(cells["lead_days"] or reminder_service.DEFAULT_LEAD_DAYS)
+    except ValueError:
+        raise ValueError("lead_days", "lead_days is not a whole number.") from None
+    if not 0 <= lead_days <= reminder_service.MAX_LEAD_DAYS:
+        raise ValueError("lead_days", "lead_days must be from 0 to 365.")
+    vehicle_field = cells["vehicle_field"] or None
+    if vehicle_field is not None and vehicle_field not in _REMINDER_VEHICLE_FIELDS:
+        raise ValueError("vehicle_field", "unknown vehicle_field.")
+    return _ReminderRow(
+        uid=cells["uid"] or None,
+        vehicle=cells["vehicle"],
+        title=cells["title"][: reminder_service.MAX_TITLE_LENGTH],
+        category=category,
+        due_date=due,
+        lead_days=lead_days,
+        status=status,
+        done_date=done if status is ReminderStatus.DONE else None,
+        vehicle_field=vehicle_field,
+        notes=cells["notes"] or None,
+    )
+
+
+def _reminder_date(text: str, name: str, required: bool = False) -> date | None:
+    if not text:
+        if required:
+            raise ValueError(name, f"{name} is missing.")
+        return None
+    try:
+        return date.fromisoformat(text)
+    except ValueError:
+        raise ValueError(name, f"{name} is not a date (YYYY-MM-DD).") from None
+
+
+def _plan_reminders(session: Session, plan: _Plan) -> None:
+    """Skip reminders whose uid exists (or repeats in the file); keep the rest."""
+    preview = plan.preview
+    seen = set(session.scalars(select(Reminder.uid)))
+    for row in plan.reminder_rows:
+        if row.uid is not None and row.uid in seen:
+            preview.duplicate_reminders += 1
+            continue
+        if row.uid is not None:
+            seen.add(row.uid)
+        vehicle_id = plan.vehicle_ids[row.vehicle]
+        plan.reminders.append((row, row.vehicle if vehicle_id is None else vehicle_id))
+    preview.new_reminders = len(plan.reminders)
 
 
 _VEHICLE_DETAILS = (
@@ -669,8 +804,10 @@ def _write(session: Session, plan: _Plan, filename: str) -> ImportBatch:
         filename=filename[:255],
         refuels_imported=len(plan.refuels),
         expenses_imported=len(plan.expenses),
+        reminders_imported=len(plan.reminders),
         duplicates_skipped=plan.preview.duplicate_refuels
-        + plan.preview.duplicate_expenses,
+        + plan.preview.duplicate_expenses
+        + plan.preview.duplicate_reminders,
     )
     session.add(batch)
     session.flush()
@@ -693,8 +830,36 @@ def _write(session: Session, plan: _Plan, filename: str) -> ImportBatch:
     for expense, target in plan.expenses:
         vehicle_id = created[target] if isinstance(target, str) else target
         session.add(_new_expense(expense, vehicle_id, batch))
+    calendar = get_calendar_entity(session)
+    for row, target in plan.reminders:
+        vehicle_id = created[target] if isinstance(target, str) else target
+        session.add(_new_reminder(row, vehicle_id, batch, calendar is not None))
     session.flush()
     return batch
+
+
+def _new_reminder(
+    row: _ReminderRow, vehicle_id: int, batch: ImportBatch, calendar: bool
+) -> Reminder:
+    reminder = Reminder(
+        vehicle_id=vehicle_id,
+        title=row.title,
+        category=row.category,
+        due_date=row.due_date,
+        lead_days=row.lead_days,
+        notes=row.notes,
+        status=row.status,
+        vehicle_field=row.vehicle_field,
+        revision=1,
+        import_batch_id=batch.id,
+    )
+    if row.uid:
+        reminder.uid = row.uid
+    if row.status is ReminderStatus.DONE:
+        reminder.done_at = datetime.combine(row.done_date or row.due_date, datetime.min.time())
+    elif calendar:
+        reminder.cal_state = CalendarState.PENDING
+    return reminder
 
 
 def _create_vehicles(session: Session, plan: _Plan) -> dict[str, int]:

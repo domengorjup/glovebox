@@ -128,15 +128,17 @@ class SourceTable:
 @dataclass
 class SourceFile:
     """
-    A read upload: its record tables, the optional ``vehicles`` and ``stations``
-    tables of a ZIP (members ``vehicles.csv`` / ``stations.csv``, recognised by
-    name and by a ``name`` column without a ``date`` column), and whether it is
-    a full backup (a ZIP that also holds ``datapackage.json``).
+    A read upload: its record tables, the optional ``vehicles``, ``stations``
+    and ``reminders`` tables of a ZIP (members ``vehicles.csv`` /
+    ``stations.csv``, recognised by name and by a ``name`` column without a
+    ``date`` column; ``reminders.csv`` by name and a ``due_date`` column), and
+    whether it is a full backup (a ZIP that also holds ``datapackage.json``).
     """
 
     tables: list[SourceTable] = field(default_factory=list)
     vehicles: SourceTable | None = None
     stations: SourceTable | None = None
+    reminders: SourceTable | None = None
     is_backup: bool = False
     sections: list[str] = field(default_factory=list)  # ``## name`` / ``# name`` lines found
 
@@ -248,7 +250,7 @@ def _read_zip(data: bytes, preset: Preset | None, answers: Answers) -> SourceFil
                 for name in member.sections:
                     if name not in result.sections:
                         result.sections.append(name)
-        if result.vehicles or result.stations or result.is_backup:
+        if result.vehicles or result.stations or result.reminders or result.is_backup:
             for table in result.tables:  # "records" is not a vehicle name
                 if table.name.casefold() == "records":
                     table.name = ""
@@ -259,19 +261,20 @@ def _read_zip(data: bytes, preset: Preset | None, answers: Answers) -> SourceFil
 
 def _read_companion(result: SourceFile, content: bytes, stem: str) -> bool:
     """
-    Take a ZIP member as the vehicles or stations table if it is one. These
-    tables have a fixed layout, so they are read without the preset.
+    Take a ZIP member as the vehicles, stations or reminders table if it is
+    one. These tables have a fixed layout, so they are read without the preset.
     """
     kind = stem.casefold()
-    if kind not in ("vehicles", "stations"):
+    if kind not in ("vehicles", "stations", "reminders"):
         return False
     tables = _read_text_file(content, stem, None, Answers()).tables
     if not tables:
         return False
     table = tables[0]
-    if find_column(["name"], table.headers) is None:
+    key_column = "due_date" if kind == "reminders" else "name"
+    if find_column([key_column], table.headers) is None:
         return False
-    if find_column(["date"], table.headers) is not None:
+    if kind != "reminders" and find_column(["date"], table.headers) is not None:
         return False
     setattr(result, kind, table)
     return True

@@ -11,6 +11,8 @@ ingress_port: 8099
 panel_icon: mdi:car-wrench
 panel_title: Glovebox
 panel_admin: true
+# Core API access (HA calendars for reminders) with SUPERVISOR_TOKEN.
+homeassistant_api: true
 # Optional stats API (Bearer token, /api/v1 only). Host port null = off until the
 # user sets it in the add-on network settings; it also needs the api_token option.
 ports:

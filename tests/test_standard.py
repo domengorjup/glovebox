@@ -60,7 +60,9 @@ def test_datapackage_structure() -> None:
     assert package["profile"] == "tabular-data-package"
     assert "glovebox" not in package
     resources = {r["name"]: r for r in package["resources"]}
-    assert list(resources) == ["records", "vehicles", "stations"]
+    assert list(resources) == [
+        "records", "vehicles", "stations", "reminders",
+    ]
     for name, resource in resources.items():
         assert resource["profile"] == "tabular-data-resource"
         assert resource["path"] == f"{name}.csv"

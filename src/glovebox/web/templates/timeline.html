@@ -117,4 +117,10 @@
 <div class="empty">No entries</div>
 {% endfor %}
 {% endif %}
+{% if saved %}
+<form class="snackbar" method="post" action="{{ url(request, saved.undo) }}" role="status" data-snackbar>
+  <span class="snackbar-text">{{ saved.text }}</span>
+  <button type="submit" class="btn">Undo</button>
+</form>
+{% endif %}
 {% endblock %}

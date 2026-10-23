@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from pathlib import Path
 from typing import Mapping
@@ -46,6 +46,9 @@ class Settings:
         Port of the add-on API listener (``/api/v1`` with Bearer token only).
         ``None`` means no such listener. Only used in add-on mode, and only
         started when ``api_token`` is set (design D9a).
+    supervisor_token : str | None
+        ``SUPERVISOR_TOKEN`` of the add-on, for the Home Assistant Core API
+        (reminders calendar). ``None`` outside add-on mode.
     """
 
     mode: Mode = Mode.STANDALONE
@@ -58,6 +61,7 @@ class Settings:
     host: str = "0.0.0.0"
     port: int = 8080
     api_port: int | None = None
+    supervisor_token: str | None = None
 
 
 MIN_ADDON_TOKEN_LENGTH = 16
@@ -120,7 +124,11 @@ def load_settings(
         options = json.loads(options_file.read_text(encoding="utf-8"))
         raw.update({k: str(v) for k, v in options.items() if k in _ENV_NAMES.values()})
     raw.update({field: env[name] for name, field in _ENV_NAMES.items() if env.get(name)})
-    return _build_settings({k: v for k, v in raw.items() if v != ""})
+    settings = _build_settings({k: v for k, v in raw.items() if v != ""})
+    token = env.get("SUPERVISOR_TOKEN") or None
+    if settings.mode is Mode.ADDON and token:
+        settings = replace(settings, supervisor_token=token)
+    return settings
 
 
 def _build_settings(raw: dict[str, str]) -> Settings:

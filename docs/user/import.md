@@ -42,10 +42,12 @@ If you leave before the last section, the stored file is kept for 24 hours; afte
 
 ## Vehicles and stations in the file
 
-A ZIP can hold `vehicles.csv` and/or `stations.csv` next to the records, with or without a `datapackage.json` (see [Optional tables](standard-format.md#optional-tables-vehicles-and-stations)). The preview then lists what it will do:
+A ZIP can hold `vehicles.csv` and/or `stations.csv` next to the records, with or without a `datapackage.json` (see [Optional tables](standard-format.md#optional-tables-vehicles-stations-and-reminders)). The preview then lists what it will do:
 
 - vehicles and stations that do not exist are **created** with the details in the file;
 - vehicles (matched by name) and stations (matched by name and location) that exist are only **filled**: empty details are completed and nothing you entered is overwritten.
+
+A `reminders.csv` in the ZIP restores the reminders. A reminder whose id already exists is skipped as a duplicate, and **Undo** removes the reminders of an import.
 
 ## Questions you may be asked
 

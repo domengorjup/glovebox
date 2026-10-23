@@ -9,7 +9,18 @@ To edit or delete a record, open it from the Timeline.
 
 ## Refuelling
 
-See [First steps](first-steps.md#2-add-a-refuelling). On a phone the form fills the screen:
+**Refuelling** opens the quick page, made for the pump. It is also available as `/quick` when you run Glovebox standalone.
+
+- **Vehicle:** a choice at the top, shown only when you have more than one vehicle. It starts with the selected vehicle, else the last one used.
+- **Odometer** comes first and has the number keypad. Under it you see the last reading and, as you type, how far you have driven since then (red when the number is lower than the last one).
+- **Litres** and **Total** are the big fields; **Price / litre** is calculated, or type it and one of the others is calculated instead.
+- **Station:** chips with the last station used with this vehicle and its two most frequent ones, preselected the last one. **Other** shows the normal station list, including *New station…*.
+- **Full tank** is on. The date chip says *Today*; tap it to change the day. **More** adds *Missed previous fill-up* and notes. The time is the current time.
+- **Save refuelling** is greyed out until odometer, litres and total are filled.
+
+After saving you are back on the Timeline, where a bar at the bottom shows the litres, the total and the consumption of this tank (when it can be worked out), with **Undo**. Undo deletes the refuelling you just saved. Tap the entry later to edit it with all fields.
+
+See [First steps](first-steps.md#2-add-a-refuelling). The full form (all fields, used for editing) fills the screen on a phone:
 
 ![Refuelling form on a phone](../assets/screenshots/refuel-form-phone-light.png){ width="260" }
 
@@ -17,9 +28,13 @@ See [First steps](first-steps.md#2-add-a-refuelling). On a phone the form fills 
 
 ## Service
 
+**Service** opens a quick page too (`/quick-service`): vehicle choice (only with several vehicles), **What was done** with chips (the fixed *Regular service*, then the titles you used before with this vehicle, at most four in all), a big **Amount**, and the **Odometer**. The field starts empty and shows the last recorded reading as a grey suggestion, with the hint *Last: … km on …*. Leave it empty and that reading is saved as an estimate (marked with ≈, with a warning on the Timeline); type the real one if you know it. The full add form behaves the same. The date chip says *Today*; **More** adds notes. Saving returns to the Timeline with *Service saved* and **Undo**. Editing an entry opens the full form below.
+
 For maintenance: oil change, tyres, repairs. Fields: vehicle, date, odometer (optional), title (for example "Oil and filter change"), amount, notes. It is stored in the *maintenance* category.
 
 ## Expense
+
+**Expense** opens the quick page `/quick-expense`: choose the type (insurance, registration, other), then the title (chips of the titles used before for that type), the amount (full price paid) and the odometer as for a service. **More** adds the coverage dates (both or none) and notes. Saving shows *Expense saved* with **Undo**.
 
 For everything else. Choose a type with the **Type** switch:
 

@@ -370,6 +370,111 @@
           ""
         ]
       }
+    },
+    {
+      "name": "reminders",
+      "path": "reminders.csv",
+      "profile": "tabular-data-resource",
+      "format": "csv",
+      "mediatype": "text/csv",
+      "encoding": "utf-8",
+      "title": "Reminders (backup only)",
+      "schema": {
+        "fields": [
+          {
+            "name": "uid",
+            "type": "string",
+            "description": "Unique id of the reminder; kept across backup and restore. Empty gives the reminder a new id.",
+            "example": "6f1c2a52-1d0e-4b9a-9c1e-3f6f0a7e2b11"
+          },
+          {
+            "name": "vehicle",
+            "type": "string",
+            "description": "Vehicle name, as used in records.csv.",
+            "example": "Golf",
+            "constraints": {
+              "required": true
+            }
+          },
+          {
+            "name": "title",
+            "type": "string",
+            "description": "Short label of the reminder.",
+            "example": "Registration renewal",
+            "constraints": {
+              "required": true
+            }
+          },
+          {
+            "name": "category",
+            "type": "string",
+            "description": "Reminder category (the expense categories).",
+            "example": "registration",
+            "constraints": {
+              "enum": [
+                "maintenance",
+                "insurance",
+                "registration",
+                "other"
+              ]
+            }
+          },
+          {
+            "name": "due_date",
+            "type": "date",
+            "description": "Day the reminder is due, YYYY-MM-DD.",
+            "example": "2027-03-01",
+            "constraints": {
+              "required": true
+            }
+          },
+          {
+            "name": "lead_days",
+            "type": "integer",
+            "description": "Notify this many days before the due date, 0 to 365.",
+            "example": "30"
+          },
+          {
+            "name": "status",
+            "type": "string",
+            "description": "Whether the reminder is still open.",
+            "example": "open",
+            "constraints": {
+              "enum": [
+                "open",
+                "done"
+              ]
+            }
+          },
+          {
+            "name": "done_date",
+            "type": "date",
+            "description": "Day the reminder was marked done; only for done reminders.",
+            "example": "2027-02-20"
+          },
+          {
+            "name": "vehicle_field",
+            "type": "string",
+            "description": "Written by Glovebox: the vehicle date this reminder follows. Leave empty.",
+            "example": "registration_valid_until",
+            "constraints": {
+              "enum": [
+                "insurance_valid_until",
+                "registration_valid_until"
+              ]
+            }
+          },
+          {
+            "name": "notes",
+            "type": "string",
+            "description": "Free text.",
+            "example": "Bring the green card"
+          }
+        ],
+        "missingValues": [
+          ""
+        ]
+      }
     }
   ]
 }

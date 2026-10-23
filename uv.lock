@@ -275,6 +275,7 @@ dependencies = [
 dev = [
     { name = "httpx" },
     { name = "pytest" },
+    { name = "pyyaml" },
 ]
 docs = [
     { name = "mkdocs-material" },
@@ -295,6 +296,7 @@ requires-dist = [
 dev = [
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "pytest", specifier = ">=9.1.1" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
 ]
 docs = [{ name = "mkdocs-material", specifier = ">=9.7.7" }]
 

@@ -5,19 +5,23 @@ The system SHALL store reminders with these fields:
 - **Required:** vehicle, title, category, due date and lead days.
 - **Optional:** notes.
 - **Category:** one of the expense categories (`maintenance`, shown as "Service"; `insurance`; `registration`; `other`).
-- **Lead days:** a whole number of 0 or more, default 14.
+- **Lead days** ("notify N days before"): a whole number from 0 to 365, default 30, set when the reminder is created and editable.
 - **Remind date:** the due date minus the lead days.
 - **Status:** `open` or `done`.
 - **Stable uid:** a unique id that SHALL be kept across backup and restore.
 
 A reminder MAY record the expense it was created from. Deleting that expense SHALL keep the reminder and drop the link. The user SHALL be able to create, edit, mark done, reopen and delete a reminder.
 
+#### Scenario: Default lead time
+- **WHEN** the user opens the new-reminder form
+- **THEN** "Notify … days before" is 30
+
 #### Scenario: Create a reminder
 - **WHEN** the user saves a reminder for "Golf" titled "Registration", category registration, due 2027-03-01, 14 days before
 - **THEN** it is stored as open with remind date 2027-02-15
 
 #### Scenario: Reject a reminder without title or due date
-- **WHEN** a reminder is submitted with a blank title, no due date or negative lead days
+- **WHEN** a reminder is submitted with a blank title, no due date, or lead days below 0 or above 365
 - **THEN** the system rejects it and stores nothing
 
 #### Scenario: Mark done and reopen
@@ -34,13 +38,13 @@ The expense edit dialog SHALL offer "Remind me", which SHALL open the reminder f
 - the expense's vehicle and category;
 - the title "<expense title> renewal";
 - the due date: the expense's coverage end when set, otherwise the expense date plus one year;
-- 14 lead days.
+- 30 lead days.
 
 The add-expense form SHALL offer a "Remind me before it runs out" switch, off by default, with a lead-days field. Saving the expense with the switch on SHALL also create that reminder. The reminder SHALL keep a link to the expense, but later edits of the expense SHALL NOT change the reminder.
 
 #### Scenario: Insurance with coverage end
 - **WHEN** the user opens "Remind me" on the insurance expense "Annual policy" with coverage 2026-03-01 to 2027-02-28
-- **THEN** the form shows title "Annual policy renewal", category insurance, due 2027-02-28 and 14 days before
+- **THEN** the form shows title "Annual policy renewal", category insurance, due 2027-02-28 and 30 days before
 
 #### Scenario: Expense without coverage
 - **WHEN** the user opens "Remind me" on a service expense dated 2026-05-10 without coverage dates
@@ -51,7 +55,7 @@ The add-expense form SHALL offer a "Remind me before it runs out" switch, off by
 - **THEN** the expense and an open reminder due 2027-04-30, 30 days before, are stored
 
 ### Requirement: Reminders from vehicle dates
-When a vehicle has an insurance or registration "valid until" date (vehicle-details change), the vehicle form SHALL offer a "Remind me … days before" switch next to each of these dates.
+When a vehicle has an insurance or registration "valid until" date (vehicle-details change), the vehicle form SHALL offer a "Remind me … days before" switch next to each of these dates, with 30 days by default.
 - **Switch on:** saving SHALL create an open reminder linked to that vehicle field, due on that date, titled "Insurance renewal" or "Registration renewal", with the category of the same name.
 - **Date changed:** the linked open reminder SHALL move to the new date.
 - **Date cleared or switch off:** the linked open reminder SHALL be deleted.

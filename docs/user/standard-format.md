@@ -24,14 +24,15 @@ A machine-readable description (a Data Package with one Table Schema per table) 
 - An expense needs `title` and a `total` greater than 0. `coverage_start` and `coverage_end` are set both or neither.
 - Records refer to vehicles by name and to stations by name and location.
 
-## Optional tables: vehicles and stations
+## Optional tables: vehicles, stations and reminders
 
-`records.csv` alone is enough. To bring vehicle and station details along, put `vehicles.csv` and/or `stations.csv` next to `records.csv` in a ZIP file, or in a ZIP of several CSV files, and import the ZIP. The ZIP does not need a `datapackage.json`.
+`records.csv` alone is enough. To bring vehicle and station details and reminders along, put `vehicles.csv`, `stations.csv` and/or `reminders.csv` next to `records.csv` in a ZIP file, or in a ZIP of several CSV files, and import the ZIP. The ZIP does not need a `datapackage.json`.
 
 - A vehicle or station that does not exist yet is created with all the details given.
 - A vehicle (matched by `name`) or station (matched by `name` and `location`) that already exists is only completed: empty details are filled and nothing is overwritten.
 - The import preview lists which vehicles and stations will be created or filled before you confirm.
 - `stations.csv` can list stations that have no refuels yet.
+- A reminder in `reminders.csv` whose `uid` already exists is skipped as a duplicate. Reminders refer to vehicles by name, like records. The link to an expense and the calendar state are not part of the file.
 - A full backup is exactly this, plus `datapackage.json`: it is made on the export page and restored on the import page like any other ZIP.
 
 ## `records.csv`
@@ -66,7 +67,7 @@ Refuels and expenses. Used by every standard import and export.
 
 ## `vehicles.csv`
 
-Optional. Vehicle details; see [Optional tables](#optional-tables-vehicles-and-stations).
+Optional. Vehicle details; see [Optional tables](#optional-tables-vehicles-stations-and-reminders).
 
 | Column | Type | Unit | Required | Description | Example |
 |---|---|---|---|---|---|
@@ -88,13 +89,30 @@ Optional. Vehicle details; see [Optional tables](#optional-tables-vehicles-and-s
 
 ## `stations.csv`
 
-Optional. Station details and stations without refuels; see [Optional tables](#optional-tables-vehicles-and-stations).
+Optional. Station details and stations without refuels; see [Optional tables](#optional-tables-vehicles-stations-and-reminders).
 
 | Column | Type | Unit | Required | Description | Example |
 |---|---|---|---|---|---|
 | `name` | string |  | always | Station name. | `OMV Celje` |
 | `location` | string |  | no | Station location. | `Celje` |
 | `brand` | string |  | no | Station brand. | `OMV` |
+
+## `reminders.csv`
+
+Optional. Date reminders of the vehicles; see [Optional tables](#optional-tables-vehicles-stations-and-reminders).
+
+| Column | Type | Unit | Required | Description | Example |
+|---|---|---|---|---|---|
+| `uid` | string |  | no | Unique id of the reminder; kept across backup and restore. Empty gives the reminder a new id. | `6f1c2a52-1d0e-4b9a-9c1e-3f6f0a7e2b11` |
+| `vehicle` | string |  | always | Vehicle name, as used in records.csv. | `Golf` |
+| `title` | string |  | always | Short label of the reminder. | `Registration renewal` |
+| `category` | enum |  | no | Reminder category (the expense categories). One of `maintenance`, `insurance`, `registration`, `other`. Empty means `other`. | `registration` |
+| `due_date` | date |  | always | Day the reminder is due, YYYY-MM-DD. | `2027-03-01` |
+| `lead_days` | integer |  | no | Notify this many days before the due date, 0 to 365. Empty means `30`. | `30` |
+| `status` | enum |  | no | Whether the reminder is still open. One of `open`, `done`. Empty means `open`. | `open` |
+| `done_date` | date |  | no | Day the reminder was marked done; only for done reminders. | `2027-02-20` |
+| `vehicle_field` | enum |  | no | Written by Glovebox: the vehicle date this reminder follows. Leave empty. One of `insurance_valid_until`, `registration_valid_until`. | `registration_valid_until` |
+| `notes` | string |  | no | Free text. | `Bring the green card` |
 
 ## Example
 

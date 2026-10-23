@@ -53,7 +53,7 @@ class StandardField:
         Unit of a number (``km``, ``l``, ``currency``, ``currency/l``).
     applies_to : tuple[str, ...]
         ``("refuel",)``, ``("expense",)``, both, or ``("vehicle",)`` /
-        ``("station",)`` for the backup tables.
+        ``("station",)`` / ``("reminder",)`` for the backup tables.
     required : str
         ``always``, ``refuel`` (required on refuel rows), ``expense``
         (required on expense rows) or ``no``.
@@ -245,10 +245,59 @@ STATION_FIELDS: tuple[StandardField, ...] = (
     StandardField("brand", STRING, "Station brand.", "OMV", applies_to=("station",)),
 )
 
+REMINDER_STATUSES = ("open", "done")
+REMINDER_VEHICLE_FIELDS = ("insurance_valid_until", "registration_valid_until")
+
+REMINDER_FIELDS: tuple[StandardField, ...] = (
+    StandardField(
+        "uid", STRING,
+        "Unique id of the reminder; kept across backup and restore. "
+        "Empty gives the reminder a new id.",
+        "6f1c2a52-1d0e-4b9a-9c1e-3f6f0a7e2b11", applies_to=("reminder",),
+    ),
+    StandardField(
+        "vehicle", STRING, "Vehicle name, as used in records.csv.", "Golf",
+        applies_to=("reminder",), required=REQUIRED_ALWAYS,
+    ),
+    StandardField(
+        "title", STRING, "Short label of the reminder.", "Registration renewal",
+        applies_to=("reminder",), required=REQUIRED_ALWAYS,
+    ),
+    StandardField(
+        "category", ENUM, "Reminder category (the expense categories).",
+        "registration", applies_to=("reminder",), enum=CATEGORIES, default="other",
+    ),
+    StandardField(
+        "due_date", DATE, "Day the reminder is due, YYYY-MM-DD.", "2027-03-01",
+        applies_to=("reminder",), required=REQUIRED_ALWAYS,
+    ),
+    StandardField(
+        "lead_days", INTEGER,
+        "Notify this many days before the due date, 0 to 365.", "30",
+        applies_to=("reminder",), default="30",
+    ),
+    StandardField(
+        "status", ENUM, "Whether the reminder is still open.", "open",
+        applies_to=("reminder",), enum=REMINDER_STATUSES, default="open",
+    ),
+    StandardField(
+        "done_date", DATE, "Day the reminder was marked done; only for done reminders.",
+        "2027-02-20", applies_to=("reminder",),
+    ),
+    StandardField(
+        "vehicle_field", ENUM,
+        "Written by Glovebox: the vehicle date this reminder follows. Leave empty.",
+        "registration_valid_until", applies_to=("reminder",),
+        enum=REMINDER_VEHICLE_FIELDS,
+    ),
+    StandardField("notes", STRING, "Free text.", "Bring the green card", applies_to=("reminder",)),
+)
+
 TABLES: dict[str, tuple[StandardField, ...]] = {
     "records": RECORD_FIELDS,
     "vehicles": VEHICLE_FIELDS,
     "stations": STATION_FIELDS,
+    "reminders": REMINDER_FIELDS,
 }
 
 # One refuel and one expense; rows of ``RECORD_FIELDS`` (empty = no value).
@@ -291,6 +340,7 @@ _TABLE_TITLES = {
     "records": "Records (refuels and expenses)",
     "vehicles": "Vehicles (backup only)",
     "stations": "Stations (backup only)",
+    "reminders": "Reminders (backup only)",
 }
 
 

@@ -282,9 +282,9 @@ def test_timeline_numbers_do_not_break_across_lines(client):
 
 def test_add_chooser_links_to_the_three_forms(client):
     html = client.get("/add").text
-    assert 'href="/refuels/new"' in html
-    assert 'href="/expenses/new?kind=service"' in html
-    assert 'href="/expenses/new"' in html
+    assert 'href="/quick"' in html
+    assert 'href="/quick-service"' in html
+    assert 'href="/quick-expense"' in html
 
 
 def test_dialog_request_returns_only_the_content(client):

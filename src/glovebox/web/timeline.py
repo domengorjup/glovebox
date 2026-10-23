@@ -346,12 +346,20 @@ def _flash_warnings(notice: dict | None) -> list[str]:
     return []
 
 
+def _flash_saved(notice: dict | None) -> dict | None:
+    """The snackbar data (text and undo path) left by a quick-add page."""
+    if notice and notice.get("undo"):
+        return {"undo": notice["undo"], "text": notice["text"]}
+    return None
+
+
 @router.get("/")
 def timeline(request: Request, session: SessionDep, type: str = "all"):
     """Summary cards, filter chips and the month-grouped entry list."""
     if type not in TYPES:
         raise HTTPException(422, detail=f"type: '{type}' is not one of {', '.join(TYPES)}")
     chrome = load_chrome(session)
+    notice = preferences.pop_flash(session)
     today = date.today()
     currency = formatting.currency_symbol(request.app.state.settings.currency)
     everyone = chrome.vehicles + chrome.archived
@@ -385,7 +393,8 @@ def timeline(request: Request, session: SessionDep, type: str = "all"):
             if groups else []
         ),
         hidden_summaries=preferences.get_hidden_summaries(session),
-        warnings=_flash_warnings(preferences.pop_flash(session)),
+        warnings=_flash_warnings(notice),
+        saved=_flash_saved(notice),
         months=group_by_month(build_entries(session, chrome, type)),
         has_vehicles=bool(everyone),
         title=title,

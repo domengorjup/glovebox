@@ -1,0 +1,21 @@
+{# Station select plus the new-station fields; shared by the full form and the quick page. #}
+{% set new_station = f.new_station_name or f.station_id == '__new' %}
+<div class="field">
+  <label for="i-station_id">Station</label>
+  <select id="i-station_id" name="station_id" data-station-select>
+    <option value="">None</option>
+    {% for s in stations %}
+    <option value="{{ s.id }}" {{ 'selected' if f.station_id == s.id | string and not new_station }}>{{ s.name }}{{ ' - ' ~ s.location if s.location }}{{ ' · ' ~ s.brand if s.brand }}</option>
+    {% endfor %}
+    <option value="__new" {{ 'selected' if new_station }}>New station…</option>
+  </select>
+</div>
+<div class="new-station" data-new-station {{ '' if new_station else 'data-closed' }}>
+  <div class="grid2">
+    {{ field('Station name', 'new_station_name', f.new_station_name) }}
+    {{ field('Brand (optional)', 'new_station_brand', f.new_station_brand, list='brand-list') }}
+  </div>
+  {{ field('Location (optional)', 'new_station_location', f.new_station_location) }}
+  <datalist id="brand-list">{% for b in brands %}<option value="{{ b }}">{% endfor %}</datalist>
+  <p class="help">A new station overrides the selection above. The brand is only what you type.</p>
+</div>

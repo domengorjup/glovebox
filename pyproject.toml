@@ -29,6 +29,7 @@ build-backend = "uv_build"
 dev = [
     "httpx>=0.28.1",
     "pytest>=9.1.1",
+    "pyyaml>=6.0.3",
 ]
 docs = [
     "mkdocs-material>=9.7.7",

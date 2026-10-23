@@ -50,9 +50,9 @@ def set_setting(session: Session, key: str, value: str) -> None:
     session.flush()
 
 
-def set_flash(session: Session, kind: str, km: float | None = None) -> None:
+def set_flash(session: Session, kind: str, km: float | None = None, **extra) -> None:
     """Remember a one-time notice for the next Timeline page."""
-    set_setting(session, FLASH, json.dumps({"kind": kind, "km": km}))
+    set_setting(session, FLASH, json.dumps({"kind": kind, "km": km, **extra}))
 
 
 def pop_flash(session: Session) -> dict | None:

@@ -17,6 +17,7 @@ from glovebox.api import v1
 from glovebox.auth import install_api_auth, install_auth
 from glovebox.config import Mode, Settings, load_settings
 from glovebox.db import make_engine, make_session_factory, run_migrations
+from glovebox.services.reminder_sync import ReminderSync, client_for
 from glovebox.web import router as web_router
 from glovebox.web.templating import STATIC_DIR
 
@@ -45,14 +46,23 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     engine = engine or make_engine(settings.data_dir)
 
     @asynccontextmanager
-    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         run_migrations(engine)
-        yield
+        sync: ReminderSync = app.state.reminder_sync
+        retry = asyncio.create_task(sync.retry_forever()) if sync.available else None
+        try:
+            yield
+        finally:
+            if retry is not None:
+                retry.cancel()
 
     app = FastAPI(title="Glovebox", version=__version__, lifespan=lifespan)
     app.state.settings = settings
     app.state.engine = engine
     app.state.session_factory = make_session_factory(engine)
+    app.state.reminder_sync = ReminderSync(
+        app.state.session_factory, client_for(settings)
+    )
     install_auth(app)
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     app.include_router(web_router)

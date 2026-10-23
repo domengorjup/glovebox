@@ -19,6 +19,7 @@ from glovebox.services.records import (
 )
 from glovebox.models import Vehicle
 from glovebox.web.formatting import parse_decimal
+from glovebox.web.reminders import sync_after_save
 from glovebox.web.common import SessionDep, redirect, render
 
 router = APIRouter(prefix="/vehicles")
@@ -214,6 +215,8 @@ def vehicle_delete(
     except ConfirmationRequired:
         session.rollback()
         return redirect(request, f"/vehicles/{vehicle_id}/delete")
+    session.commit()
+    sync_after_save(request)  # removes the calendar events of its reminders
     return redirect(request, "/vehicles")
 
 

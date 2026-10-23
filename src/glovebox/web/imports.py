@@ -44,6 +44,7 @@ from glovebox.importers.presets import (
 )
 from glovebox.services import records
 from glovebox.services.records import NotFoundError, RecordsError
+from glovebox.web.reminders import sync_after_save
 from glovebox.standard import BOOLEAN, ENUM, RECORD_FIELDS, StandardField
 from glovebox.web.common import SessionDep, redirect, render
 
@@ -733,6 +734,7 @@ async def import_commit(request: Request, session: SessionDep):
     except (ValueError, RecordsError) as exc:
         session.rollback()
         return _preview_page(request, session, sub, 422, [str(exc)])
+    sync_after_save(request)  # imported open reminders go to the calendar
     seen = (*sub.seen, *([sub.preset.file.section] if sub.preset.file.section else []))
     remaining = _remaining_sections(data, sub.preset, seen)
     query = [("done", batch.id)]
@@ -792,4 +794,5 @@ def import_undo(request: Request, batch_id: int, session: SessionDep):
         pipeline.undo_batch(session, batch_id)
     except NotFoundError as exc:
         raise HTTPException(404, detail=str(exc)) from None
+    sync_after_save(request)  # events of the undone reminders are removed
     return redirect(request, "/import")

@@ -14,10 +14,17 @@ from sqlalchemy.orm import Session
 from glovebox.models import Expense, ExpenseCategory
 from glovebox.services import preferences, records
 from glovebox.services.records import ExpenseInput, ValidationError
+from glovebox.services.stats import StatsFilter
+from glovebox.web import formatting
 from glovebox.web.common import SessionDep, load_chrome, redirect, render
 from glovebox.web.formatting import parse_decimal, to_scaled_int
 
 router = APIRouter(prefix="/expenses")
+# The phone-first /quick-service and /quick-expense pages share the code below.
+quick_router = APIRouter()
+
+REGULAR_SERVICE = "Regular service"
+MAX_TITLE_CHIPS = 4
 
 
 class ExpenseForm(BaseModel):
@@ -56,8 +63,8 @@ def _form_from_expense(expense: Expense) -> dict[str, str]:
 
 def _form_page(request: Request, session: Session, entered: dict[str, str],
                expense_id: int | None = None, status: int = 200,
-               errors: list[str] | None = None):
-    """Render the service form (category maintenance) or the expense form."""
+               errors: list[str] | None = None, quick: bool = False):
+    """Render the service or expense form (the quick page when ``quick``)."""
     chrome = load_chrome(session)
     vehicles = list(chrome.vehicles)
     selected = entered.get("vehicle_id", "")
@@ -75,9 +82,10 @@ def _form_page(request: Request, session: Session, entered: dict[str, str],
         stored = records.get_expense(session, expense_id)
         if stored.odometer_estimated:
             estimated = stored.odometer_km
+    extra = _quick_context(session, entered) if quick else {}
     return render(
         request,
-        "expenses/form.html",
+        "expenses/quick.html" if quick else "expenses/form.html",
         status,
         chrome=chrome,
         section="timeline",
@@ -95,6 +103,7 @@ def _form_page(request: Request, session: Session, entered: dict[str, str],
             ).items()
         }),
         estimated_km=estimated,
+        **extra,
     )
 
 
@@ -167,8 +176,10 @@ def _parse_form(form: ExpenseForm) -> ExpenseInput:
     )
 
 
-def _save(request: Request, session: Session, form: ExpenseForm, expense_id: int | None):
+def _save(request: Request, session: Session, form: ExpenseForm, expense_id: int | None,
+          quick: bool = False):
     """Validate and save; on problems show the form again with messages."""
+    created = None
     try:
         data = _parse_form(form)
         notice = None
@@ -182,14 +193,17 @@ def _save(request: Request, session: Session, form: ExpenseForm, expense_id: int
                 data = replace(data, odometer_km=last.km, odometer_estimated=True)
                 notice = ("estimated", last.km)
         if expense_id is None:
-            records.create_expense(session, data)
+            created = records.create_expense(session, data)
         else:
             records.update_expense(session, expense_id, data)
     except (ValueError, ValidationError) as exc:
         session.rollback()
         messages = exc.messages if isinstance(exc, ValidationError) else [str(exc)]
-        return _form_page(request, session, form.model_dump(), expense_id, 422, messages)
-    if notice is not None:
+        return _form_page(request, session, form.model_dump(), expense_id, 422, messages,
+                          quick=quick)
+    if quick and created is not None:
+        _flash_saved(request, session, created, notice)
+    elif notice is not None:
         preferences.set_flash(session, *notice)
     return redirect(request, "/")
 
@@ -213,3 +227,114 @@ def expense_delete(request: Request, expense_id: int, session: SessionDep):
     """Delete an expense."""
     records.delete_expense(session, expense_id)
     return redirect(request, "/")
+
+
+@router.post("/{expense_id}/undo")
+def expense_undo(request: Request, expense_id: int, session: SessionDep):
+    """Delete the entry a quick add just created (the snackbar's Undo)."""
+    try:
+        records.delete_expense(session, expense_id)
+    except records.NotFoundError:
+        pass  # Already gone (Undo pressed twice): nothing to undo.
+    return redirect(request, "/")
+
+
+# --- Quick add (phone-first) ----------------------------------------------
+
+
+def _recent_titles(session: Session, vehicle_id: int, category: ExpenseCategory) -> list[str]:
+    """Distinct titles of the vehicle's entries in ``category``, newest first."""
+    flt = StatsFilter(vehicles=(vehicle_id,), categories=(category,))
+    titles: list[str] = []
+    for expense in records.list_expenses(session, flt):
+        if expense.title not in titles:
+            titles.append(expense.title)
+    return titles
+
+
+def _title_chips(session: Session, vehicle_id: str) -> dict[str, list[str]]:
+    """
+    Title chips per category for this vehicle (at most ``MAX_TITLE_CHIPS``).
+
+    Service starts with the fixed "Regular service", then recent titles.
+    """
+    chips: dict[str, list[str]] = {}
+    for category in ExpenseCategory:
+        recent = _recent_titles(session, int(vehicle_id), category) if vehicle_id.isdigit() else []
+        if category is ExpenseCategory.MAINTENANCE:
+            recent = [REGULAR_SERVICE] + [
+                t for t in recent if t.casefold() != REGULAR_SERVICE.casefold()
+            ]
+        chips[category.value] = recent[:MAX_TITLE_CHIPS]
+    return chips
+
+
+def _quick_context(session: Session, entered: dict[str, str]) -> dict:
+    """Extra template data of the quick pages: title chips, date chip text."""
+    today = date.today()
+    try:
+        day = date.fromisoformat(entered.get("date", ""))
+    except ValueError:
+        day = today
+    day_text = formatting.short_date(day)
+    return {
+        "title_chips": _title_chips(session, entered.get("vehicle_id", "")),
+        "today": today.isoformat(),
+        "date_text": f"Today, {day_text}" if day == today else day_text,
+    }
+
+
+def _flash_saved(request: Request, session: Session, expense: Expense,
+                 notice: tuple[str, float | None] | None) -> None:
+    """Leave the Timeline snackbar (and the odometer notice, if any) once."""
+    noun = "Service" if expense.category is ExpenseCategory.MAINTENANCE else "Expense"
+    money = formatting.money(expense.amount_cents, request.app.state.settings.currency)
+    kind, km = notice or ("saved", None)
+    preferences.set_flash(
+        session, kind, km, undo=f"/expenses/{expense.id}/undo",
+        text=f"{noun} saved \u00b7 {money}",
+    )
+
+
+def _quick_new(request: Request, session: Session, category: str, vehicle: str):
+    chrome = load_chrome(session)
+    if not chrome.vehicles:
+        return redirect(request, "/")
+    ids = {str(v.id) for v in chrome.vehicles}
+    default = vehicle if vehicle in ids else chrome.form_vehicle
+    default = default or str(chrome.vehicles[0].id)
+    entered = ExpenseForm(
+        vehicle_id=default, date=date.today().isoformat(), category=category
+    ).model_dump()
+    return _form_page(request, session, entered, quick=True)
+
+
+def _quick_create(request: Request, session: Session, form: ExpenseForm):
+    return _save(request, session, form, None, quick=True)
+
+
+@quick_router.get("/quick-service")
+def quick_service_new(request: Request, session: SessionDep, vehicle: str = ""):
+    """Quick service page (category maintenance)."""
+    return _quick_new(request, session, ExpenseCategory.MAINTENANCE.value, vehicle)
+
+
+@quick_router.get("/quick-expense")
+def quick_expense_new(request: Request, session: SessionDep, vehicle: str = ""):
+    """Quick expense page (insurance by default; the type is a choice)."""
+    return _quick_new(request, session, ExpenseCategory.INSURANCE.value, vehicle)
+
+
+@quick_router.post("/quick-service")
+def quick_service_create(request: Request, session: SessionDep,
+                         form: Annotated[ExpenseForm, Form()]):
+    """Create a service from the quick page."""
+    form.category = ExpenseCategory.MAINTENANCE.value
+    return _quick_create(request, session, form)
+
+
+@quick_router.post("/quick-expense")
+def quick_expense_create(request: Request, session: SessionDep,
+                         form: Annotated[ExpenseForm, Form()]):
+    """Create an expense from the quick page."""
+    return _quick_create(request, session, form)

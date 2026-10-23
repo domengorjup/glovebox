@@ -1,0 +1,61 @@
+blueprint:
+  name: Glovebox reminders
+  description: >-
+    Sends a notification on the remind date and on the due date of each
+    Glovebox reminder found in a calendar.
+  domain: automation
+  source_url: https://github.com/domengorjup/glovebox/blob/master/blueprints/automation/glovebox/reminders.yaml
+  input:
+    calendar:
+      name: Calendar
+      description: The calendar Glovebox writes its reminders to.
+      selector:
+        entity:
+          domain: calendar
+    notify_time:
+      name: Time of day
+      selector:
+        time:
+      default: "09:00:00"
+    notify_action:
+      name: Notify action
+      description: The action to call, for example notify.mobile_app_my_phone.
+      selector:
+        text:
+      default: notify.notify
+mode: single
+triggers:
+  - trigger: time
+    at: !input notify_time
+actions:
+  - variables:
+      cal: !input calendar
+  - action: calendar.get_events
+    target:
+      entity_id: !input calendar
+    data:
+      duration:
+        days: 366
+    response_variable: agenda
+  - repeat:
+      for_each: >-
+        {{ agenda[cal].events
+           | selectattr('description', 'defined')
+           | selectattr('description', 'search', 'Glovebox reminder')
+           | list }}
+      sequence:
+        - variables:
+            lead: >-
+              {{ (repeat.item.description
+                  | regex_findall('Notify (\\d+) days? before')
+                  | first | default(0)) | int }}
+            days_left: >-
+              {{ ((repeat.item.start | as_datetime).date() - now().date()).days }}
+        - if: "{{ days_left == lead or days_left == 0 }}"
+          then:
+            - action: !input notify_action
+              data:
+                title: Car reminder
+                message: >-
+                  {{ repeat.item.summary }}
+                  {{ 'today' if days_left == 0 else 'in ' ~ days_left ~ ' days' }}

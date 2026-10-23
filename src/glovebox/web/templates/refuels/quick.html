@@ -1,0 +1,67 @@
+{% extends layout %}
+{% from "_macros.html" import messages, field, textarea, switch, dialog_head with context %}
+{% set dialog_page = true %}
+{% set choice = f.station_choice or default_choice %}
+{% block title %}Refuel - Glovebox{% endblock %}
+{% block content %}
+<div class="scrim" data-scrim>
+<form class="dialog form quick" method="post" role="dialog" aria-label="Refuel" action="{{ url(request, '/quick') }}">
+  {{ dialog_head(request, 'Refuel') }}
+  <div class="dialog-body">
+    {{ messages(errors, warnings) }}
+    {% if figures is defined %}
+    <p class="help">Calculated: {{ figures.litres_milli | litres }} L at
+    {{ figures.price_per_litre_milli | price }} per litre, total {{ figures.total_cents | money }}.</p>
+    {% endif %}
+    <input type="hidden" name="vehicle_id" value="{{ f.vehicle_id }}">
+    {% if vehicles | length > 1 %}
+    <div class="seg type-seg" role="group" aria-label="Refuel vehicle">
+      {% for v in vehicles %}
+      <a href="{{ url(request, '/quick?vehicle=%d' % v.id) }}" data-dialog class="{{ 'active' if f.vehicle_id == v.id | string }}">{{ v.name }}</a>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <div class="qgroup">
+      {{ field('Odometer', 'odometer_km', f.odometer_km, suffix='km', inputmode='numeric', required=True, placeholder='0', big=True, autofocus=True) }}
+      <div class="help qhint" data-quick-hint data-last-km="{{ last_km if last_km is not none }}"
+           data-last-text="{{ last_km_text }}" data-last-date="{{ last_date_text }}">
+        {% if last_km is not none %}Last: {{ last_km_text }}&nbsp;km on {{ last_date_text }}{% else %}No earlier refuelling for this vehicle{% endif %}
+      </div>
+    </div>
+    <div data-price-fields class="qprice">
+      <div class="grid2 qpair">
+        {{ field('Litres', 'litres', f.litres, suffix='L', inputmode='decimal', calc='litres', required=True, placeholder='0.0', big=True) }}
+        {{ field('Total', 'total', f.total, suffix=currency, inputmode='decimal', calc='total', required=True, placeholder='0.00', big=True) }}
+      </div>
+      {{ field('Price / litre (calculated, or type it)', 'price_per_litre', f.price_per_litre, suffix=currency ~ '/L', inputmode='decimal', calc='price_per_litre', placeholder='0.000') }}
+    </div>
+    <div class="qgroup">
+      <div class="qlabel">Station</div>
+      <div class="chips qchips stations" role="radiogroup" aria-label="Station">
+        {% for s in chips %}
+        <label class="chip"><input type="radio" name="station_choice" value="{{ s.id }}" {{ 'checked' if choice == s.id | string }}>{{ s.name }}</label>
+        {% endfor %}
+        <label class="chip"><input type="radio" name="station_choice" value="other" {{ 'checked' if choice == 'other' }}>Other{{ icon('menu-down', 18) }}</label>
+      </div>
+      <div class="qother">{% include "refuels/_station_picker.html" %}</div>
+    </div>
+    {{ switch('is_full', 'Full tank', 'Needed to work out consumption', f.is_full) }}
+    <div class="chips qchips qmore">
+      <label class="chip" for="q-open-date">{{ icon('calendar', 18) }}<span data-quick-date>{{ date_text }}</span></label>
+      <label class="chip" for="q-open-more">{{ icon('tune-variant', 18) }}More</label>
+    </div>
+    <input type="checkbox" id="q-open-date" class="qtoggle" {{ 'checked' if f.date != today }}>
+    <input type="checkbox" id="q-open-more" class="qtoggle" {{ 'checked' if f.missed_previous or f.notes }}>
+    <div class="qdate-panel">{{ field('Date', 'date', f.date, type='date', required=True) }}</div>
+    <div class="qextra">
+      {{ switch('missed_previous', 'Missed previous fill-up', 'Skips consumption for this entry', f.missed_previous) }}
+      {{ textarea('Notes', 'notes', f.notes) }}
+    </div>
+  </div>
+  <div class="dialog-foot qfoot">
+    {% if needs_confirm is defined %}<input type="hidden" name="confirm_warnings" value="1">{% endif %}
+    <button type="submit" class="btn primary big-btn" data-quick-save>{{ 'Save anyway' if needs_confirm is defined else 'Save refuelling' }}</button>
+  </div>
+</form>
+</div>
+{% endblock %}

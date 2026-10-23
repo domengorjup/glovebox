@@ -28,6 +28,8 @@ With the Home Assistant Android app you can open Glovebox in one tap, which is h
 2. Add a shortcut of type **Dashboard** with the path `/dc7a9428_glovebox` and a label such as "Glovebox".
 3. Long-press the Home Assistant app icon: the shortcut is in its menu. Drag it onto the home screen to keep it there.
 
+The shortcut opens Glovebox on the Timeline. From version 0.2.5 you can open a quick form directly with these paths instead: `/dc7a9428_glovebox/quick` (refuelling), `/dc7a9428_glovebox/quick-service` and `/dc7a9428_glovebox/quick-expense`. Older versions open the Timeline, where **+** leads to the same forms.
+
 The path is the part after your Home Assistant address when Glovebox is open in the sidebar. See the [companion app docs](https://companion.home-assistant.io/docs/integrations/android-shortcuts/) for details.
 
 ### Options

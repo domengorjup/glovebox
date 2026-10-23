@@ -26,7 +26,7 @@ Check that full tanks are marked as full, that no *missed fill-up* is flagged in
 
 ## A home-screen shortcut on Android
 
-Yes: add a *Dashboard* shortcut with the path `/dc7a9428_glovebox` in the Home Assistant Android app, then find it by long-pressing the app icon. Step by step: [Open Glovebox from your phone's home screen](install.md#open-glovebox-from-your-phones-home-screen). The `dc7a9428` prefix comes from the repository URL and stays the same as long as the add-on is installed from the same repository.
+Yes: add a *Dashboard* shortcut with the path `/dc7a9428_glovebox` in the Home Assistant Android app, then find it by long-pressing the app icon. It opens the Timeline. From version 0.2.5 the path `/dc7a9428_glovebox/quick` opens the quick refuelling form directly (`/quick-service` and `/quick-expense` for the other two); in older versions use **+** on the Timeline. Step by step: [Open Glovebox from your phone's home screen](install.md#open-glovebox-from-your-phones-home-screen). The `dc7a9428` prefix comes from the repository URL and stays the same as long as the add-on is installed from the same repository.
 
 ## Where is my data? How do I back it up?
 

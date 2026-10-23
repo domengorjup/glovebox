@@ -16,6 +16,7 @@
     bindStationSelect(overlay);
     bindOdometerHint(overlay);
     bindCopy(overlay);
+    bindQuick(overlay);
   }
 
   function openDialog(href) {
@@ -152,10 +153,14 @@
       else if (target === "price_per_litre" && v.litres) { out = v.total / v.litres; }
       if (out !== null && isFinite(out)) {
         box[target].value = out.toFixed(target === "price_per_litre" ? 3 : 2);
+        box[target].closest(".field").classList.add("computed");
       }
     }
     Object.keys(box).forEach(function (name) {
-      box[name].addEventListener("input", function () { touch(name); });
+      box[name].addEventListener("input", function () {
+        box[name].closest(".field").classList.remove("computed");
+        touch(name);
+      });
     });
   }
 
@@ -358,7 +363,9 @@
     var steps = {};
     try { steps = JSON.parse(hint.dataset.steps || "{}"); } catch (e) { return; }
     var text = hint.querySelector("[data-odo-text]");
+    var input = "placeholder" in hint.dataset ? root.querySelector("#i-odometer_km") : null;
     function update() {
+      if (input) { input.placeholder = "0"; }
       if (!vehicle.value) { text.textContent = "Choose a vehicle to see its last recorded odometer."; return; }
       var last = null;
       (steps[vehicle.value] || []).forEach(function (s) {
@@ -366,6 +373,7 @@
       });
       if (!last) { text.textContent = "No earlier reading for this vehicle. Entering the odometer is recommended."; return; }
       var km = last[1].toLocaleString("en-US", { maximumFractionDigits: 1 }) + "\u00a0km";
+      if (input) { input.placeholder = last[1].toLocaleString("en-US", { maximumFractionDigits: 1 }); }
       var when = last[0] === "" ? "initial"
         : parseInt(last[0].slice(8), 10) + "\u00a0" + MONTHS[parseInt(last[0].slice(5, 7), 10) - 1];
       text.textContent = "Last recorded: " + km + " (" + when + "). Left empty, this is used and marked as estimated.";
@@ -375,7 +383,104 @@
     day.addEventListener("input", update);
   }
 
+  function chipDate(day, chip) {
+    var iso = day.value;
+    if (!iso) { return; }
+    var t = new Date(), now = t.getFullYear() + "-" + ("0" + (t.getMonth() + 1)).slice(-2) + "-" + ("0" + t.getDate()).slice(-2);
+    var short = parseInt(iso.slice(8), 10) + "\u00a0" + MONTHS[parseInt(iso.slice(5, 7), 10) - 1];
+    chip.textContent = iso === now ? "Today, " + short : short;
+  }
+
+  /* Quick service / expense: title chips, odometer hint, Save enabled when complete. */
+  function bindQuickEntry(form) {
+    var title = form.querySelector("#i-title"), amount = form.querySelector("#i-amount");
+    var odo = form.querySelector("#i-odometer_km"), save = form.querySelector("[data-quick-save]");
+    var hint = form.querySelector("[data-odo-quick]"), day = form.querySelector("#i-date");
+    var groups = form.querySelectorAll("[data-title-chips]");
+    var types = form.querySelectorAll("input[name=category]");
+    var initial = hint.textContent.trim();
+    var last = hint.dataset.lastKm === "" ? null : parseFloat(hint.dataset.lastKm);
+    function category() {
+      var picked = form.querySelector("input[name=category]:checked");
+      return picked ? picked.value : "maintenance";
+    }
+    function showChips() {
+      groups.forEach(function (group) {
+        group.hidden = group.getAttribute("data-title-chips") !== category();
+        group.querySelectorAll(".chip").forEach(function (chip) {
+          chip.classList.toggle("active", chip.getAttribute("data-title") === title.value);
+        });
+      });
+    }
+    function update() {
+      var km = number(odo.value);
+      hint.classList.remove("err", "warn");
+      if (last === null) { hint.textContent = initial; }
+      else if (km === null) { hint.textContent = initial; hint.classList.add("warn"); }
+      else if (km >= last) {
+        hint.textContent = "+" + (km - last).toLocaleString("en-US", { maximumFractionDigits: 1 }) +
+          "\u00a0km since the last recorded reading (" + (/\((.*)\)/.exec(hint.dataset.lastText) || [0, "initial"])[1] + ").";
+      } else {
+        hint.textContent = "Lower than the last recorded reading, " + hint.dataset.lastText.replace(/^([\d.,]+)/, "$1\u00a0km") + ". Check the number.";
+        hint.classList.add("err");
+      }
+      save.disabled = !(title.value.trim() && number(amount.value) !== null);
+    }
+    groups.forEach(function (group) {
+      group.querySelectorAll(".chip").forEach(function (chip) {
+        chip.addEventListener("click", function () {
+          title.value = chip.getAttribute("data-title");
+          showChips(); update();
+        });
+      });
+    });
+    types.forEach(function (type) { type.addEventListener("change", showChips); });
+    [title, amount, odo].forEach(function (input) { input.addEventListener("input", function () { showChips(); update(); }); });
+    day.addEventListener("change", function () { chipDate(day, form.querySelector("[data-quick-date]")); });
+    showChips(); update();
+  }
+
+  /* ---------- quick add: odometer hint, Save enabled when complete, date chip ---------- */
+  function bindQuick(root) {
+    var form = root.querySelector("form.quick");
+    if (!form || form.dataset.bound) { return; }
+    form.dataset.bound = "1";
+    if (form.dataset.quickKind) { bindQuickEntry(form); return; }
+    var odo = form.querySelector("#i-odometer_km"), litres = form.querySelector("#i-litres");
+    var total = form.querySelector("#i-total"), save = form.querySelector("[data-quick-save]");
+    var hint = form.querySelector("[data-quick-hint]"), day = form.querySelector("#i-date");
+    var chip = form.querySelector("[data-quick-date]");
+    var last = hint.dataset.lastKm === "" ? null : parseFloat(hint.dataset.lastKm);
+    var initial = hint.textContent.trim();
+    function update() {
+      var km = number(odo.value);
+      hint.classList.remove("err");
+      if (km !== null && last !== null) {
+        var diff = km - last;
+        if (diff >= 0) {
+          hint.textContent = "+" + diff.toLocaleString("en-US", { maximumFractionDigits: 1 }) + "\u00a0km since the last refuelling";
+        } else {
+          hint.textContent = "Lower than the last odometer (" + hint.dataset.lastText + "\u00a0km). Check the number.";
+          hint.classList.add("err");
+        }
+      } else { hint.textContent = initial; }
+      save.disabled = !(km !== null && number(litres.value) > 0 && number(total.value) > 0);
+    }
+    function dateText() { chipDate(day, chip); }
+    [odo, litres, total, form.querySelector("#i-price_per_litre")].forEach(function (input) {
+      input.addEventListener("input", update);
+    });
+    day.addEventListener("change", dateText);
+    update();
+  }
+
+  /* A snackbar goes away by itself; the Undo button stays a plain form post. */
+  document.querySelectorAll("[data-snackbar]").forEach(function (bar) {
+    setTimeout(function () { bar.remove(); }, 6000);
+  });
+
   bindOdometerHint(document);
+  bindQuick(document);
   bindCalc(document);
   bindStationSelect(document);
   bindRevealSelect(document);

@@ -14,8 +14,8 @@ The link to an expense and the calendar sync state SHALL NOT be part of the tabl
 - **THEN** `stations.csv` contains it
 
 #### Scenario: Reminder row
-- **WHEN** an open reminder "Registration" for "Golf", category registration, due 2027-03-01, 14 days before, is backed up
-- **THEN** its `reminders.csv` row has its uid, `vehicle` "Golf", `due_date` "2027-03-01", `lead_days` "14", `status` "open" and an empty `done_date`
+- **WHEN** an open reminder "Registration" for "Golf", category registration, due 2027-03-01, 30 days before, is backed up
+- **THEN** its `reminders.csv` row has its uid, `vehicle` "Golf", `due_date` "2027-03-01", `lead_days` "30", `status` "open" and an empty `done_date`
 
 ### Requirement: Generated format documentation
 A command (`uv run python -m glovebox.formatdocs`) SHALL generate, from the definition:

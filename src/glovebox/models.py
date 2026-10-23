@@ -8,11 +8,13 @@ milli-units of the currency (1.459 per litre is stored as 1459).
 
 from __future__ import annotations
 
+import uuid
 from datetime import date, datetime, time, timezone
 from enum import StrEnum
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     Enum,
@@ -54,12 +56,33 @@ class ExpenseCategory(StrEnum):
     OTHER = "other"
 
 
+class ReminderStatus(StrEnum):
+    """A reminder is open until the user marks it done."""
+
+    OPEN = "open"
+    DONE = "done"
+
+
+class CalendarState(StrEnum):
+    """Where a reminder stands with the Home Assistant calendar (design D5)."""
+
+    NONE = "none"  # nothing to write: no calendar, or the reminder is done
+    PENDING = "pending"  # to be written (again)
+    SYNCED = "synced"
+    UNCHANGED = "unchanged"  # the calendar cannot change or remove the event
+    ERROR = "error"  # needs the user's attention
+
+
 class DerivedField(StrEnum):
     """Which of the three refuel price figures was computed, not entered."""
 
     LITRES = "litres"
     PRICE_PER_LITRE = "price_per_litre"
     TOTAL = "total"
+
+
+def _new_uid() -> str:
+    return str(uuid.uuid4())
 
 
 def _utc_now() -> datetime:
@@ -90,6 +113,9 @@ class ImportBatch(Base):
     refuels_imported: Mapped[int] = mapped_column(Integer, default=0)
     expenses_imported: Mapped[int] = mapped_column(Integer, default=0)
     duplicates_skipped: Mapped[int] = mapped_column(Integer, default=0)
+    reminders_imported: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0")
+    )
 
 
 class Vehicle(Base):
@@ -218,6 +244,60 @@ class Expense(Base):
         ForeignKey("import_batch.id", ondelete="SET NULL"), index=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
+
+
+class Reminder(Base):
+    """
+    A date reminder of a vehicle (design D1).
+
+    The remind date (``due_date - lead_days``) is computed, not stored.
+    ``revision`` grows with every change; it is the .ics ``SEQUENCE`` and tells
+    the calendar sync that the event is out of date. The ``cal_*`` columns
+    record where the event was written and how that went.
+    """
+
+    __tablename__ = "reminder"
+    __table_args__ = (
+        CheckConstraint("lead_days >= 0 AND lead_days <= 365", name="lead_days"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    uid: Mapped[str] = mapped_column(String(36), unique=True, default=_new_uid)
+    vehicle_id: Mapped[int] = mapped_column(
+        ForeignKey("vehicle.id", ondelete="CASCADE"), index=True
+    )
+    title: Mapped[str] = mapped_column(String(200))
+    category: Mapped[ExpenseCategory] = mapped_column(
+        _enum(ExpenseCategory, "reminder_category")
+    )
+    due_date: Mapped[date] = mapped_column(Date)
+    lead_days: Mapped[int] = mapped_column(Integer, default=30)
+    notes: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[ReminderStatus] = mapped_column(
+        _enum(ReminderStatus, "reminder_status"), default=ReminderStatus.OPEN
+    )
+    done_at: Mapped[datetime | None] = mapped_column(DateTime)
+    expense_id: Mapped[int | None] = mapped_column(
+        ForeignKey("expense.id", ondelete="SET NULL")
+    )
+    vehicle_field: Mapped[str | None] = mapped_column(String(40))
+    revision: Mapped[int] = mapped_column(Integer, default=1)
+    cal_entity: Mapped[str | None] = mapped_column(String(255))
+    cal_uid: Mapped[str | None] = mapped_column(String(255))
+    cal_state: Mapped[CalendarState] = mapped_column(
+        _enum(CalendarState, "reminder_cal_state"), default=CalendarState.NONE
+    )
+    cal_message: Mapped[str | None] = mapped_column(Text)
+    cal_synced_revision: Mapped[int | None] = mapped_column(Integer)
+    # Due date of the event as last written; the lookup window of the next pass.
+    cal_synced_due: Mapped[date | None] = mapped_column(Date)
+    import_batch_id: Mapped[int | None] = mapped_column(
+        ForeignKey("import_batch.id", ondelete="SET NULL"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utc_now, onupdate=_utc_now
+    )
 
 
 class Setting(Base):

@@ -796,7 +796,8 @@ def test_backup_round_trip_restores_identically(
     exported = _backup(client)
     with zipfile.ZipFile(io.BytesIO(exported)) as archive:
         assert set(archive.namelist()) == {
-            "records.csv", "vehicles.csv", "stations.csv", "datapackage.json",
+            "records.csv", "vehicles.csv", "stations.csv", "reminders.csv",
+            "datapackage.json",
         }  # fmt: skip
 
     other, other_engine = second_app

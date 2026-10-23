@@ -1,41 +1,39 @@
 ## Context
 
-Glovebox runs as a Home Assistant add-on (Ingress, `panel_admin: true`) and standalone (Docker, optional password). It has no link to HA Core yet. The user wants date reminders per vehicle that reach HA calendars and their own Google/Outlook calendars, and that can produce a phone notification, while staying as simple as possible and using existing HA mechanisms.
+Glovebox runs as a Home Assistant add-on (Ingress, `panel_admin: true`) and standalone (Docker, optional password). It has no link to HA Core yet. The user wants date reminders per vehicle that reach HA calendars and their own calendars, and phone notifications. Glovebox should **pass reminders on to HA's standard calendar handling and maintain as little as possible itself**.
 
 **HA calendar facts (checked in HA Core source, 2026-10-21):**
-- What each integration can do with events:
-  - Local Calendar: create, update and delete.
-  - Google Calendar: create (read/write setup only) and delete; no update.
-  - CalDAV: create only.
+- Each calendar entity reports in `supported_features` what it can do: CREATE_EVENT = 1, DELETE_EVENT = 2, UPDATE_EVENT = 4. For example:
+  - Local Calendar: 7 (create, update, delete);
+  - Google Calendar: create and delete in the read/write setup;
+  - CalDAV: create only;
   - Remote Calendar: read-only.
-  - Outlook: no official integration.
 - The calls:
-  - `calendar.create_event` (service) returns no uid, and `calendar.get_events` omits the uid.
+  - `calendar.create_event` returns no uid.
   - `GET /api/calendars/<entity>?start=&end=` returns events with their uid.
   - Update and delete are websocket-only: `calendar/event/update` and `calendar/event/delete`.
 - Add-on access:
   - With `homeassistant_api: true` an add-on reaches the Core REST API at `http://supervisor/core/api` with `SUPERVISOR_TOKEN`.
-  - The websocket proxy URL for add-ons (expected `ws://supervisor/core/websocket`) is **not verified** (task 0.1).
-- Calendar triggers with an offset can drive Companion-app notifications.
+  - The websocket URL for add-ons (expected `ws://supervisor/core/websocket`) is **not verified** (task 0.1).
 
-**Sibling app (Cekar), checked 2026-10-22:** it reads HA user identity from the Ingress `X-Remote-User-*` headers (its design D2) but does not call the Core API yet. Its v1.1 plans "notifications via HA notify (needs `homeassistant_api`)". So Glovebox's Core API client is the first one. It is written as a small, self-contained module and documented in `docs/dev/architecture.md` so that Cekar can reuse the same pattern. Reminders here are per vehicle, not per person, so HA user identity is not needed (D10).
+**Sibling app (Cekar), checked 2026-10-22:** it reads HA user identity from the Ingress `X-Remote-User-*` headers (its design D2) but does not call the Core API yet. Its v1.1 plans HA notifications with `homeassistant_api`. Glovebox's Core API client is therefore the first one. It is documented in `docs/dev/architecture.md` so that Cekar can reuse the pattern. Reminders here belong to a vehicle, not a person, so HA user identity is not needed (D10).
 
 ## Goals / Non-Goals
 
 **Goals:**
 - Reminders per vehicle with a due date and a lead time, created by hand, from an expense, or from a vehicle's insurance/registration date.
 - Visible on the Timeline when they come due.
-- Delivered to one user-chosen HA calendar, kept in step when the reminder changes, as far as that calendar allows.
-- A per-reminder and an all-open .ics download for any other calendar (Outlook, Apple, Google without HA) and for standalone mode.
-- Phone notifications through a documented HA automation, with no notification code in the add-on.
+- Written to one user-chosen HA calendar. Edits and deletes are passed on where that calendar supports them.
+- A per-reminder .ics download for every other calendar (Outlook, Apple, anything) and for standalone mode.
+- Phone notifications through one shipped HA blueprint. Glovebox sends no notifications.
 
 **Non-Goals:**
-- Recurring reminders (the renewal flow covers it: record the new expense, tap "Remind me").
-- Odometer-based "service due" (v2, companion integration).
-- An iCal feed (D8), a native HA calendar entity (v2 companion), HA to-do entities (rejected earlier: no due-date trigger).
-- Calendar sync in standalone mode (no HA URL/token settings).
-- Reading changes back from the calendar (sync is one way: Glovebox to calendar).
-- Reminder fields in `/api/v1` (v2).
+- Logic per calendar provider beyond reading `supported_features`; any integration of our own (Outlook or other).
+- An iCal feed. Google Calendar and Outlook.com fetch subscribed URLs from their own servers, which would need the app exposed to the internet.
+- Recurring reminders. The renewal flow covers them: record the new expense, then "Remind me".
+- Odometer-based "service due", a native HA calendar entity, reminder fields in `/api/v1` (all v2, companion integration).
+- Reading changes back from the calendar. Sync is one way.
+- Calendar sync in standalone mode.
 
 ## Decisions
 
@@ -46,222 +44,288 @@ New table `reminder` (migration 0006):
 | Column | Type | Notes |
 |---|---|---|
 | `id` | int PK | |
-| `uid` | str(36), unique | Random UUID. Stable across backups; used in the .ics `UID`, in the HA event marker (D4) and for import duplicates. |
+| `uid` | str(36), unique | Random UUID. Stable across backups; used in the .ics `UID`, the event marker (D3) and import duplicates. |
 | `vehicle_id` | FK vehicle, `ON DELETE CASCADE` | Required. |
-| `title` | str(200) | Required, e.g. "Insurance renewal". |
-| `category` | `ExpenseCategory` | `maintenance` (shown as "Service"), `insurance`, `registration`, `other`. Same enum as expenses. |
+| `title` | str(200) | Required, e.g. "Registration". |
+| `category` | `ExpenseCategory` | `maintenance` (shown as "Service"), `insurance`, `registration`, `other`. |
 | `due_date` | date | Required. |
-| `lead_days` | int ≥ 0 | Default 14. **Remind date** = `due_date - lead_days` (computed, not stored). |
+| `lead_days` | int, 0 to 365 | Default **30**. Set when the reminder is created; editable. |
 | `notes` | text, nullable | |
 | `status` | `open` / `done` | Done = dismissed; `done_at` records when. |
 | `done_at` | datetime, nullable | |
 | `expense_id` | FK expense, nullable, `ON DELETE SET NULL` | "Created from" link, informational only. |
 | `vehicle_field` | str(40), nullable | `insurance_valid_until` or `registration_valid_until` (names follow the vehicle-details change). At most one open reminder per vehicle and field. |
-| `revision` | int | +1 on every change; the .ics `SEQUENCE`. |
-| `cal_entity` | str, nullable | Calendar entity the event lives in. |
-| `cal_uid` | str, nullable | Event uid found by the REST lookup (D4). |
-| `cal_state` | str | `none`, `pending`, `synced`, `stale`, `error` (D5). |
-| `cal_message` | text, nullable | Plain-language reason for `pending`, `stale`, `error`. |
-| `cal_synced_revision` | int, nullable | Revision last written to the calendar. |
+| `revision` | int | +1 on every change; the .ics `SEQUENCE` and the "needs sync" check. |
+| `cal_entity`, `cal_uid` | str, nullable | Where the event was written, and its uid. |
+| `cal_state` | str | `none`, `pending`, `synced`, `unchanged`, `error` (D5). |
+| `cal_message` | text, nullable | Plain-language reason when the state is not `synced`. |
+| `cal_synced_revision` | int, nullable | Revision last written. |
 | `import_batch_id` | FK import batch, nullable | Undo of an import removes its reminders. |
 | `created_at`, `updated_at` | datetime | |
 
-"Overdue" = open and `due_date < today`. "Due soon" = open and remind date ≤ today. "Today" is the same local date the Timeline periods use.
+Dates used:
+- **Remind date** = `due_date - lead_days`. It is computed, not stored.
+- **Due soon** = open and remind date ≤ today.
+- **Overdue** = open and due date < today.
+- "Today" is the same local date the Timeline periods use.
 
-The chosen calendar is one setting in the existing `setting` table (`reminders.calendar`, an entity id or empty). It is not chosen per reminder, to keep the UI to one setting.
+The chosen calendar is one row in the existing `setting` table (`reminders.calendar`: an entity id, or empty for none).
 
 ### D2. UI
 
-All UI work goes through the living mockup `.mockups/ui-v2/` first (task 2.1), then into the app. The standard elements in `docs/dev/design.md` are reused: list card and rows, dialog, buttons, floating button chooser, sub-page header, messages.
+All UI work goes through the living mockup `.mockups/ui-v2/` first (task 2.1), then into the app. The standard elements from `docs/dev/design.md` are reused: list card and rows, dialog, buttons, floating button chooser, sub-page header, messages.
 
-- **Timeline "Due soon" card:** a list card above the summary cards. It shows open reminders whose remind date has arrived, filtered by the app-bar vehicle (all vehicles: every vehicle, with the vehicle name in each row). Order: overdue first, then by due date. Each row shows:
+- **Timeline "Due soon" card:** a list card above the summary cards. It shows open reminders whose remind date has arrived, filtered by the app-bar vehicle (with all vehicles, the vehicle name is in each row). Order: overdue first, then by due date. Each row shows:
   - category icon, title, vehicle;
   - "Due 1 Mar 2027 · in 12 days" or "Overdue by 3 days";
-  - a Done icon button on the right.
+  - a Done icon button.
 
-  Tapping the row opens the edit dialog. The card header has an "All reminders" button. The card is hidden when nothing is due.
-- **Reminders page** `/reminders` (sub-page header with back button; also a row "Reminders" under Manage > Garage, with the count of open ones):
-  - an "Open" list ordered by due date;
+  Tapping the row opens the edit dialog. The header has an "All reminders" button. The card is hidden when nothing is due.
+- **Reminders page** `/reminders` (sub-page header; also a "Reminders" row under Manage > Garage with the open count):
+  - open reminders by due date;
   - a collapsed "Done" section;
-  - a "Download all (.ics)" button;
-  - the calendar setting (D5): HA calendar select plus a status line.
+  - the calendar setting (D4) with a status line.
 
-  A reminder whose `cal_state` is not `synced` or `none` shows a small status line in its row, for example "Not in calendar yet: Home Assistant did not answer. Will retry."
-- **Create:** a "Reminder" entry in the floating add chooser opens the reminder dialog. Its fields are vehicle (default as in other forms), title, category, due date, "Remind me … days before", and notes.
-- **Edit dialog:** the same fields, plus:
-  - "Download .ics", Mark done (or Reopen), Delete;
-  - "Created from: <expense title, date>" when linked;
-  - the calendar status with a "Sync now" button when the state is not synced.
-- **"Remind me" on an expense:** the expense edit dialog gets a "Remind me" button. It opens the reminder dialog pre-filled with:
+  A row whose calendar state is not `synced` or `none` shows its message in one line.
+- **Reminder dialog** (also from a "Reminder" entry in the floating add chooser):
+  - fields: vehicle, title, category, due date, "Notify … days before" (default 30), notes;
+  - in the edit dialog also: Download .ics, Mark done (or Reopen), Delete, "Created from: <expense>" when linked, and "Sync now" when not synced.
+- **"Remind me" on an expense:** a button in the expense edit dialog opens the reminder dialog pre-filled with:
   - the vehicle and category of the expense;
   - the title "<expense title> renewal";
-  - the due date = coverage end if set, else the expense date + 1 year;
-  - 14 lead days.
+  - the due date = coverage end if set, else expense date + 1 year;
+  - 30 days.
 
-  The add-expense form gets a "Remind me before it runs out" switch, off by default, with the lead days next to it. Saving with the switch on creates the same reminder in one step. Editing the expense later does not move the reminder (the link is informational).
-- **From vehicle dates (depends on vehicle-details):** next to each of the "Insurance valid until" and "Registration valid until" fields of the vehicle form, a "Remind me … days before" switch.
-  - Switching it on creates the reminder, linked to the field, with the title "Insurance renewal" or "Registration renewal".
-  - Changing the date moves the linked open reminder to the new date.
-  - Clearing the date or switching off deletes the linked open reminder.
-  - When the linked reminder is marked done and a later date is saved, a new linked reminder is created (if the switch is on).
+  The add-expense form has a "Remind me before it runs out" switch, off by default, with the days next to it. Later edits of the expense do not move the reminder.
+- **From vehicle dates (depends on vehicle-details):** next to each "Insurance valid until" / "Registration valid until" field, a "Remind me … days before" switch (default 30).
+  - Switch on: a reminder linked to the field.
+  - Date changed: the linked open reminder moves with it.
+  - Date cleared or switch off: the linked open reminder is deleted.
+  - A new date after the linked reminder was done: a new linked reminder.
 
-  Why these follow their field and expense links do not: the vehicle field *is* the due date. An expense only suggests one.
+  The vehicle field *is* the due date, so the reminder follows it. An expense only suggests one.
 
 ### D3. Calendar event shape
 
-One all-day event per open reminder, **on the remind date**, not on the due date. Reasons:
-- It is the day the user should act.
-- A single generic HA automation can notify at a fixed time of that day (D9) without per-reminder offset arithmetic, which a calendar trigger cannot do.
-- Google and Outlook show their own default notification for all-day events on that day.
+One all-day event per open reminder, **on the due date**: `start_date = due_date`, `end_date = due_date + 1 day` (HA's all-day end is exclusive).
 
-The due date is in the title and the description:
-- **Summary:** `<vehicle>: <title> (due 1 Mar 2027)`. With 0 lead days: `<vehicle>: <title> (due today)`.
-- **Description:** the notes (if any), then a final marker line `Glovebox reminder <uid>`.
-- **Dates:** `start_date = remind date`, `end_date = remind date + 1 day` (HA's all-day end is exclusive).
+- **Summary:** `<vehicle>: <title> due`, e.g. "Golf: Registration due".
+- **Description**, one item per line:
+  ```
+  <notes, if any>
+  Notify 30 days before
+  Glovebox reminder 6f1c…-uuid
+  ```
 
-This choice is open question Q1.
+The `Notify <N> days before` line is machine-readable. The blueprint (D9) reads it, so the lead time travels with the event and nothing else has to be stored in HA. The marker line identifies Glovebox's events, for the uid lookup and for the blueprint.
 
 ### D4. HA calendar sync (tier 1)
 
-A small client `services/ha_calendar.py`, used only in add-on mode when `SUPERVISOR_TOKEN` is set.
+Glovebox relays to whatever calendar entity the user chooses and adapts only to that entity's `supported_features`.
 
-- **REST** (`httpx`, base `http://supervisor/core/api`, `Authorization: Bearer $SUPERVISOR_TOKEN`, 10 s timeout):
-  - `GET /calendars` lists the calendar entities.
-  - `GET /states/<entity>` gives `attributes.supported_features`: CREATE_EVENT = 1, DELETE_EVENT = 2, UPDATE_EVENT = 4.
-  - `POST /services/calendar/create_event` with `entity_id`, `summary`, `description`, `start_date`, `end_date`.
-  - `GET /calendars/<entity>?start=<remind date>&end=<remind date + 1 day>` finds the uid.
-- **Websocket** (`websockets`, URL from task 0.1, auth with the same token): `calendar/event/update` and `calendar/event/delete`, used only when the calendar supports them.
+- **Calendar select:** it lists every entity from `GET /api/calendars` whose `supported_features` include CREATE_EVENT. That covers any integration or add-on the user installs that HA lets create events in, without knowing which one it is. Each entry shows what it can do: "Adds, changes and removes events", "Adds and removes events", "Adds and changes events" or "Only adds events".
+- **Write (open reminder whose revision is not yet synced):**
+  1. **Find first.** Look up an existing event by its marker with `GET /api/calendars/<entity>`, in a window around the current and the last synced due date. This keeps retries and restores from creating duplicates, and finds the uid.
+  2. **No event:** `calendar.create_event`, then the same lookup to store the uid.
+     - If the event is not listed yet, the state stays `pending` ("Waiting for the calendar to list the new event"), and the next pass looks again without creating another event.
+  3. **Event exists and the reminder changed:**
+     - With UPDATE_EVENT: `calendar/event/update`.
+     - Without it: the event is left alone. The state is `unchanged` with the message "This calendar can't change events; edit it there."
+- **Mark done or delete:**
+  - With DELETE_EVENT: `calendar/event/delete`.
+  - Without it: the event stays, with the message "This calendar can't remove events; remove it there."
+- **Changing the calendar setting:**
+  - Open reminders are written to the new calendar.
+  - Their events in the old one are deleted where the old calendar supports it. Otherwise the page says how many stay there.
+  - "None" stops writing and deletes where supported.
 
-**Writing an open reminder whose revision is not yet synced:**
-1. **Find first.** Look up the event by the marker line `Glovebox reminder <uid>` in the reminder's event window and in the window of the last synced remind date. If it is found, keep its uid. This makes sync idempotent: a retry after a timeout, or a restore into the same HA, does not create duplicates.
-2. **No event yet:** `create_event`, then look up the uid by the marker.
-   - If the lookup does not find it (some integrations, e.g. Google, may list a new event only after their next refresh), the state stays `pending` with the message "Waiting for the calendar to list the new event", and the next pass looks again without creating a second event.
-3. **Event exists and the reminder changed:**
-   - **UPDATE_EVENT supported (Local Calendar):** `calendar/event/update` with the new summary, dates and description.
-   - **Only DELETE_EVENT (Google):** delete, then create and look up a new uid.
-   - **Create only (CalDAV):** state `stale`, with the message "This calendar can only add events, so the event on 12 Feb cannot follow the change. Delete it in your calendar app, then press Add new event." The **Add new event** button creates a fresh event and forgets the old uid.
+No delete-and-recreate, no per-provider rules.
 
-**Mark done or delete a reminder:** delete the event if DELETE_EVENT is supported. If not, the event stays and the app says so once ("The calendar event stays: this calendar cannot delete events").
+**Recommended in the docs:** a dedicated Local Calendar named "Glovebox reminders". It supports everything, and the blueprint can target it.
 
-**Change the calendar setting:** open reminders are moved:
-- they are deleted from the old calendar where it allows that, otherwise they stay there and the page says how many;
-- then they are created in the new one.
+### D5. Sync timing and failures
 
-Setting the calendar to "None" only removes the events (same rule).
+- **On save:** sync runs right after the database commit, with a 10 s timeout. A failure never blocks or undoes saving the reminder.
+- **Background retry:** a task in the app lifespan (one asyncio task with a lock) retries every 15 minutes, and once at startup, every reminder in `pending` or `error`, or whose `revision` differs from `cal_synced_revision`.
+- **Sync now:** runs the same pass at once.
 
-**The calendar select lists** calendars with CREATE_EVENT, each labelled with what it can do: "Adds, changes and removes events", "Adds and removes events" or "Can only add events". Remote Calendar and read-only Google calendars therefore do not appear. The docs recommend a dedicated Local Calendar named "Glovebox reminders" (simplest, full support, easy to target in an automation). For Google: a Google calendar in HA's read/write setup.
-
-### D5. Sync timing and failure handling
-
-- **On save:** sync runs right after the database commit, with the 10 s timeout. A failure never blocks or rolls back the reminder itself.
-- **Background retry:** a task started in the app lifespan retries every 15 minutes (and once at startup) every reminder whose `cal_state` is `pending` or `error`, or whose revision differs from `cal_synced_revision`. "Sync now" on the page and in the dialog runs the same pass at once.
-
-| Failure | State | Message (shown on the row and in the dialog) |
+| Failure | State | Message |
 |---|---|---|
 | HA unreachable, timeout, 5xx | `pending` | "Home Assistant did not answer. Will retry." |
-| 401/403 (no `homeassistant_api`, token problem) | `error` | "Glovebox may not use the Home Assistant API. Update or reinstall the add-on." |
-| Entity gone (404 on states) | `error` on all, plus a warning at the calendar setting | "Calendar <entity> no longer exists. Choose another calendar." |
-| Entity lost CREATE_EVENT (e.g. Google switched to read-only) | `error` | "Calendar <name> no longer accepts new events." |
-| Update not supported | `stale` | See D4. |
-| Lookup cannot find the created event | `pending` | "Waiting for the calendar to list the new event." |
+| 401/403 | `error` | "Glovebox may not use the Home Assistant API. Update or reinstall the add-on." |
+| Entity gone | `error` (plus a warning at the setting) | "Calendar <entity> no longer exists. Choose another calendar." |
+| Entity no longer creates events | `error` | "Calendar <name> no longer accepts new events." |
+| Change or removal not supported | `unchanged` | See D4. |
+| Created event not listed yet | `pending` | "Waiting for the calendar to list the new event." |
 
 Errors are also logged.
 
 ### D6. .ics download (tier 2)
 
-- **Endpoints:** `GET /reminders/<id>.ics` (one event) and `GET /reminders.ics` (all open reminders, all vehicles or the app-bar vehicle). Served as `text/calendar; charset=utf-8` with `Content-Disposition: attachment`. Standard download buttons, also under Ingress.
-- **Writer:** hand-written in `ics.py`, about 40 lines with no new dependency. RFC 5545 rules: CRLF, line folding at 75 octets, escaping `\ ; ,` and newlines.
+- **Endpoint:** `GET /reminders/<id>.ics`, served as `text/calendar; charset=utf-8` with `Content-Disposition: attachment`. A standard download button in the reminder dialog, working under Ingress and standalone.
+- **Writer:** hand-written in `ics.py` (about 40 lines, no dependency), following RFC 5545: CRLF line ends, folding at 75 octets, escaping of `\ ; ,` and newlines.
 - **Content:**
   - `VCALENDAR` with `PRODID:-//Glovebox//Reminders//EN`, `VERSION:2.0`, `METHOD:PUBLISH`.
-  - Per reminder a `VEVENT`:
+  - One `VEVENT`:
     - `UID:<uid>@glovebox`, `SEQUENCE:<revision>`, `DTSTAMP`;
-    - `DTSTART;VALUE=DATE` = remind date, `DTEND;VALUE=DATE` = next day;
+    - `DTSTART;VALUE=DATE` = due date, `DTEND;VALUE=DATE` = the next day;
     - `SUMMARY` and `DESCRIPTION` as in D3;
-    - `TRANSP:TRANSPARENT`;
-    - a `VALARM` (`ACTION:DISPLAY`, `TRIGGER:PT9H`, i.e. 09:00 on that day).
-- **Limits:**
-  - Calendar apps that honour `UID` and `SEQUENCE` (Outlook, Apple) update the event when a newer file is opened. Google Calendar's import does not and may add a duplicate; the docs say so.
-  - Google ignores `VALARM` on import and uses its default notification.
-- **Standalone mode:** this is the only delivery (D11).
+    - `TRANSP:TRANSPARENT`.
+  - **Alarms**, both `ACTION:DISPLAY` and relative to the start:
+    - one at 09:00 on the remind date: `TRIGGER:-P<N-1>DT15H` (N = lead days ≥ 1);
+    - one at 09:00 on the due date: `TRIGGER:PT9H`.
+- This is the path for Outlook and every other calendar. Apps that honour `UID` and `SEQUENCE` update the event when a newer file is opened. Some apps ignore imported alarms and use their own defaults; the docs say so.
 
 ### D7. Add-on config
 
-`addon/glovebox/config.yaml` gets `homeassistant_api: true`. Nothing else: no new options, since the calendar is chosen in the UI. `config.py` reads `SUPERVISOR_TOKEN` (present only in add-on mode). Task 0.1 also records whether the change alters the add-on's security rating shown in HA.
+`addon/glovebox/config.yaml` gets `homeassistant_api: true` and no new options. `config.py` reads `SUPERVISOR_TOKEN`, which is present only in add-on mode. Task 0.1 records whether the change alters the add-on's security rating.
 
-### D8. iCal feed (tier 3): not in this change
+### D8. Core API client and dependencies
 
-A subscribable feed (`/reminders/feed.ics?token=…`) was considered and left out:
-- Google Calendar and Outlook.com fetch subscribed URLs **from their own servers**, so the feed would have to be reachable from the internet. Ingress requires an HA login, so it would need the API port opened to the internet with a token in the URL. That is a bigger exposure than the feature is worth.
-- On the LAN, HA's Remote Calendar could read it, but tier 1 with a Local Calendar already gives HA a calendar with less setup.
-- The all-open .ics download covers a one-off import into any app.
+`services/ha_calendar.py` uses only the standard library. No new dependencies.
 
-It can be added later as its own small change if the user wants a live feed for a LAN client (Thunderbird, Apple Calendar, ICSx5).
+- **REST:** `urllib.request` against `http://supervisor/core/api` with the Bearer token and a 10 s timeout, called from a worker thread. Calls: `GET /calendars`, `GET /states/<entity>`, `POST /services/calendar/create_event`, `GET /calendars/<entity>?start=&end=`.
+- **Websocket (update and delete only):** a minimal client over plain `ws://` inside the Supervisor network, about 80 lines:
+  - opening the connection: the HTTP upgrade handshake, the `auth` message with the same token, then `auth_ok`;
+  - messages: masked text frames out, unfragmented text frames in, answers to pings;
+  - one command per connection.
 
-### D9. Notifications
+  The same approach already works in the repository's `.dev/release_deploy.py`.
 
-The add-on sends no notifications itself. A calendar trigger on the reminders calendar is the existing HA mechanism, and it leaves the choice of device, time and wording to the user. `docs/user/reminders.md` and `DOCS.md` give this example (the trigger offset is checked in task 0.3):
+Reasons:
+- There is no TLS, no fragmentation and no long-lived connection to deal with.
+- The two commands are short request/answer pairs.
+
+If task 0.1 shows the Supervisor needs anything the small client cannot do, the fallback is the `websockets` package (pure Python), added with `uv add`.
+
+### D9. Notifications: one shipped blueprint
+
+Glovebox sends no notifications. The repository ships an automation blueprint, `blueprints/automation/glovebox/reminders.yaml`, with a `source_url` so that it can be imported with the my.home-assistant.io blueprint-import link. The link is shown as a badge in `docs/user/reminders.md` and in `DOCS.md`.
+
+**Inputs:**
+- `calendar` (entity selector, domain `calendar`);
+- `notify_time` (time selector, default 09:00);
+- `notify_action` (text, the notify action to call, e.g. `notify.mobile_app_my_phone`; default `notify.notify`).
+
+**Behaviour:**
+- Runs daily at `notify_time`.
+- Calls `calendar.get_events` on the calendar for the next 366 days (lead days are capped at 365), with `response_variable`.
+- For each event whose description contains `Glovebox reminder`, reads N from `Notify (\d+) days? before` (0 if missing).
+- Notifies when *start − N days* is today ("Golf: Registration due in 30 days") or when start is today ("Golf: Registration due today").
+
+**Blueprint** (verified form, `blueprints/automation/glovebox/reminders.yaml`):
 
 ```yaml
-alias: Glovebox reminder on my phone
+blueprint:
+  name: Glovebox reminders
+  description: >-
+    Sends a notification on the remind date and on the due date of each
+    Glovebox reminder found in a calendar.
+  domain: automation
+  source_url: https://github.com/domengorjup/glovebox/blob/master/blueprints/automation/glovebox/reminders.yaml
+  input:
+    calendar:
+      name: Calendar
+      description: The calendar Glovebox writes its reminders to.
+      selector:
+        entity:
+          domain: calendar
+    notify_time:
+      name: Time of day
+      selector:
+        time:
+      default: "09:00:00"
+    notify_action:
+      name: Notify action
+      description: The action to call, for example notify.mobile_app_my_phone.
+      selector:
+        text:
+      default: notify.notify
+mode: single
 triggers:
-  - trigger: calendar
-    event: start
-    entity_id: calendar.glovebox_reminders
-    offset: "9:00:00"   # all-day events start at 00:00; notify at 09:00
+  - trigger: time
+    at: !input notify_time
 actions:
-  - action: notify.mobile_app_my_phone
+  - variables:
+      cal: !input calendar
+  - action: calendar.get_events
+    target:
+      entity_id: !input calendar
     data:
-      title: Car reminder
-      message: "{{ trigger.calendar_event.summary }}"
+      duration:
+        days: 366
+    response_variable: agenda
+  - repeat:
+      for_each: >-
+        {{ agenda[cal].events
+           | selectattr('description', 'defined')
+           | selectattr('description', 'search', 'Glovebox reminder')
+           | list }}
+      sequence:
+        - variables:
+            lead: >-
+              {{ (repeat.item.description
+                  | regex_findall('Notify (\\d+) days? before')
+                  | first | default(0)) | int }}
+            days_left: >-
+              {{ ((repeat.item.start | as_datetime).date() - now().date()).days }}
+        - if: "{{ days_left == lead or days_left == 0 }}"
+          then:
+            - action: !input notify_action
+              data:
+                title: Car reminder
+                message: >-
+                  {{ repeat.item.summary }}
+                  {{ 'today' if days_left == 0 else 'in ' ~ days_left ~ ' days' }}
 ```
 
-With a shared calendar (e.g. Google), the example adds a condition `{{ 'Glovebox reminder' in trigger.calendar_event.description }}`. Whether the add-on should also create its own HA notification is open question Q3.
+The blueprint works with any calendar Glovebox writes to, including one HA only reads (e.g. Google), because it reads only the events.
+
+**Fallback, gated on task 0.2.** If `calendar.get_events` does not return `description`, or the templates above cannot be made to work, Glovebox also writes a separate heads-up event on the remind date: summary "Golf: Registration due in 30 days", the same marker plus the suffix `heads-up`. That event gets its own `cal_headsup_uid` column and follows the same sync rules. The blueprint then becomes a plain calendar trigger at event start (offset `notify_time`) that notifies with the event summary for events carrying the marker. Task 0.2 decides which variant ships and updates D3, D9 and the specs.
+
+**Verified on haos-test, 2026-10-23** (HA 2026.10.2, Local Calendar "Glovebox test", from outside the add-on over REST and websocket):
+- `calendar.get_events` (REST `POST /api/services/calendar/get_events?return_response`) returns `description` for Local Calendar events (empty string if none). An all-day event of today is in the 366-day window. The heads-up fallback is not needed.
+- `GET /api/calendars/<entity>?start=&end=` returns `uid` per event; `supported_features` of the Local Calendar is 7; `calendar.create_event` with `start_date`/`end_date` and a description works.
+- The regex, the `search` test and the date maths pick the right events; a missing "Notify" line gives 0; events with an empty description are skipped.
+- `action: !input notify_action` is accepted. With `persistent_notification.create`, one run on 2026-10-23 gave exactly two notifications: the event due today ("today") and the event due in 30 days with lead 30 ("in 30 days"); events due in 10 and 60 days gave none.
+- Correction to the earlier sketch: the `due` variable became a string ("2026-10-23"), so `due - now().date()` would fail (not run in that form); days_left is now computed in one expression.
+- Blueprint saved with websocket `blueprint/save` (domain `automation`, path `glovebox/reminders.yaml`) and the automation created from it.
+- `calendar/event/update` and `calendar/event/delete` (websocket, `entity_id`, `uid`, `event` with `summary`, `dtstart`, `dtend`, `description`) work on the Local Calendar from outside; the in-add-on URL `ws://supervisor/core/websocket` is still to be checked (task 0.1). Timed events were not tested.
 
 ### D10. HA user identity
 
-Not used. Reminders belong to a vehicle and the household, as all Glovebox data does. Who gets notified is decided in the user's automation. If per-person reminders are ever needed, Cekar's header approach (its design D2) is the one to reuse.
+Not used. Reminders belong to a vehicle and the household, as all Glovebox data does. Who is notified is chosen in the blueprint. If per-person reminders are ever needed, Cekar's header approach (its design D2) is the one to reuse.
 
 ### D11. Standalone mode
 
-There is no HA connection and no token setting. The calendar setting is hidden and replaced by the line "Calendar sync needs the Home Assistant add-on. Use Download .ics to add reminders to any calendar." `cal_state` stays `none`. The Timeline card, the Reminders page and the .ics downloads work the same.
+There is no HA connection and no token setting. The calendar setting is replaced by the line "Calendar sync needs the Home Assistant add-on. Use Download .ics to add a reminder to any calendar." The Timeline card, the Reminders page and the .ics download work the same.
 
 ### D12. Backup and standard format
 
-`reminders.csv` becomes a companion table of the standard format, defined in `standard.py` like `vehicles.csv` and `stations.csv`. It is generated into the docs and the Data Package descriptor.
+`reminders.csv` becomes a companion table of the standard format, defined in `standard.py` and generated into the docs and the Data Package descriptor.
 
 - **Columns:** `uid`, `vehicle`, `title`, `category`, `due_date`, `lead_days`, `status`, `done_date`, `vehicle_field`, `notes`.
 - **Full backup:** always contains it (header only when there are no reminders).
 - **Import:** a ZIP member named `reminders` with a `due_date` column is read as this table.
-  - A reminder whose `uid` already exists is skipped as a duplicate.
+  - A known `uid` is skipped as a duplicate.
   - The vehicle mapping applies.
   - Undo removes the imported reminders.
-- **Not kept:** the expense link (records have no stable id in the CSV; the link is informational) and the calendar state (it belongs to one HA installation). After a restore in add-on mode, the open reminders are synced to the configured calendar. Thanks to the marker lookup (D4) this does not duplicate events that are already there.
-
-### D13. Dependencies
-
-- `httpx` moves from the dev group to runtime dependencies (`uv add httpx`); it is already locked.
-- `websockets` is added (`uv add websockets`) for the two websocket commands. It is small, pure Python and widely used.
-- **Alternative:** a stdlib-only websocket client like the one in `.dev/release_deploy.py`. It avoids the dependency but is more code to maintain in the app. Open question Q4.
+- **Not kept:** the expense link and the calendar state. After a restore in add-on mode, open reminders are written to the configured calendar. The find-first lookup (D4) reuses events that are already there.
 
 ## Risks / Trade-offs
 
-- **Websocket proxy URL unverified** → task 0.1 checks it before any code depends on it. Fallback if add-ons cannot use the websocket: create only, with every calendar treated like CalDAV (D4 `stale` path), and say so in the docs.
-- **Google lists new events with a delay** → the lookup stays `pending` and retries without creating a second event, thanks to the marker (D4 step 1).
-- **The marker line is visible** in the user's calendar → accepted. It is short and makes sync idempotent without storing anything in HA.
-- **The user deletes or edits the event in the calendar** → sync is one way. On the next change Glovebox does not find the uid, so it creates a new event (update or delete of a missing uid is treated as "not found", then create). Edits made in the calendar are overwritten on the next change.
-- **Event on the remind date, not the due date** → the calendar does not show the deadline day itself. This is Q1.
-- **.ics re-import into Google** may duplicate → documented. Google users are pointed to tier 1.
-- **Background task in a single-process app** → one asyncio task with a lock, so a manual "Sync now" and the timer never run at the same time.
+- **The websocket URL for add-ons is unverified** → task 0.1 checks it first. If add-ons cannot use the websocket, sync is create-only for every calendar: changes and removals get the "edit it there" messages. The docs say so.
+- **`get_events` may lack `description`** → task 0.2 checks it; the D9 fallback (heads-up event) is ready.
+- **The marker and "Notify" lines are visible** in the user's calendar → accepted. They are short and keep HA free of extra state.
+- **Edits made in the calendar** are overwritten by the next change in Glovebox. If the user deleted the event, the next change creates a new one (a missing uid is treated as no event).
+- **A calendar without update shows outdated events** after edits → the plain message tells the user to edit there. This is the price of having no per-provider logic.
+- **A hand-written websocket client** is code to maintain → it is kept to the two commands, and tests run it against a local fake server.
 
 ## Migration Plan
 
-- Migration 0006 adds the `reminder` table; existing data is untouched. The new add-on version asks for `homeassistant_api`, which HA grants on update.
-- **Rollback:** the table is dropped by the downgrade. Events already written to calendars stay there.
+- Migration 0006 adds the `reminder` table; existing data is untouched. The add-on update asks for `homeassistant_api`.
+- **Downgrade:** drops the table. Events in calendars stay.
 
 ## Open Questions
 
-- **Q1. Event date.** Should the calendar event sit on the remind date (proposed: "act now" day, simple notifications) or on the due date (calendar shows the deadline; notifications then need a fixed-offset automation, the same N days for all reminders)?
-- **Q2. Outlook.** Do you use Outlook with a Microsoft 365 work account or outlook.com? Tier 2 (.ics) works with both. A HACS Microsoft 365 calendar integration might expose a writable HA calendar, but that is unverified. Should we look into it, or is .ics enough for Outlook?
-- **Q3. Add-on notification.** Is the documented calendar automation enough, or should the add-on also create an HA persistent notification on the remind date (no automation needed, but one more piece of code and a setting)?
-- **Q4. Dependency.** May we add `websockets` (and move `httpx` to runtime), or do you prefer a stdlib-only client?
-- **Q5. Default lead time.** 14 days for everything, or 30 days for insurance and registration?
+None. The user's decisions of 2026-10-23 settled the event date, notifications, scope, default lead time and dependencies. The only open point is technical and is decided by task 0.2: blueprint over `get_events`, or the heads-up event fallback (D9).

@@ -1,8 +1,9 @@
 {% extends layout %}
 {% from "_macros.html" import messages, field, textarea, dialog_head, vehicle_select with context %}
 {% set dialog_page = true %}
+{% set last_placeholder = (last_odometer.km | km_grouped) if (last_odometer and not expense_id) else None %}
 {% macro odometer_hint() %}
-  <div class="help" data-odo-hint data-steps='{{ odometer_steps }}'>
+  <div class="help" data-odo-hint{{ ' data-placeholder' if not expense_id }} data-steps='{{ odometer_steps }}'>
     <span data-odo-text>
     {% if not f.vehicle_id %}Choose a vehicle to see its last recorded odometer.
     {% elif last_odometer %}Last recorded: {{ last_odometer.km | km_grouped }}&nbsp;km{% if last_odometer.date %} ({{ last_odometer.date | short_date }}){% else %} (initial){% endif %}.
@@ -27,7 +28,7 @@
       <input type="hidden" name="category" value="maintenance">
       <div class="grid2">
         {{ field('Date', 'date', f.date, type='date', required=True) }}
-        {{ field('Odometer', 'odometer_km', f.odometer_km, suffix='km', inputmode='decimal') }}
+        {{ field('Odometer', 'odometer_km', f.odometer_km, suffix='km', inputmode='decimal', placeholder=last_placeholder) }}
       </div>
       {{ odometer_hint() }}
       {{ field('Title', 'title', f.title, required=True, placeholder='e.g. Oil and filter change') }}
@@ -44,7 +45,7 @@
       {{ field('Date (paid)', 'date', f.date, type='date', required=True) }}
       {{ field('Title', 'title', f.title, required=True, placeholder='e.g. Insurance 2026') }}
       {{ field('Amount (full price paid)', 'amount', f.amount, suffix=currency, inputmode='decimal', required=True) }}
-      {{ field('Odometer', 'odometer_km', f.odometer_km, suffix='km', inputmode='decimal') }}
+      {{ field('Odometer', 'odometer_km', f.odometer_km, suffix='km', inputmode='decimal', placeholder=last_placeholder) }}
       {{ odometer_hint() }}
       <div class="grid2">
         {{ field('Coverage start', 'coverage_start', f.coverage_start, type='date') }}

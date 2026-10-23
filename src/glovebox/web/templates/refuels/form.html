@@ -2,7 +2,6 @@
 {% from "_macros.html" import messages, field, textarea, switch, select, dialog_head, vehicle_select with context %}
 {% set dialog_page = true %}
 {% set heading = 'Edit refuelling' if refuel_id else 'New refuelling' %}
-{% set new_station = f.new_station_name or f.station_id == '__new' %}
 {% block title %}{{ heading }} - Glovebox{% endblock %}
 {% block content %}
 <div class="scrim" data-scrim>
@@ -27,25 +26,7 @@
       {{ field('Total', 'total', f.total, suffix=currency, inputmode='decimal', calc='total') }}
     </div>
     <div class="help">Fill in any two; the third is calculated.</div>
-    <div class="field">
-      <label for="i-station_id">Station</label>
-      <select id="i-station_id" name="station_id" data-station-select>
-        <option value="">None</option>
-        {% for s in stations %}
-        <option value="{{ s.id }}" {{ 'selected' if f.station_id == s.id | string and not new_station }}>{{ s.name }}{{ ' - ' ~ s.location if s.location }}{{ ' · ' ~ s.brand if s.brand }}</option>
-        {% endfor %}
-        <option value="__new" {{ 'selected' if new_station }}>New station…</option>
-      </select>
-    </div>
-    <div class="new-station" data-new-station {{ '' if new_station else 'data-closed' }}>
-      <div class="grid2">
-        {{ field('Station name', 'new_station_name', f.new_station_name) }}
-        {{ field('Brand (optional)', 'new_station_brand', f.new_station_brand, list='brand-list') }}
-      </div>
-      {{ field('Location (optional)', 'new_station_location', f.new_station_location) }}
-      <datalist id="brand-list">{% for b in brands %}<option value="{{ b }}">{% endfor %}</datalist>
-      <p class="help">A new station overrides the selection above. The brand is only what you type.</p>
-    </div>
+    {% include "refuels/_station_picker.html" %}
     {{ switch('is_full', 'Full tank', 'Needed to work out consumption', f.is_full) }}
     {{ switch('missed_previous', 'Missed previous fill-up', 'Skips consumption for this entry', f.missed_previous) }}
     {{ textarea('Notes', 'notes', f.notes) }}

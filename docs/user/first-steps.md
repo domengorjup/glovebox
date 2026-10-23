@@ -14,7 +14,7 @@ Tap the **+** button on the Timeline and choose **Refuelling**.
 
 ![Refuelling form](../assets/screenshots/refuel-form-desktop-light.png)
 
-Fill in the vehicle, date and odometer (km). Then enter the fuel figures.
+The quick page asks for the odometer (km) first, then the fuel figures. The date is today unless you change it; see [Adding and editing records](records.md#refuelling) for all options. The screenshot shows the full form, which you get when you edit an entry.
 
 ### Any two of litres, price per litre, total
 

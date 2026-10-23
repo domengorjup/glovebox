@@ -50,10 +50,14 @@ class ValidationError(RecordsError):
 class ConfirmationRequired(RecordsError):
     """A destructive action needs ``confirm=True``; carries the record counts."""
 
-    def __init__(self, refuels: int, expenses: int) -> None:
-        super().__init__(f"{refuels} refuels and {expenses} expenses would be deleted")
+    def __init__(self, refuels: int, expenses: int, reminders: int = 0) -> None:
+        super().__init__(
+            f"{refuels} refuels, {expenses} expenses and {reminders} reminders "
+            "would be deleted"
+        )
         self.refuels = refuels
         self.expenses = expenses
+        self.reminders = reminders
 
 
 @dataclass(frozen=True)
@@ -152,10 +156,11 @@ class LastOdometer:
 
 @dataclass(frozen=True)
 class RecordCounts:
-    """Number of records of a vehicle."""
+    """Number of records and reminders of a vehicle."""
 
     refuels: int
     expenses: int
+    reminders: int = 0
 
 
 # --- Helpers --------------------------------------------------------------
@@ -277,7 +282,9 @@ def archive_vehicle(session: Session, vehicle_id: int, archived: bool = True) ->
 
 
 def count_vehicle_records(session: Session, vehicle_id: int) -> RecordCounts:
-    """Count a vehicle's refuels and expenses (for the delete confirmation)."""
+    """Count a vehicle's refuels, expenses and reminders (for the delete confirmation)."""
+    from glovebox.services import reminders  # reminders imports this module
+
     refuels = session.scalar(
         select(func.count()).select_from(Refuel).where(Refuel.vehicle_id == vehicle_id)
     )
@@ -286,16 +293,24 @@ def count_vehicle_records(session: Session, vehicle_id: int) -> RecordCounts:
         .select_from(Expense)
         .where(Expense.vehicle_id == vehicle_id)
     )
-    return RecordCounts(refuels=refuels or 0, expenses=expenses or 0)
+    return RecordCounts(
+        refuels=refuels or 0,
+        expenses=expenses or 0,
+        reminders=reminders.count_vehicle_reminders(session, vehicle_id),
+    )
 
 
 def delete_vehicle(session: Session, vehicle_id: int, *, confirm: bool = False) -> None:
-    """Delete a vehicle and its records; raises ``ConfirmationRequired`` if it
-    has records and ``confirm`` is false."""
+    """Delete a vehicle with its records and reminders; raises
+    ``ConfirmationRequired`` if it has any and ``confirm`` is false. Calendar
+    events of the reminders are removed by the next calendar sync."""
+    from glovebox.services import reminders  # reminders imports this module
+
     vehicle = get_vehicle(session, vehicle_id)
     counts = count_vehicle_records(session, vehicle_id)
-    if (counts.refuels or counts.expenses) and not confirm:
-        raise ConfirmationRequired(counts.refuels, counts.expenses)
+    if (counts.refuels or counts.expenses or counts.reminders) and not confirm:
+        raise ConfirmationRequired(counts.refuels, counts.expenses, counts.reminders)
+    reminders.delete_vehicle_reminders(session, vehicle_id)
     # Explicit deletes: do not depend on SQLite foreign-key enforcement.
     session.execute(delete(Refuel).where(Refuel.vehicle_id == vehicle_id))
     session.execute(delete(Expense).where(Expense.vehicle_id == vehicle_id))

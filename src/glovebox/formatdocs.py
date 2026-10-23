@@ -39,12 +39,17 @@ _TABLE_HEADINGS = {
     "records": ("records.csv", "Refuels and expenses. Used by every standard import and export."),
     "vehicles": (
         "vehicles.csv",
-        "Optional. Vehicle details; see [Optional tables](#optional-tables-vehicles-and-stations).",
+        "Optional. Vehicle details; see [Optional tables](#optional-tables-vehicles-stations-and-reminders).",
     ),
     "stations": (
         "stations.csv",
         "Optional. Station details and stations without refuels; see "
-        "[Optional tables](#optional-tables-vehicles-and-stations).",
+        "[Optional tables](#optional-tables-vehicles-stations-and-reminders).",
+    ),
+    "reminders": (
+        "reminders.csv",
+        "Optional. Date reminders of the vehicles; see "
+        "[Optional tables](#optional-tables-vehicles-stations-and-reminders).",
     ),
 }
 
@@ -167,11 +172,11 @@ def render_standard_markdown() -> str:
         "",
     ]
     lines += [
-        "## Optional tables: vehicles and stations",
+        "## Optional tables: vehicles, stations and reminders",
         "",
         "`records.csv` alone is enough. To bring vehicle and station details "
-        "along, put `vehicles.csv` and/or `stations.csv` next to `records.csv` "
-        "in a ZIP file, or in a ZIP of several CSV files, and import the ZIP. "
+        "and reminders along, put `vehicles.csv`, `stations.csv` and/or "
+        "`reminders.csv` next to `records.csv` in a ZIP file, or in a ZIP of several CSV files, and import the ZIP. "
         "The ZIP does not need a `datapackage.json`.",
         "",
         "- A vehicle or station that does not exist yet is created with all the "
@@ -182,6 +187,9 @@ def render_standard_markdown() -> str:
         "- The import preview lists which vehicles and stations will be created "
         "or filled before you confirm.",
         "- `stations.csv` can list stations that have no refuels yet.",
+        "- A reminder in `reminders.csv` whose `uid` already exists is skipped as "
+        "a duplicate. Reminders refer to vehicles by name, like records. The "
+        "link to an expense and the calendar state are not part of the file.",
         "- A full backup is exactly this, plus `datapackage.json`: it is made "
         "on the export page and restored on the import page like any other ZIP.",
         "",

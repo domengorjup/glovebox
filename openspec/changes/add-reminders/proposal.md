@@ -1,28 +1,30 @@
 ## Why
 
-Insurance, registration and services come due once a year or so, and Glovebox already knows most of these dates (the coverage end of an insurance expense, soon the "valid until" dates on a vehicle). Today the user has to copy them into a calendar by hand. Reminders should show up where the user already looks: the Glovebox Timeline, Home Assistant's calendars, and the user's own Google or Outlook calendar, with a phone notification if they want one.
+Insurance, registration and services come due once a year or so, and Glovebox already knows most of these dates (the coverage end of an insurance expense, soon the "valid until" dates on a vehicle). Today the user has to copy them into a calendar by hand. Reminders should show up on the Timeline, in a Home Assistant calendar (and through it the user's own calendars), and as a phone notification. Glovebox should pass them on to HA's standard calendar handling and maintain as little as possible itself.
 
 ## What Changes
 
-- **Reminders per vehicle:** title, category (the expense categories), due date, "remind me N days before", notes, status open or done. Create, edit, mark done, delete.
+- **Reminders per vehicle:** title, category (the expense categories), due date, "notify N days before" (default 30, set per reminder), notes, status open or done. Create, edit, mark done, delete.
 - **Quick create:**
-  - "Remind me" on an expense: due date = coverage end if set, else the expense date + 1 year; lead days editable.
+  - "Remind me" on an expense: due date = coverage end if set, else expense date + 1 year.
   - From the vehicle's insurance and registration "valid until" dates (added by the concurrent vehicle-details change): a reminder linked to the date that moves with it.
-- **Timeline:** a "Due soon" card at the top lists open reminders whose reminder date has arrived (with overdue ones first). A Reminders page (from the card and from Manage) lists all of them. The add chooser gets "Reminder".
-- **Delivery to calendars, in tiers:**
-  1. **HA calendar sync (add-on mode):** the user picks one HA calendar entity that can create events. Glovebox writes each open reminder as an all-day event, finds the event's uid through HA's REST calendar API and keeps it. Changes use update where the calendar supports it, else delete and re-create, else the reminder says why the event cannot follow. Through HA this reaches Local Calendar, Google Calendar (read/write setup) and CalDAV.
-  2. **.ics download** per reminder and for all open reminders: works with any calendar app, including Outlook, and in standalone mode.
-  3. **iCal feed:** not in this change (see design D8).
-- **Notifications:** no new notification code. The docs give an example HA automation (calendar trigger on the reminders calendar, then `notify.mobile_app_*`).
-- **Add-on config:** `homeassistant_api: true`.
+- **Timeline:** a "Due soon" card at the top for open reminders whose notify date has arrived, overdue first. A Reminders page (from the card and from Manage) lists all of them. The add chooser gets "Reminder".
+- **Calendars:**
+  1. **HA calendar (add-on mode):** the user picks any calendar entity HA can create events in.
+     - Each open reminder becomes an all-day event on the due date, e.g. "Golf: Registration due". The description carries a machine-readable "Notify 30 days before" line and a marker line.
+     - Edits and removals are passed on only where the calendar's supported features allow. Otherwise a plain message says to edit it there.
+  2. **.ics download per reminder**, with alarms on the notify date and the due date: for Outlook and any other calendar, and in standalone mode.
+- **Notifications:** Glovebox sends none. The repository ships one HA automation blueprint (importable with a my.home-assistant.io link). It runs daily, reads the calendar's upcoming events and notifies on the notify date and on the due date. A fallback (a separate heads-up event) is ready in case the test VM check fails.
+- **Add-on config:** `homeassistant_api: true`. No new dependencies: the HA client uses only the standard library.
 - **Backup:** a new `reminders.csv` companion table in the standard format, in the full backup and in imports.
 - **Vehicle delete:** the confirmation also counts the vehicle's reminders.
+- **Not in this change:** an iCal feed, integrations for specific calendar providers, recurring reminders.
 
 ## Capabilities
 
 ### New Capabilities
 - `reminders`: reminder records, the quick-create paths, the Timeline "Due soon" card and the Reminders page.
-- `reminder-delivery`: HA calendar sync, .ics download, failure handling, standalone behaviour, notification guidance.
+- `reminder-delivery`: HA calendar writing, .ics download, failure handling, standalone behaviour, the notification blueprint.
 
 ### Modified Capabilities
 - `ha-addon`: Core API access (`homeassistant_api: true`).
@@ -35,10 +37,11 @@ Insurance, registration and services come due once a year or so, and Glovebox al
 
 - **Code:**
   - `models.py` + migration 0006 (`reminder` table).
-  - New `services/reminders.py`, `services/ha_calendar.py` (Core API client), `ics.py`, `web/reminders.py` with templates.
+  - New `services/reminders.py`, `services/ha_calendar.py` (stdlib REST and minimal websocket client), `ics.py`, `web/reminders.py` with templates.
   - Changes to `web/timeline.py`, `web/expenses.py`, `web/vehicles.py`, `manage.html`, `standard.py`, `formatdocs.py`, `exporters/backup.py`, `importers/pipeline.py`, `app.py` (background retry), `config.py` (Supervisor token).
-- **Dependencies:** `httpx` moves from dev to runtime; `websockets` is added for the two websocket-only calendar commands (open question Q4).
-- **Add-on:** `addon/glovebox/config.yaml` (`homeassistant_api: true`), `DOCS.md`.
-- **Docs:** new `docs/user/reminders.md` (with the example automation); `standard-format.md`, `export.md`, `import.md`, `timeline.md`; `docs/dev/design.md` (new elements); `docs/dev/architecture.md` (HA Core API client, written so the sibling app can reuse it).
-- **API:** `/api/v1` is unchanged. The stats-api rule that the summary has no reminder fields stays as it is; a reminders endpoint for the companion integration is v2 work.
-- **Depends on:** the vehicle-details change for the two "valid until" fields (task group 6 waits for it; everything else is independent).
+- **New repo file:** `blueprints/automation/glovebox/reminders.yaml`.
+- **Add-on:** `addon/glovebox/config.yaml`, `DOCS.md`.
+- **Docs:** new `docs/user/reminders.md`; `standard-format.md`, `export.md`, `import.md`, `timeline.md`; `docs/dev/design.md`; `docs/dev/architecture.md` (HA Core API client, written so the sibling app can reuse it).
+- **API:** `/api/v1` is unchanged.
+- **Dependencies:** none added.
+- **Depends on:** the vehicle-details change, for the two "valid until" fields (task group 6 waits for it).

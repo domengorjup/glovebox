@@ -1,0 +1,73 @@
+{# Quick service / expense page (phone-first). Service: category fixed to maintenance. #}
+{% extends layout %}
+{% from "_macros.html" import messages, field, textarea, dialog_head with context %}
+{% set dialog_page = true %}
+{% set noun = 'service' if is_service else 'expense' %}
+{% set page_path = '/quick-service' if is_service else '/quick-expense' %}
+{% block title %}{{ noun | capitalize }} - Glovebox{% endblock %}
+{% block content %}
+<div class="scrim" data-scrim>
+<form class="dialog form quick" method="post" role="dialog" aria-label="{{ noun | capitalize }}" action="{{ url(request, page_path) }}"
+      data-quick-kind="{{ noun }}">
+  {{ dialog_head(request, noun | capitalize) }}
+  <div class="dialog-body">
+    {{ messages(errors) }}
+    <input type="hidden" name="vehicle_id" value="{{ f.vehicle_id }}">
+    {% if vehicles | length > 1 %}
+    <div class="seg type-seg" role="group" aria-label="Vehicle choice">
+      {% for v in vehicles %}
+      <a href="{{ url(request, page_path ~ '?vehicle=%d' % v.id) }}" data-dialog class="{{ 'active' if f.vehicle_id == v.id | string }}">{{ v.name }}</a>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% if is_service %}
+    <input type="hidden" name="category" value="maintenance">
+    {% else %}
+    <div class="seg type-seg" role="radiogroup" aria-label="Type">
+      {% for c in categories %}
+      <label><input type="radio" name="category" value="{{ c.value }}" {{ 'checked' if f.category == c.value }}><span>{{ c.value | capitalize }}</span></label>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <div class="qgroup">
+      {{ field('What was done' if is_service else 'Title', 'title', f.title, required=True, placeholder='e.g. Oil and filter change' if is_service else 'e.g. Insurance 2026', autofocus=True) }}
+      {% for key, titles in title_chips.items() if (key == 'maintenance') == is_service %}
+      <div class="chips qchips titles" data-title-chips="{{ key }}" hidden>
+        {% for t in titles %}<button type="button" class="chip" data-title="{{ t }}">{{ t }}</button>{% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+    {{ field('Amount' if is_service else 'Amount (full price paid)', 'amount', f.amount, suffix=currency, inputmode='decimal', required=True, placeholder='0.00', big=True) }}
+    <div class="qgroup">
+      {{ field('Odometer', 'odometer_km', f.odometer_km, suffix='km', inputmode='numeric', placeholder=(last_odometer.km | km_grouped) if last_odometer else '0') }}
+      <div class="help qhint{{ ' warn' if last_odometer }}" data-odo-quick
+           data-last-km="{{ last_odometer.km if last_odometer }}"
+           data-last-text="{{ last_odometer.km | km_grouped if last_odometer }}{{ ' (' ~ (last_odometer.date | short_date) ~ ')' if last_odometer and last_odometer.date }}">
+        {% if last_odometer %}Last: {{ last_odometer.km | km_grouped }}&nbsp;km{% if last_odometer.date %} on {{ last_odometer.date | short_date }}{% else %} (initial){% endif %}. Left empty, it is saved as an estimate.
+        {% else %}No earlier reading for this vehicle. Entering the odometer is recommended.{% endif %}
+      </div>
+    </div>
+    <div class="chips qchips qmore">
+      <label class="chip" for="q-open-date">{{ icon('calendar', 18) }}<span data-quick-date>{{ date_text }}</span></label>
+      <label class="chip" for="q-open-more">{{ icon('tune-variant', 18) }}More</label>
+    </div>
+    <input type="checkbox" id="q-open-date" class="qtoggle" {{ 'checked' if f.date != today }}>
+    <input type="checkbox" id="q-open-more" class="qtoggle" {{ 'checked' if f.notes or f.coverage_start or f.coverage_end }}>
+    <div class="qdate-panel">{{ field('Date' if is_service else 'Date (paid)', 'date', f.date, type='date', required=True) }}</div>
+    <div class="qextra">
+      {% if not is_service %}
+      <div class="grid2">
+        {{ field('Coverage start', 'coverage_start', f.coverage_start, type='date') }}
+        {{ field('Coverage end', 'coverage_end', f.coverage_end, type='date') }}
+      </div>
+      <div class="help">Optional (both dates or none). Stats spreads the cost over the days it covers; the stored amount stays the full price.</div>
+      {% endif %}
+      {{ textarea('Notes', 'notes', f.notes) }}
+    </div>
+  </div>
+  <div class="dialog-foot qfoot">
+    <button type="submit" class="btn primary big-btn" data-quick-save>Save {{ noun }}</button>
+  </div>
+</form>
+</div>
+{% endblock %}

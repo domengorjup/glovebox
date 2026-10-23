@@ -22,6 +22,22 @@
   ];
   var FONT_VAR = "--ha-font-family-body";
 
+  // Deep link for the Android shortcut: HA opens an add-on panel at its start
+  // page and never passes a subpath on, but the panel URL itself may end in
+  // /quick, /quick-service or /quick-expense. Reset the parent URL first
+  // (replaceState fires no popstate, so HA's router stays put and reloads or
+  // Back do not loop), then open that page inside the iframe.
+  var script = document.currentScript;
+  try {
+    var outer = window.parent !== window ? window.parent.location : null;
+    var link = outer && /^(\/[^/]+)\/(quick(?:-service|-expense)?)\/?$/.exec(outer.pathname);
+    if (link && script) {
+      var base = new URL(script.src).pathname.replace(/\/static\/theme\.js$/, "");
+      window.parent.history.replaceState(window.parent.history.state, "", link[1] + outer.search);
+      window.location.replace(base + "/" + link[2]);
+    }
+  } catch (e) { /* standalone or cross-origin: no deep link */ }
+
   function parentRoot() {
     try {
       if (window.parent && window.parent !== window) {

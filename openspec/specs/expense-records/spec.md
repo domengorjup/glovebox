@@ -45,6 +45,7 @@ The Timeline SHALL list expenses newest first, filtered by the vehicle selected 
 ### Requirement: Odometer default on the expense and service forms
 The odometer SHALL stay optional on the expense and service forms, but the forms SHALL encourage it.
 - **Last known odometer:** the highest entered odometer of the vehicle (refuels, and expenses whose odometer is not estimated) dated on or before the entry's date, or the vehicle's initial odometer when that is higher or nothing else exists.
+- **Suggestion, not a value:** on add forms (not edit forms) the odometer field SHALL start empty and show the last known odometer as its placeholder; it SHALL NOT be prefilled.
 - **Hint:** the form SHALL show the last known odometer and its date, for example "Last recorded: 104,163 km (18 Oct)", and say that it is used when the field is left empty. Without any earlier reading it SHALL say that entering the odometer is recommended.
 - **Empty field on save:** the system SHALL store the last known odometer with `odometer_estimated` true.
 - **No earlier reading:** the odometer SHALL stay empty.

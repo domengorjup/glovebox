@@ -76,7 +76,9 @@ def test_backup_contents(session: Session) -> None:
     _populate(session)
     files = _read(export_backup(session, Settings()))
 
-    assert set(files) == {"records.csv", "vehicles.csv", "stations.csv", "datapackage.json"}
+    assert set(files) == {
+        "records.csv", "vehicles.csv", "stations.csv", "reminders.csv", "datapackage.json",
+    }
     records = _rows(files["records.csv"])
     assert list(records[0]) == [f.name for f in RECORD_FIELDS]
     assert len(records) == 4
@@ -111,10 +113,12 @@ def test_backup_metadata(session: Session) -> None:
     descriptor = json.loads(files["datapackage.json"])
     meta = descriptor["glovebox"]
     assert meta["app_version"] == __version__
-    assert meta["schema_version"] == "0006"
+    assert meta["schema_version"] == "0007"
     assert meta["currency"] == "CHF"
     assert meta["exported_at"]
-    assert [r["name"] for r in descriptor["resources"]] == ["records", "vehicles", "stations"]
+    assert [r["name"] for r in descriptor["resources"]] == [
+        "records", "vehicles", "stations", "reminders",
+    ]
 
 
 def test_selected_vehicle(session: Session) -> None:
