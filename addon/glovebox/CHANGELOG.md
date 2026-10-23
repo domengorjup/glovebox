@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.5
+
+- Quick add for refuelling, service and expense: phone-first forms (station suggestions, recent titles, Regular service) opened from + or directly from an HA shortcut (/quick, /quick-service, /quick-expense), saved with an Undo snackbar. Odometer in service and expense add forms is a suggestion; left empty, the last reading is saved as an estimate. Groundwork for reminders (not visible yet); the add-on now requests Home Assistant API access for the coming calendar sync.
+
 ## 0.2.4
 
 - Import opens a short review page (preset steps, vehicle choice, Import now); column mapping only when needed. Timeline summaries: period picker per vehicle (this month, 30 days, this year, 12 months, all time, custom) with fair comparisons. Vehicle details (VIN, year, engine, tyres, insurance and registration dates) in a folded section. Presets: full notes, editable notes, lock and duplicate. Vehicle delete offers a backup download. Version shown in the app bar.
