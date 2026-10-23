@@ -8,11 +8,10 @@ from pathlib import Path
 import pytest
 import yaml
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine
-from sqlalchemy.orm import Session
 
 from fake_ha import TOKEN, FakeHa
 from glovebox.app import create_app
+from glovebox.db import make_engine
 from glovebox.config import Mode, Settings, load_settings
 from glovebox.models import Reminder, ReminderStatus
 from glovebox.services import reminder_sync, records, reminders
@@ -92,8 +91,16 @@ def test_standalone_ignores_the_calendar_choice(client: TestClient) -> None:
 
 
 @pytest.fixture
-def addon_client(engine: Engine, settings: Settings):
-    """The app wired to a fake Home Assistant."""
+def addon_client(tmp_path: Path):
+    """
+    The app wired to a fake Home Assistant.
+
+    It uses a file database: the in-memory test engine shares one connection
+    between threads, so the background sync would roll back the request's
+    uncommitted changes. Production has one connection per session.
+    """
+    settings = Settings(data_dir=tmp_path)
+    engine = make_engine(tmp_path)
     with FakeHa() as ha:
         ha.add_calendar("calendar.glovebox", "Glovebox", 7)
         app = create_app(settings, engine)
