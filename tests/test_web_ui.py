@@ -186,8 +186,15 @@ def use_vehicles(monkeypatch, *vehicles):
     return list(vehicles)
 
 
+# The only external links: the footer links on Manage (new tab, no resources loaded).
+EXTERNAL_LINKS = (
+    "https://github.com/domengorjup/glovebox",
+    "https://domengorjup.github.io/glovebox/",
+)
+
+
 def urls_in(html: str) -> list[str]:
-    return URL_ATTRIBUTE.findall(html)
+    return [u for u in URL_ATTRIBUTE.findall(html) if u not in EXTERNAL_LINKS]
 
 
 PAGES = [
@@ -222,6 +229,8 @@ def test_page_urls_carry_ingress_prefix(client, path):
 @pytest.mark.parametrize("path", PAGES)
 def test_pages_reference_no_external_hosts(client, path):
     html = client.get(path).text
+    for link in EXTERNAL_LINKS:
+        html = html.replace(link, "")
     assert not re.search(r"""(?:https?:)?//[\w.-]+\.\w+""", html)
 
 
@@ -1233,6 +1242,15 @@ def test_manage_links_to_import_export_and_presets(client):
     assert "CSV files with presets" in html
     assert "Standard CSV, Fuelly-compatible CSV or full backup" in html
     assert f'href="{PREFIX}/presets"' in html
+
+
+def test_manage_has_github_and_documentation_links(client):
+    html = client.get("/manage", headers=INGRESS).text
+    for href, label in [
+        ("https://github.com/domengorjup/glovebox", "Glovebox on GitHub"),
+        ("https://domengorjup.github.io/glovebox/", "Documentation"),
+    ]:
+        assert f'href="{href}" target="_blank" rel="noopener" aria-label="{label}"' in html
 
 
 def test_vehicle_edit_prefills_form(client):

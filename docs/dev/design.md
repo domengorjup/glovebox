@@ -245,6 +245,16 @@ A text field whose value is often copied (the VIN) gets `copy=True` in the `fiel
 
 `table.tbl` in `.card.card-pad.table-scroll` for the price table; numeric cells have `.num`, columns that are dropped on phones have `.wide`. Charts are inline SVG drawn by `app.js` from the `#chart-data` JSON into `[data-chart]` inside `.card.chart-card`, with a `.legend` below (swatches `.swatch-<key>`).
 
+### Footer links (Manage page)
+
+`div.manage-links` below the last card on Manage: centred, holds icon-only `a.icon-btn` links (`aria-label` and `title`, `target="_blank" rel="noopener"` because the app runs in the Ingress iframe and GitHub refuses to load in a frame). Currently GitHub (`github`) and Documentation (`book-open-variant`).
+
+```html
+<div class="manage-links">
+  <a class="icon-btn" href="https://github.com/domengorjup/glovebox" target="_blank" rel="noopener" aria-label="Glovebox on GitHub" title="Glovebox on GitHub">{{ icon('github', 24) }}</a>
+</div>
+```
+
 ### Toast
 
 For a result the user can undo use the Snackbar above. `toast(message)` in `app.js` shows a short `.toast` at the bottom of the screen for about three seconds. Use it only to report a background action that failed (for example saving the card choice); successful actions reload the page and need no toast.

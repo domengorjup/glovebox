@@ -550,3 +550,6 @@ a.choice { color: inherit; } .choice .t, .choice .s { display: block; }
 
 /* Fuel type read from the vehicle, shown in the Litres label (not editable). */
 .field label .fuel-type { font-weight: 500; }
+
+/* Manage page footer links */
+.manage-links { display: flex; justify-content: center; gap: 8px; margin: 24px 0 8px; }
