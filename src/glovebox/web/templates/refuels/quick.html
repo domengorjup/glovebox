@@ -1,5 +1,5 @@
 {% extends layout %}
-{% from "_macros.html" import messages, field, textarea, switch, dialog_head with context %}
+{% from "_macros.html" import messages, field, textarea, switch, dialog_head, quick_tabs with context %}
 {% set dialog_page = true %}
 {% set choice = f.station_choice or default_choice %}
 {% set litres_label %}Litres{% if fuel_type %} <span class="fuel-type">· {{ fuel_type }}</span>{% endif %}{% endset %}
@@ -7,7 +7,8 @@
 {% block content %}
 <div class="scrim" data-scrim>
 <form class="dialog form quick" method="post" role="dialog" aria-label="Refuel" action="{{ url(request, '/quick') }}">
-  {{ dialog_head(request, 'Refuel') }}
+  {{ dialog_head(request, 'Add entry') }}
+  {{ quick_tabs(request, 'refuel', f.vehicle_id) }}
   <div class="dialog-body">
     {{ messages(errors, warnings) }}
     {% if figures is defined %}

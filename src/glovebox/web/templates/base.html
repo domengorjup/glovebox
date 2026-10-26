@@ -37,7 +37,7 @@
   </main>
 
   {% if section == 'timeline' and not dialog_page %}
-  <a class="fab" href="{{ url(request, '/add') }}" data-dialog aria-label="Add entry">{{ icon('plus', 28) }}</a>
+  <a class="fab" href="{{ url(request, '/quick') }}" data-dialog aria-label="Add entry">{{ icon('plus', 28) }}</a>
   {% endif %}
   <nav class="bottom-nav" aria-label="Sections">
     <a class="{{ 'active' if section == 'timeline' }}" href="{{ url(request, '/') }}"><span class="pill">{{ icon('timeline-text-outline') }}</span>Timeline</a>

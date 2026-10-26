@@ -882,7 +882,7 @@ def test_split_export_skips_vehicles_without_rows(client: TestClient) -> None:
 
 # --- Everything under an Ingress prefix ------------------------------------
 
-PAGES = ["/", "/?type=service", "/stats", "/manage", "/add", "/vehicles", "/vehicles/new",
+PAGES = ["/", "/?type=service", "/stats", "/manage", "/quick", "/vehicles", "/vehicles/new",
          "/refuels/new", "/expenses/new", "/expenses/new?kind=service", "/stations",
          "/import", "/export"]  # fmt: skip
 _URL_ATTR = re.compile(r'(?:href|src|action)="(/[^"]*)"')

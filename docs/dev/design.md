@@ -148,11 +148,9 @@ One `.btn` base (pill, text style). Variants:
 
 Any button that destroys data carries `data-confirm="Question?"` (browser confirm) or opens a confirm dialog. `{{ post_button(request, path, label, confirm_text) }}` renders a small outlined POST button.
 
-### Floating button and chooser
+### Floating button
 
-The round `+` (`a.fab`, `data-dialog`) appears on the Timeline only. It opens `/add`, a bottom sheet on phones and a small dialog on desktop, listing three `a.choice` rows: Refuelling, Service, Expense. The category mapping is fixed: Service is maintenance; Expense is insurance, registration or other.
-
-Refuelling opens the quick-add page (`/quick`, see below), not the full form.
+The round `+` (`a.fab`, `data-dialog`, aria-label "Add entry") appears on the Timeline only. It opens the quick Refuelling page (`/quick`) directly; the type is switched with the tabs in that page (see Quick-add page). There is no chooser; `GET /add` only redirects to `/quick` so old links keep working. Reminders are not part of this flow: they are added on the Reminders page (Manage -> Reminders, or "All reminders" on the Due soon card), and from an expense with "Remind me".
 
 ### Quick-add page
 
@@ -162,6 +160,7 @@ Refuelling opens the quick-add page (`/quick`, see below), not the full form.
 - `.field.big`: filled field with a 28px value (odometer, litres, total). The `field` macro takes `big=True` and `autofocus=True`.
 - `.qchips`: chips of 40px height. Choice chips are `label.chip` around a hidden radio (`.qchips.stations`: two columns, name ellipsised, selected = tinted). `.qmore` holds two toggle chips (date, More) that tick the hidden `.qtoggle` checkbox after them and reveal `.qdate-panel` / `.qextra`; `.qother` is the station select shown by the "Other" radio.
 - `.big-btn`: full-width 56px primary button in `.qfoot`. A disabled `.btn.primary` is grey.
+- `.qtabs` / `.qtab`: type tabs under the header title ("Add entry") of the three quick pages, from the `quick_tabs(request, kind, vehicle_id)` macro. `.qtabs` is a full-width flex strip with a divider below (the head's own border is removed on `.quick`); each `a.qtab` (`role="tab"`, `aria-selected`, `data-dialog`) is 48px high with icon and short label (Refuelling, Service, Expense), three equal columns that fit 390px. The active one (`.active`) takes its type colour from `t-refuel`, `t-service` or `t-expense` (`--c`) for text, a 2px underline and a 10% tint. Tabs are links to `/quick`, `/quick-service`, `/quick-expense` with `?vehicle=<id>`, so they work without JavaScript; entered values are not carried over. They differ on purpose from the outlined `.seg.type-seg` (vehicle, expense type), which stays in the form body.
 - The vehicle choice is a `.seg.type-seg` of links (`?vehicle=`) and appears only with more than one active vehicle.
 - `.field label .fuel-type`: the vehicle's fuel type after the Litres label ("Litres · Diesel"), read-only, medium weight; nothing when the vehicle has none. Quick form: server-rendered, follows `?vehicle=`. Full form: also updated by `app.js` (`bindFuelType`) from `data-fuel-types` JSON on the span when the Vehicle select changes.
 - `.field.computed`: the value the page script calculated (any two of litres, price per litre, total) is drawn in the primary colour; typing in it removes the mark. The full refuelling form uses it too.

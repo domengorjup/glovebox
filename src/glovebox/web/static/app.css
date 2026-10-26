@@ -279,13 +279,7 @@ h2 { font-size: 14px; font-weight: 500; color: var(--secondary-text-color); marg
   border-radius: 28px; width: min(560px, 94vw); max-height: 92vh; display: flex; flex-direction: column; overflow: hidden;
   box-shadow: 0 12px 40px var(--shadow-color); animation: rise .2s;
 }
-.chooser { width: min(360px, 94vw); padding: 8px 0 12px; }
-.chooser h3, .dialog-head h3 { margin: 0; font-size: 20px; font-weight: 500; }
-.chooser h3 { padding: 18px 24px 8px; }
-.choice { display: flex; align-items: center; gap: 16px; width: 100%; padding: 12px 24px; background: none; border: 0; text-align: left; }
-.choice:hover { background: rgba(127,127,127,.09); }
-.choice .t { font-weight: 500; font-size: 15px; }
-.choice .s { color: var(--secondary-text-color); font-size: 13px; }
+.dialog-head h3 { margin: 0; font-size: 20px; font-weight: 500; }
 .dialog-head { display: flex; align-items: center; gap: 8px; padding: 12px 12px 12px 24px; border-bottom: 1px solid var(--divider-color); }
 .dialog-head h3 { flex: 1; }
 .dialog-body { padding: 20px 24px; overflow: auto; display: flex; flex-direction: column; gap: 16px; }
@@ -380,8 +374,6 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
   .bottom-nav a.active .pill { background: color-mix(in srgb, var(--primary-color) 22%, transparent); color: var(--primary-color); }
   .fab { right: 16px; bottom: 80px; }
   .scrim { align-items: flex-end; }
-  .dialog.chooser { width: 100%; border-radius: 28px 28px 0 0; padding-bottom: 24px; }
-  .dialog.chooser::before { content: ""; width: 32px; height: 4px; border-radius: 2px; background: var(--divider-color); margin: 8px auto 0; }
   .dialog.form { width: 100%; height: 100%; max-height: none; border-radius: 0; }
   .dialog-body { padding: 16px; flex: 1; }
   .dialog-foot { padding: 12px 16px; }
@@ -450,11 +442,10 @@ a.row, a.row-link { text-decoration: none; color: inherit; }
 .brand:visited { color: inherit; }
 .brand span { color: var(--primary-text-color); }
 .table-head { margin-top: var(--ha-space-6); }
-a.btn, a.icon-btn, a.choice, a.chip, .seg a { text-decoration: none; }
+a.btn, a.icon-btn, a.chip, a.qtab, .seg a { text-decoration: none; }
 @media (max-width: 699px) { .row .detail { white-space: normal; } }
 @media (max-width: 699px) { .tbl th, .tbl td { padding-left: 5px; padding-right: 5px; } .tbl { font-size: 13px; } }
 @media (max-width: 699px) { .tbl th.num { white-space: normal; } .tbl td:first-child, .tbl th:first-child { width: 38%; } }
-a.choice { color: inherit; } .choice .t, .choice .s { display: block; }
 .btn.with-icon { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
 .btn.primary.with-icon { padding: 10px 24px; font-size: inherit; }
 .card + .summary-grid { margin-top: var(--ha-space-4); }
@@ -496,6 +487,15 @@ a.choice { color: inherit; } .choice .t, .choice .s { display: block; }
 
 /* ---------- quick add refuelling (/quick) ---------- */
 .quick .dialog-body { gap: 18px; }
+/* type tabs in the quick-add header */
+.quick .dialog-head { border-bottom: 0; }
+.qtabs { display: flex; border-bottom: 1px solid var(--divider-color); }
+.qtab { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 8px; height: 48px; padding: 0 8px; position: relative;
+  background: none; border: 0; color: var(--secondary-text-color); font-size: 14px; font-weight: 500; letter-spacing: .02em; white-space: nowrap; }
+.qtab:hover { background: rgba(127,127,127,.08); }
+.qtab:focus-visible { outline: 2px solid var(--primary-color); outline-offset: -2px; }
+.qtab.active { color: var(--c); background: color-mix(in srgb, var(--c) 10%, transparent); }
+.qtab.active::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--c); }
 @media (min-width: 700px) { .dialog.quick { width: min(460px, 94vw); } }
 .type-seg.seg a, .type-seg.seg label { flex: 1; text-align: center; }
 .qgroup { display: flex; flex-direction: column; gap: var(--ha-space-2); }

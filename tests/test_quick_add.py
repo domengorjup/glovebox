@@ -156,13 +156,12 @@ def test_vehicle_choice_only_with_several_vehicles(client: TestClient):
     assert f'name="vehicle_id" value="{golf}"' in client.get(f"/quick?vehicle={golf}").text
 
 
-def test_quick_defaults_and_chooser(client: TestClient):
+def test_quick_defaults(client: TestClient):
     _vehicle(client, "Golf")
     html = client.get("/quick").text
     assert re.search(r'name="is_full"[^>]*checked', html)
     assert "Today, " in html and "autofocus" in html
     assert 'inputmode="numeric"' in html
-    assert 'href="/quick"' in client.get("/add").text
 
 
 def test_quick_without_vehicles_goes_to_timeline(client: TestClient):
@@ -259,14 +258,12 @@ def test_quick_expense_errors_rerender(client: TestClient, engine: Engine):
     assert _expense_rows(engine) == []
 
 
-def test_quick_pages_vehicle_choice_and_chooser(client: TestClient):
+def test_quick_pages_vehicle_choice(client: TestClient):
     _vehicle(client, "Golf")
     html = client.get("/quick-expense").text
     assert 'aria-label="Vehicle choice"' not in html
     _vehicle(client, "Clio")
     assert 'aria-label="Vehicle choice"' in client.get("/quick-service").text
-    chooser = client.get("/add").text
-    assert 'href="/quick-service"' in chooser and 'href="/quick-expense"' in chooser
 
 
 def test_full_add_forms_suggest_the_last_odometer_only(client: TestClient):
@@ -305,3 +302,55 @@ def test_full_form_embeds_fuel_types_per_vehicle(client: TestClient):
     html = client.get(f"/refuels/new?vehicle={plain}").text
     assert "· Diesel</span>" not in html
     assert "data-fuel-types" in html
+
+
+def _tabs(html: str) -> list[tuple[str, str, str]]:
+    """(href, aria-selected, class) of each quick tab."""
+    return re.findall(r'<a role="tab" aria-selected="(\w+)" class="([^"]*)"\s+href="([^"]*)"', html)
+
+
+def test_fab_opens_quick_refuelling(client: TestClient):
+    _vehicle(client, "Golf")
+    html = client.get("/").text
+    assert re.search(r'<a class="fab" href="/quick" data-dialog aria-label="Add entry"', html)
+
+
+def test_add_redirects_to_quick(client: TestClient):
+    response = client.get("/add", follow_redirects=False)
+    assert response.status_code == 303 and response.headers["location"] == "/quick"
+    ingress = client.get("/add", headers={"X-Ingress-Path": "/api/hassio_ingress/abc"},
+                         follow_redirects=False)
+    assert ingress.headers["location"] == "/api/hassio_ingress/abc/quick"
+
+
+def test_quick_tabs_mark_the_active_type_and_keep_the_vehicle(client: TestClient):
+    _vehicle(client, "Golf")
+    clio = _vehicle(client, "Clio")
+    for path, active in [("/quick", "refuel"), ("/quick-service", "service"),
+                         ("/quick-expense", "expense")]:
+        html = client.get(f"{path}?vehicle={clio}").text
+        assert "<h3>Add entry</h3>" in html
+        tabs = _tabs(html)
+        assert [t[2] for t in tabs] == [
+            f"/quick?vehicle={clio}", f"/quick-service?vehicle={clio}",
+            f"/quick-expense?vehicle={clio}"]
+        selected = [t for t in tabs if t[0] == "true"]
+        assert len(selected) == 1 and f"t-{active} active" in selected[0][1]
+
+
+def test_quick_tabs_under_ingress_prefix(client: TestClient):
+    _vehicle(client, "Golf")
+    prefix = "/api/hassio_ingress/abc"
+    html = client.get("/quick-service", headers={"X-Ingress-Path": prefix}).text
+    assert all(t[2].startswith(prefix + "/quick") for t in _tabs(html)) and len(_tabs(html)) == 3
+
+
+def test_quick_tab_switch_posts_to_the_other_form(client: TestClient):
+    """Follow the Service tab link, then submit the form it returns."""
+    vid = _vehicle(client, "Golf")
+    href = _tabs(client.get(f"/quick?vehicle={vid}").text)[1][2]
+    page = client.get(href).text
+    assert 'action="/quick-service"' in page and f'name="vehicle_id" value="{vid}"' in page
+    _post(client, "/quick-service", {"vehicle_id": str(vid), "category": "maintenance",
+                                     "title": "Oil", "amount": "80",
+                                     "date": date.today().isoformat()})

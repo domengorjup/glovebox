@@ -13,7 +13,7 @@ from glovebox.models import Expense, ExpenseCategory, Refuel, Vehicle
 from glovebox.services import periods, preferences, records, reminders, stats
 from glovebox.services.stats import LastRefuel, Segment, StatsFilter
 from glovebox.web import formatting
-from glovebox.web.common import Chrome, SessionDep, load_chrome, render, view_filter
+from glovebox.web.common import Chrome, SessionDep, load_chrome, redirect, render, view_filter
 from glovebox.web.formatting import (
     NBSP,
     format_milli,
@@ -406,6 +406,6 @@ def timeline(request: Request, session: SessionDep, type: str = "all"):
 
 
 @router.get("/add")
-def add_entry(request: Request, session: SessionDep):
-    """Chooser dialog behind the floating + button."""
-    return render(request, "add.html", section="timeline")
+def add_entry(request: Request):
+    """Old chooser address: the quick Refuelling page has the type tabs now."""
+    return redirect(request, "/quick")

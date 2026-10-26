@@ -1,6 +1,6 @@
 {# Quick service / expense page (phone-first). Service: category fixed to maintenance. #}
 {% extends layout %}
-{% from "_macros.html" import messages, field, textarea, dialog_head, remind_switch with context %}
+{% from "_macros.html" import messages, field, textarea, dialog_head, quick_tabs, remind_switch with context %}
 {% set dialog_page = true %}
 {% set noun = 'service' if is_service else 'expense' %}
 {% set page_path = '/quick-service' if is_service else '/quick-expense' %}
@@ -9,7 +9,8 @@
 <div class="scrim" data-scrim>
 <form class="dialog form quick" method="post" role="dialog" aria-label="{{ noun | capitalize }}" action="{{ url(request, page_path) }}"
       data-quick-kind="{{ noun }}">
-  {{ dialog_head(request, noun | capitalize) }}
+  {{ dialog_head(request, 'Add entry') }}
+  {{ quick_tabs(request, noun, f.vehicle_id) }}
   <div class="dialog-body">
     {{ messages(errors) }}
     <input type="hidden" name="vehicle_id" value="{{ f.vehicle_id }}">

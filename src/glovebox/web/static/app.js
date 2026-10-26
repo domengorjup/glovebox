@@ -11,7 +11,7 @@
   function show(html) {
     overlay.innerHTML = html;
     var first = overlay.querySelector("input:not([type=hidden]), select, textarea");
-    if (first && !overlay.querySelector(".chooser, .confirm")) { first.focus(); }
+    if (first && !overlay.querySelector(".confirm")) { first.focus(); }
     bindCalc(overlay);
     bindStationSelect(overlay);
     bindOdometerHint(overlay);

@@ -72,6 +72,16 @@
   </div>
 {% endmacro %}
 
+{# Type tabs of the quick-add pages (links, so they work without JavaScript). #}
+{% macro quick_tabs(request, kind, vehicle_id) %}
+  <div class="qtabs" role="tablist" aria-label="Entry type">
+    {% for k, path, ic, label in [('refuel', '/quick', 'gas-station', 'Refuelling'), ('service', '/quick-service', 'wrench', 'Service'), ('expense', '/quick-expense', 'file-document-outline', 'Expense')] %}
+    <a role="tab" aria-selected="{{ 'true' if k == kind else 'false' }}" class="qtab t-{{ k }}{{ ' active' if k == kind }}"
+       href="{{ url(request, path ~ ('?vehicle=' ~ vehicle_id if vehicle_id else '')) }}" data-dialog>{{ icon(ic, 20) }}<span>{{ label }}</span></a>
+    {% endfor %}
+  </div>
+{% endmacro %}
+
 {# HA sub-page header: round back button left of the title. #}
 {% macro page_head(request, title, parent_path='/manage', parent_label='Manage') %}
   <div class="page-head">

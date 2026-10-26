@@ -117,9 +117,9 @@ def test_reminder_dialog_uses_ingress_prefix(client: TestClient) -> None:
 # --- Chooser, Manage, Timeline card ----------------------------------------------------------------
 
 
-def test_chooser_and_manage_row(client: TestClient) -> None:
+def test_manage_row_and_add_action(client: TestClient) -> None:
     vid = _vehicle(client)
-    assert "/reminders/new" in client.get("/add").text
+    assert "/reminders/new" in client.get("/reminders").text
     assert "Reminders" in client.get("/manage").text
     _create(client, vid)
     assert "1 open" in client.get("/manage").text

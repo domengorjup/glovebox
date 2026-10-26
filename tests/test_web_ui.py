@@ -198,7 +198,7 @@ def urls_in(html: str) -> list[str]:
 
 
 PAGES = [
-    "/", "/?type=refuel", "/stats", "/manage", "/add",
+    "/", "/?type=refuel", "/stats", "/manage", "/quick",
     "/vehicles", "/vehicles/new", "/vehicles/1/edit", "/vehicles/1/delete",
     "/refuels/new", "/refuels/1/edit",
     "/expenses/new", "/expenses/new?kind=service", "/expenses/1/edit",
@@ -287,13 +287,6 @@ def test_timeline_shows_consumption_or_dash_for_cards(client, monkeypatch):
 def test_timeline_numbers_do_not_break_across_lines(client):
     html = client.get("/").text
     assert "420.00\u00a0\u20ac" in html
-
-
-def test_add_chooser_links_to_the_three_forms(client):
-    html = client.get("/add").text
-    assert 'href="/quick"' in html
-    assert 'href="/quick-service"' in html
-    assert 'href="/quick-expense"' in html
 
 
 def test_dialog_request_returns_only_the_content(client):
