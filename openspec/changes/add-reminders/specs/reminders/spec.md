@@ -97,7 +97,7 @@ The Timeline SHALL show a "Due soon" card above the summary cards. The card SHAL
 - **THEN** the reminder is marked done and the row disappears
 
 ### Requirement: Reminders page
-The system SHALL provide a Reminders page, reachable from the "Due soon" card and from Manage. It SHALL list the open reminders by due date and the done reminders in a collapsed section, filtered by the app-bar vehicle. The add chooser SHALL offer "Reminder", which opens the reminder form.
+The system SHALL provide a Reminders page, reachable from the "Due soon" card and from Manage. It SHALL list the open reminders by due date and the done reminders in a collapsed section, filtered by the app-bar vehicle. The Reminders page SHALL offer "Add reminder", which opens the reminder form.
 
 #### Scenario: Open the list from Manage
 - **WHEN** the user opens Manage and selects Reminders

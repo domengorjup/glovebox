@@ -8,7 +8,7 @@ Insurance, registration and services come due once a year or so, and Glovebox al
 - **Quick create:**
   - "Remind me" on an expense: due date = coverage end if set, else expense date + 1 year.
   - From the vehicle's insurance and registration "valid until" dates (added by the concurrent vehicle-details change): a reminder linked to the date that moves with it.
-- **Timeline:** a "Due soon" card at the top for open reminders whose notify date has arrived, overdue first. A Reminders page (from the card and from Manage) lists all of them. The add chooser gets "Reminder".
+- **Timeline:** a "Due soon" card at the top for open reminders whose notify date has arrived, overdue first. A Reminders page (from the card and from Manage) lists all of them. The Reminders page has "Add reminder".
 - **Calendars:**
   1. **HA calendar (add-on mode):** the user picks any calendar entity HA can create events in.
      - Each open reminder becomes an all-day event on the due date, e.g. "Golf: Registration due". The description carries a machine-readable "Notify 30 days before" line and a marker line.

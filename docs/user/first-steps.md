@@ -10,7 +10,7 @@ Open the folded **More details** card for facts you want at hand: VIN (the copy 
 
 ## 2. Add a refuelling
 
-Tap the **+** button on the Timeline and choose **Refuelling**.
+Tap the **+** button on the Timeline. It opens the quick **Refuelling** form.
 
 ![Refuelling form](../assets/screenshots/refuel-form-desktop-light.png)
 

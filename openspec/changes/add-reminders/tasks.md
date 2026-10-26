@@ -22,7 +22,7 @@
 
 ## 2. UI (design iteration first)
 - [x] 2.1 (done 2026-10-23; the user has not reviewed the mockup yet) Add to `.mockups/ui-v2/`: the "Due soon" card, the Reminders page (with the calendar setting and status lines), the reminder dialog, "Remind me" in the expense dialog and form, the vehicle date switches. Desktop and phone, light and dark; record it in `NOTES.md`; get the user's feedback before 2.2.
-- [x] 2.2 `web/reminders.py` and templates: Reminders page, reminder dialog (default 30 days), add-chooser entry, Manage row.
+- [x] 2.2 `web/reminders.py` and templates: Reminders page, reminder dialog (default 30 days), Manage row (the add-chooser entry was dropped on 2026-10-26 when + started opening the quick Refuelling form).
 - [x] 2.3 Timeline "Due soon" card (`web/timeline.py`, `timeline.html`), filtered by the app-bar vehicle.
 - [x] 2.4 "Remind me" on the expense dialog, and the switch on the add-expense form.
 - [x] 2.5 New repeated elements added to `docs/dev/design.md`. Screenshots (desktop 1400x900, phone 390x844, light and dark) compared with the mockup.

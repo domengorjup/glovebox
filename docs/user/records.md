@@ -2,8 +2,8 @@
 
 Tap **+** on the Timeline. It opens the quick **Refuelling** form, with the tabs **Refuelling**, **Service** and **Expense** under the title to switch the type (the vehicle is kept, entered values are not). Reminders are added on the Reminders page; see [Reminders](reminders.md). Every form has a **Vehicle** dropdown. It starts with the selected vehicle, or with the last specific vehicle when *All vehicles* is selected.
 
-![Add entry on a phone](../assets/screenshots/add-chooser-phone-light.png){ width="260" }
-![Add entry on a desktop](../assets/screenshots/add-chooser-desktop-light.png)
+![Quick add on a phone](../assets/screenshots/quick-add-phone-light.png){ width="260" }
+![Quick add on a desktop](../assets/screenshots/quick-add-desktop-light.png)
 
 To edit or delete a record, open it from the Timeline.
 

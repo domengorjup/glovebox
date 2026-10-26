@@ -73,7 +73,7 @@ The chosen calendar is one row in the existing `setting` table (`reminders.calen
 
 ### D2. UI
 
-All UI work goes through the living mockup `.mockups/ui-v2/` first (task 2.1), then into the app. The standard elements from `docs/dev/design.md` are reused: list card and rows, dialog, buttons, floating button chooser, sub-page header, messages.
+All UI work goes through the living mockup `.mockups/ui-v2/` first (task 2.1), then into the app. The standard elements from `docs/dev/design.md` are reused: list card and rows, dialog, buttons, floating button, sub-page header, messages.
 
 - **Timeline "Due soon" card:** a list card above the summary cards. It shows open reminders whose remind date has arrived, filtered by the app-bar vehicle (with all vehicles, the vehicle name is in each row). Order: overdue first, then by due date. Each row shows:
   - category icon, title, vehicle;
@@ -87,7 +87,7 @@ All UI work goes through the living mockup `.mockups/ui-v2/` first (task 2.1), t
   - the calendar setting (D4) with a status line.
 
   A row whose calendar state is not `synced` or `none` shows its message in one line.
-- **Reminder dialog** (also from a "Reminder" entry in the floating add chooser):
+- **Reminder dialog** (from "Add reminder" on the Reminders page):
   - fields: vehicle, title, category, due date, "Notify … days before" (default 30), notes;
   - in the edit dialog also: Download .ics, Mark done (or Reopen), Delete, "Created from: <expense>" when linked, and "Sync now" when not synced.
 - **"Remind me" on an expense:** a button in the expense edit dialog opens the reminder dialog pre-filled with:
