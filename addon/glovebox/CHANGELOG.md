@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0
+
+- Reminders: dates per vehicle (insurance, registration, service) with a lead time, a Due soon card on the Timeline and a Reminders page; synced to any Home Assistant calendar that can create events (also restored from backups without duplicates, rewritten when a removed calendar comes back, checked in full by Sync now), an .ics download, and a blueprint for phone notifications. The + button opens quick refuelling, with tabs for service and expense. Fuel type shown on the refuel forms. GitHub and documentation links on Manage. Stopping the add-on no longer shows it as failed.
+
 ## 0.2.5
 
 - Quick add for refuelling, service and expense: phone-first forms (station suggestions, recent titles, Regular service) opened from + or directly from an HA shortcut (/quick, /quick-service, /quick-expense), saved with an Undo snackbar. Odometer in service and expense add forms is a suggestion; left empty, the last reading is saved as an estimate. Groundwork for reminders (not visible yet); the add-on now requests Home Assistant API access for the coming calendar sync.
