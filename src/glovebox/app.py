@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import signal
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager, contextmanager
 
@@ -145,4 +146,16 @@ def main() -> None:
         settings = load_settings()
     except ValueError as exc:
         raise SystemExit(f"glovebox: {exc}") from exc
+    signal.signal(signal.SIGTERM, _exit_after_shutdown)
     asyncio.run(_serve(settings))
+
+
+def _exit_after_shutdown(_signum: int, _frame: object) -> None:
+    """
+    End with status 0 on SIGTERM.
+
+    uvicorn shuts down gracefully and then raises the signal again; with the
+    default handler the process would die by the signal (status 143), and the
+    Supervisor would show a stopped add-on as failed.
+    """
+    raise SystemExit(0)

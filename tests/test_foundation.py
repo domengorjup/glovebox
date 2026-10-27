@@ -105,3 +105,37 @@ def test_settings_table_exists_after_migration(engine) -> None:
     columns = {c["name"]: c for c in inspector.get_columns("setting")}
     assert set(columns) == {"key", "value"}
     assert inspector.get_pk_constraint("setting")["constrained_columns"] == ["key"]
+
+
+def test_sigterm_ends_the_server_with_status_0(tmp_path: Path) -> None:
+    """The Supervisor stops the add-on with SIGTERM; a clean stop is not a failure."""
+    import os
+    import signal
+    import socket
+    import subprocess
+    import sys
+    import time
+
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    env = dict(os.environ, DATA_DIR=str(tmp_path), GLOVEBOX_HOST="127.0.0.1",
+               GLOVEBOX_PORT=str(port), GLOVEBOX_MODE="standalone")
+    proc = subprocess.Popen(
+        [sys.executable, "-c", "from glovebox.app import main; main()"],
+        env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    try:
+        deadline = time.monotonic() + 30
+        while True:
+            try:
+                socket.create_connection(("127.0.0.1", port), timeout=1).close()
+                break
+            except OSError:
+                assert proc.poll() is None and time.monotonic() < deadline
+                time.sleep(0.2)
+        proc.send_signal(signal.SIGTERM)
+        assert proc.wait(timeout=30) == 0
+    finally:
+        if proc.poll() is None:
+            proc.kill()
