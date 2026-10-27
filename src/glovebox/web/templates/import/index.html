@@ -5,7 +5,7 @@
 {{ page_head(request, 'Import') }}
 {% if done %}
 <div class="alert success" role="status">
-  <span><strong>Imported {{ done.refuels_imported }} refuels and {{ done.expenses_imported }} expenses{% if done.reminders_imported %} and {{ done.reminders_imported }} reminders{% endif %}</strong> from {{ done.filename }}.
+  <span><strong>Imported {{ done.refuels_imported }} refuels{{ ',' if done.reminders_imported else ' and' }} {{ done.expenses_imported }} expenses{% if done.reminders_imported %} and {{ done.reminders_imported }} {{ 'reminder' if done.reminders_imported == 1 else 'reminders' }}{% endif %}</strong> from {{ done.filename }}.
   {{ done.duplicates_skipped }} duplicates skipped.</span>
   {{ post_button(request, '/import/%d/undo' % done.id, 'Undo', 'Remove all records of this import?') }}
 </div>

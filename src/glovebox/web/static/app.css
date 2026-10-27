@@ -283,6 +283,8 @@ h2 { font-size: 14px; font-weight: 500; color: var(--secondary-text-color); marg
 .dialog-head { display: flex; align-items: center; gap: 8px; padding: 12px 12px 12px 24px; border-bottom: 1px solid var(--divider-color); }
 .dialog-head h3 { flex: 1; }
 .dialog-body { padding: 20px 24px; overflow: auto; display: flex; flex-direction: column; gap: 16px; }
+/* A body taller than the screen scrolls; its children keep their height. */
+.dialog-body > * { flex-shrink: 0; }
 .dialog-foot { display: flex; gap: 8px; justify-content: flex-end; padding: 12px 24px; border-top: 1px solid var(--divider-color); }
 .btn { border: 0; border-radius: var(--ha-border-radius-pill); padding: 10px 24px; font-weight: 500; background: none; color: var(--primary-color); }
 .btn:hover { background: rgba(0,154,199,.08); }
@@ -480,7 +482,6 @@ a.btn, a.icon-btn, a.chip, a.qtab, .seg a { text-decoration: none; }
 .actions.top { margin-top: 0; }
 
 /* ---------- vehicle details: copy button inside a field ---------- */
-.dialog-body > .fold { flex: none; }
 .field.has-copy input { padding-right: 44px; }
 .field-copy { position: absolute; right: 4px; bottom: 4px; width: 36px; height: 36px; }
 .field-copy[hidden] { display: none; }

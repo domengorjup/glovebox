@@ -328,6 +328,43 @@ def test_missing_calendar_entity_is_an_error_and_a_warning(factory, ha) -> None:
         assert reminder_sync.calendar_status(session, True).problem == expected
 
 
+def test_calendar_removed_while_all_synced_is_noticed_and_rewritten(factory, ha) -> None:
+    sync, rid = _setup(factory, ha)
+    with factory() as session:
+        other = reminders.create_reminder(session, ReminderInput(
+            _get(factory, rid).vehicle_id, "Insurance", "insurance", DUE, 14))
+        session.commit()
+        other_id = other.id
+    sync.run()
+    assert len(ha.events(ENTITY)) == 2
+    del ha.calendars[ENTITY]
+    sync.run()  # the background pass, nothing edited
+    expected = f"Calendar {ENTITY} no longer exists. Choose another calendar."
+    for reminder_id in (rid, other_id):
+        reminder = _get(factory, reminder_id)
+        assert (reminder.cal_state, reminder.cal_message) == (CalendarState.ERROR, expected)
+    ha.add_calendar(ENTITY, "Glovebox")  # added again, empty
+    sync.run()
+    assert len(ha.events(ENTITY)) == 2
+    assert _get(factory, other_id).cal_state is CalendarState.SYNCED
+    with factory() as session:
+        assert reminder_sync.calendar_status(session, True).problem is None
+
+
+def test_sync_now_rewrites_events_lost_between_passes(factory, ha) -> None:
+    sync, rid = _setup(factory, ha)
+    sync.run()
+    del ha.calendars[ENTITY]
+    ha.add_calendar(ENTITY, "Glovebox")  # removed and added again between passes
+    sync.run()
+    assert ha.events(ENTITY) == []  # a normal pass only checks the calendar
+    sync.run(full=True)
+    [event] = ha.events(ENTITY)
+    assert _get(factory, rid).cal_uid == event["uid"]
+    sync.run(full=True)  # nothing lost: found by its marker, not created again
+    assert len(ha.events(ENTITY)) == 1
+
+
 def test_calendar_that_lost_the_create_feature(factory, ha) -> None:
     sync, rid = _setup(factory, ha)
     sync.run()

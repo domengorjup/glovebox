@@ -172,7 +172,7 @@ class ReminderSync:
         except HaError:
             return [], MSG_UNREACHABLE
 
-    def run(self, deadline_seconds: float | None = None) -> None:
+    def run(self, deadline_seconds: float | None = None, full: bool = False) -> None:
         """
         Run one pass: removals, then every reminder that is out of date.
 
@@ -181,21 +181,24 @@ class ReminderSync:
         deadline_seconds : float | None, optional
             Stop starting new work after this long; what is left waits for
             the background retry.
+        full : bool, optional
+            Check every open reminder against the calendar ("Sync now"), so
+            that events lost in the calendar are written again.
         """
         if self._client is None:
             return
         deadline = None if deadline_seconds is None else time.monotonic() + deadline_seconds
         with self._lock, self._session_factory() as session:
             try:
-                _Pass(self._client, session, deadline).run()
+                _Pass(self._client, session, deadline, full).run()
             except BaseException:
                 session.rollback()
                 raise
 
-    def run_safely(self, deadline_seconds: float | None = None) -> None:
+    def run_safely(self, deadline_seconds: float | None = None, full: bool = False) -> None:
         """``run`` for callers that must never fail: errors are logged."""
         try:
-            self.run(deadline_seconds)
+            self.run(deadline_seconds, full)
         except Exception:  # noqa: BLE001 - a save must not fail on the calendar
             logger.exception("Reminder calendar sync failed")
 
@@ -217,11 +220,13 @@ class _Pass:
     """State of one sync pass."""
 
     def __init__(
-        self, client: HaClient, session: Session, deadline: float | None
+        self, client: HaClient, session: Session, deadline: float | None,
+        full: bool = False,
     ) -> None:
         self.client = client
         self.session = session
         self.deadline = deadline
+        self.full = full
         self._infos: dict[str, CalendarInfo] = {}
 
     def run(self) -> None:
@@ -256,7 +261,7 @@ class _Pass:
             retry = reminder.cal_state in (CalendarState.PENDING, CalendarState.ERROR)
             stale = reminder.cal_synced_revision != reminder.revision
             if reminder.status is ReminderStatus.OPEN:
-                if stale or retry:
+                if stale or retry or self.full:
                     found.append(reminder)
             elif reminder.cal_entity and (stale or retry):
                 found.append(reminder)
@@ -276,7 +281,15 @@ class _Pass:
         try:
             info = self._info(entity)
         except HaError as error:
-            for reminder in targets:
+            affected = list(targets)
+            if isinstance(error, HaNotFound):
+                # The events went with the calendar: every open reminder must
+                # be written again if a calendar with this id comes back.
+                affected += [
+                    r for r in self.session.scalars(select(Reminder).order_by(Reminder.id))
+                    if r.status is ReminderStatus.OPEN and r not in targets
+                ]
+            for reminder in affected:
                 self._record_failure(reminder, error, entity)
             self.session.commit()
             return None

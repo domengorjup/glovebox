@@ -147,13 +147,13 @@ No delete-and-recreate, no per-provider rules.
 
 - **On save:** sync runs right after the database commit, with a 10 s timeout. A failure never blocks or undoes saving the reminder.
 - **Background retry:** a task in the app lifespan (one asyncio task with a lock) retries every 15 minutes, and once at startup, every reminder in `pending` or `error`, or whose `revision` differs from `cal_synced_revision`.
-- **Sync now:** runs the same pass at once.
+- **Sync now:** runs the same pass at once, and also checks every open reminder against the calendar (one lookup by the marker each), so events lost in the calendar are written again (found on `haos-test` 2026-10-27: a Local Calendar deleted and re-added came back empty while untouched reminders still counted as synced).
 
 | Failure | State | Message |
 |---|---|---|
 | HA unreachable, timeout, 5xx | `pending` | "Home Assistant did not answer. Will retry." |
 | 401/403 | `error` | "Glovebox may not use the Home Assistant API. Update or reinstall the add-on." |
-| Entity gone | `error` (plus a warning at the setting) | "Calendar <entity> no longer exists. Choose another calendar." |
+| Entity gone | `error` for every open reminder, changed or not (plus a warning at the setting); the next pass after it is back writes them again | "Calendar <entity> no longer exists. Choose another calendar." |
 | Entity no longer creates events | `error` | "Calendar <name> no longer accepts new events." |
 | Change or removal not supported | `unchanged` | See D4. |
 | Created event not listed yet | `pending` | "Waiting for the calendar to list the new event." |

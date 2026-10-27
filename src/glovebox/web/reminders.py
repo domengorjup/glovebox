@@ -167,8 +167,8 @@ def reminder_calendar(
 
 @router.post("/sync")
 def reminder_sync_now(request: Request, session: SessionDep, next: NextForm = DEFAULT_NEXT):
-    """Run the calendar sync at once ("Sync now")."""
-    sync_after_save(request)
+    """Check every open reminder against the calendar at once ("Sync now")."""
+    request.app.state.reminder_sync.run_safely(SAVE_DEADLINE_SECONDS, full=True)
     return redirect(request, safe_next(next))
 
 

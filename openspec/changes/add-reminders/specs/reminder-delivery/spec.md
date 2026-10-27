@@ -45,7 +45,7 @@ When the chosen calendar changes, open reminders SHALL be written to the new cal
 - **THEN** its event is removed from the calendar
 
 ### Requirement: Calendar sync failures
-A calendar failure SHALL NOT block or undo saving a reminder. The system SHALL attempt the sync on save, and SHALL retry unsynced reminders in the background at least every 15 minutes and at startup. A "Sync now" action SHALL run the retry at once. A reminder that is not synced SHALL show a plain-language reason:
+A calendar failure SHALL NOT block or undo saving a reminder. The system SHALL attempt the sync on save, and SHALL retry unsynced reminders in the background at least every 15 minutes and at startup. A "Sync now" action SHALL run the retry at once and SHALL also check every open reminder against the calendar, writing again any event that is missing there. A reminder that is not synced SHALL show a plain-language reason:
 - Home Assistant did not answer (will retry);
 - the add-on may not use the Home Assistant API;
 - the calendar no longer exists, or no longer accepts events (choose another);
@@ -59,7 +59,15 @@ A calendar failure SHALL NOT block or undo saving a reminder. The system SHALL a
 #### Scenario: Calendar entity removed
 - **WHEN** the chosen calendar entity no longer exists
 - **THEN** the calendar setting shows a warning asking the user to choose another calendar
-- **AND** the affected reminders show the same reason
+- **AND** every open reminder shows the same reason, also when none of them was changed
+
+#### Scenario: Calendar removed and added again
+- **WHEN** the chosen calendar entity is removed and later a calendar with the same entity id exists again
+- **THEN** the next sync pass writes the event of every open reminder to it again, without duplicating events that are still there
+
+#### Scenario: Sync now repairs lost events
+- **WHEN** an event of a synced open reminder is missing from the chosen calendar and the user selects "Sync now"
+- **THEN** the event is written again
 
 ### Requirement: Calendar file download
 Each reminder SHALL offer a "Download .ics" action that returns an iCalendar (RFC 5545) file with one all-day event on the due date. The event SHALL have:

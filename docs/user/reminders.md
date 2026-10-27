@@ -53,7 +53,7 @@ When the calendar cannot do something, the reminder shows a plain message: "This
 
 ### Syncing
 
-Glovebox sends a reminder to the calendar right after you save it. If Home Assistant does not answer, saving still works, the reminder shows "Home Assistant did not answer. Will retry." and Glovebox tries again every 15 minutes. **Sync now** on the Reminders page, or in the reminder, tries at once.
+Glovebox sends a reminder to the calendar right after you save it. If Home Assistant does not answer, saving still works, the reminder shows "Home Assistant did not answer. Will retry." and Glovebox tries again every 15 minutes. **Sync now** on the Reminders page, or in the reminder, tries at once. It also checks every open reminder against the calendar and writes again any event that is missing there, for example after the calendar was removed and added again.
 
 Sync is one way. Glovebox writes to the calendar and never reads changes back. If you change or delete the event in the calendar, Glovebox does not notice. If you switch to another calendar, open reminders are written to the new one, and the old events are removed where that calendar allows it. The page says how many stay behind.
 
