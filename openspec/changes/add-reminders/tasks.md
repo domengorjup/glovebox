@@ -1,5 +1,5 @@
 ## 0. Checks on the test VM before building on them
-- [ ] 0.1 On `haos-test`, use a debug build of the add-on (or a throwaway add-on) with `homeassistant_api: true`. Record:
+- [x] 0.1 (verified 2026-10-27 with a throwaway debug build `local_glovebox_dev` that ran a probe in the container before the app: `SUPERVISOR_TOKEN` present; REST `http://supervisor/core/api/calendars` listed `calendar.glovebox_test` with features 7; `ws://supervisor/core/websocket` (and `.../core/api/websocket`) gave `auth_required`, then `auth_ok` with the token; the stdlib client created, found by marker, moved with `calendar/event/update` (same uid, new date and summary) and removed with `calendar/event/delete`; a wrong token gave 401 on REST and an auth failure on the websocket; security rating 7 with and without `homeassistant_api: true`, the same as the published 0.2.5) On `haos-test`, use a debug build of the add-on (or a throwaway add-on) with `homeassistant_api: true`. Record:
   - the websocket URL that works for add-ons (expected `ws://supervisor/core/websocket`) and that auth with `SUPERVISOR_TOKEN` succeeds;
   - whether `calendar/event/update` and `calendar/event/delete` work through it, using a stdlib-only client (D8);
   - whether the add-on's security rating changes.
@@ -62,18 +62,18 @@
 - [x] 8.3 `openspec validate add-reminders --strict`, full `uv run pytest`, `mkdocs build --strict`, `formatdocs --check`.
 
 ## 9. Verification on the test HA
-- [ ] 9.1 Deploy to `haos-test`. With the Local Calendar "Glovebox reminders":
+- [x] 9.1 (verified 2026-10-27 on a local unpublished build `local_glovebox_dev` with the Local Calendar "Glovebox test": create gave one all-day event with the Notify and marker lines; edit kept the event uid and changed date and summary; done and delete removed the event, reopen wrote it again; None removed it and choosing the calendar again wrote it again; moving to another calendar removed it from the old one; re-importing the backup into the same add-on skipped the reminder, and restoring it into a second, empty add-on on the same HA adopted the existing event by its marker, no duplicate) Deploy to `haos-test`. With the Local Calendar "Glovebox reminders":
   - create (event on the due date with the "Notify" and marker lines, uid stored);
   - edit (same uid, updated);
   - mark done (event removed);
   - delete;
   - switch the calendar to None and back;
   - restore a backup into the same HA (no duplicate events).
-- [ ] 9.2 Failure cases on `haos-test`:
+- [x] 9.2 (verified 2026-10-27: with HA Core stopped, a reminder saved through the Supervisor ingress was stored with "Home Assistant did not answer. Will retry." and the background retry wrote it about 15 minutes later; a browser save during a Core restart cannot reach the add-on because ingress goes through Core. Deleting the Local Calendar integration showed "not available" in the select and, after the next pass, the warning at the setting and on every open reminder; re-adding it with the same name: first run found that untouched reminders were not written again, fixed (D5: a gone calendar flags every open reminder, Sync now checks every open reminder); after the fix both reminders came back on the next pass and through Sync now) Failure cases on `haos-test`:
   - restart HA Core while saving (pending, then synced);
   - delete the Local Calendar integration (error, and a warning at the setting);
   - re-add it and choose it again.
-- [ ] 9.3 Import the shipped blueprint on `haos-test` through its import link (from `master` after the push). Create an automation with a persistent notification as the action and check that it fires on a reminder's remind date and due date (test dates set accordingly).
+- [x] 9.3 (verified 2026-10-27: imported from its GitHub URL through HA's Import blueprint dialog, stored as `domengorjup/reminders.yaml` with the `source_url`; the my-link redirect opened the blueprint list but not the prefilled dialog in the headless browser, so the badge itself is left for the user's check in 9.5. An automation with `persistent_notification.create` at a set time gave exactly two notifications: "Clio: ... due today" for a reminder due that day and "Golf: ... due in 5 days" for one whose remind date it was; the two later reminders gave none) Import the shipped blueprint on `haos-test` through its import link (from `master` after the push). Create an automation with a persistent notification as the action and check that it fires on a reminder's remind date and due date (test dates set accordingly).
 - [ ] 9.4 (user-assisted) A calendar from the user's own account that HA can write to (e.g. Google in the read/write setup, or CalDAV): create, then edit and done. Check that the capability label and the "edit it there" / "remove it there" messages match what that calendar does.
 - [ ] 9.5 (user-assisted) Phone: the blueprint's notification through the Companion app's notify action; .ics download and open from the Companion app (Android and iOS); .ics import into Outlook (re-opening after an edit updates the event, the alarms fire).
-- [ ] 9.6 Screenshots inside HA; review against the mockup.
+- [x] 9.6 (done 2026-10-27, `.mockups/ha-v2/screenshots/vm030-*`: Timeline with Due soon, Reminders page, reminder dialog and the quick-add tabs, desktop and phone, light and dark. Matches the mockup except that the dialog names the calendar by entity id ("In calendar calendar.glovebox_test") where the mockup shows its name. Found and fixed: the phone refuel form squeezed the vehicle switch (dialog body children now keep their height)) Screenshots inside HA; review against the mockup.

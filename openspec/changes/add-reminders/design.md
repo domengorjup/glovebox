@@ -178,7 +178,7 @@ Errors are also logged.
 
 ### D7. Add-on config
 
-`addon/glovebox/config.yaml` gets `homeassistant_api: true` and no new options. `config.py` reads `SUPERVISOR_TOKEN`, which is present only in add-on mode. Task 0.1 records whether the change alters the add-on's security rating.
+`addon/glovebox/config.yaml` gets `homeassistant_api: true` and no new options. `config.py` reads `SUPERVISOR_TOKEN`, which is present only in add-on mode. Task 0.1 (2026-10-27): the security rating stays 7 with and without `homeassistant_api: true`.
 
 ### D8. Core API client and dependencies
 
@@ -196,7 +196,7 @@ Reasons:
 - There is no TLS, no fragmentation and no long-lived connection to deal with.
 - The two commands are short request/answer pairs.
 
-If task 0.1 shows the Supervisor needs anything the small client cannot do, the fallback is the `websockets` package (pure Python), added with `uv add`.
+Task 0.1 (2026-10-27) confirmed it inside the add-on on `haos-test`: `ws://supervisor/core/websocket` accepts `SUPERVISOR_TOKEN`, and `calendar/event/update` and `calendar/event/delete` work through the small client, so the `websockets` fallback is not needed.
 
 ### D9. Notifications: one shipped blueprint
 
@@ -314,7 +314,7 @@ There is no HA connection and no token setting. The calendar setting is replaced
 
 ## Risks / Trade-offs
 
-- **The websocket URL for add-ons is unverified** → task 0.1 checks it first. If add-ons cannot use the websocket, sync is create-only for every calendar: changes and removals get the "edit it there" messages. The docs say so.
+- **The websocket URL for add-ons** → verified by task 0.1 (2026-10-27): `ws://supervisor/core/websocket` with `SUPERVISOR_TOKEN` works from inside the add-on, including update and delete.
 - **`get_events` may lack `description`** → task 0.2 checks it; the D9 fallback (heads-up event) is ready.
 - **The marker and "Notify" lines are visible** in the user's calendar → accepted. They are short and keep HA free of extra state.
 - **Edits made in the calendar** are overwritten by the next change in Glovebox. If the user deleted the event, the next change creates a new one (a missing uid is treated as no event).
