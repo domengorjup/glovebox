@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0
+
+- Optional Location field on service and expense entries (garage, insurer), with suggestions from earlier entries of the same type; Drivvo import fills it; new `location` column in the standard format and backup. New service and expense entries start with the last odometer reading filled in; an empty field now saves no reading instead of an estimate. The Timeline shows each entry's odometer. On phones the Save button stays visible above the keyboard.
+
 ## 0.3.0
 
 - Reminders: dates per vehicle (insurance, registration, service) with a lead time, a Due soon card on the Timeline and a Reminders page; synced to any Home Assistant calendar that can create events (also restored from backups without duplicates, rewritten when a removed calendar comes back, checked in full by Sync now), an .ics download, and a blueprint for phone notifications. The + button opens quick refuelling, with tabs for service and expense. Fuel type shown on the refuel forms. GitHub and documentation links on Manage. Stopping the add-on no longer shows it as failed.
