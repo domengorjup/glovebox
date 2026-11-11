@@ -144,6 +144,7 @@ class ExpenseInput:
     coverage_start: date | None = None
     coverage_end: date | None = None
     notes: str | None = None
+    location: str | None = None
 
 
 @dataclass(frozen=True)
@@ -169,6 +170,9 @@ INCONSISTENCY_TOLERANCE = 0.01
 
 
 FIRST_MODEL_YEAR = 1886  # Benz Patent-Motorwagen
+
+
+MAX_LOCATION_LENGTH = 200
 
 
 def _clean(value: str | None) -> str | None:
@@ -601,6 +605,32 @@ def list_expenses(session: Session, flt: StatsFilter) -> list[Expense]:
     return list(session.scalars(select_expenses(flt)))
 
 
+def recent_locations(
+    session: Session, category: ExpenseCategory, limit: int = 50
+) -> list[str]:
+    """
+    Distinct locations of earlier expenses in ``category`` (all vehicles),
+    most recently used first. Duplicates differing only in case are dropped,
+    keeping the newest spelling.
+    """
+    rows = session.scalars(
+        select(Expense.location)
+        .where(Expense.category == category, Expense.location.is_not(None))
+        .order_by(Expense.date.desc(), Expense.id.desc())
+    )
+    seen: set[str] = set()
+    result: list[str] = []
+    for location in rows:
+        key = location.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(location)
+        if len(result) >= limit:
+            break
+    return result
+
+
 def get_expense(session: Session, expense_id: int) -> Expense:
     """Return an expense or raise ``NotFoundError``."""
     return _get_or_raise(session, Expense, expense_id, "Expense")
@@ -619,6 +649,9 @@ def _apply_expense(session: Session, expense: Expense, data: ExpenseInput) -> No
         errors.append("Title is required")
     if data.amount_cents < 0:
         errors.append("Amount must not be negative")
+    location = _clean(data.location)
+    if location is not None and len(location) > MAX_LOCATION_LENGTH:
+        errors.append(f"Location must be at most {MAX_LOCATION_LENGTH} characters")
     start, end = data.coverage_start, data.coverage_end
     if (start is None) != (end is None):
         errors.append("Coverage start and end must be set together")
@@ -630,6 +663,7 @@ def _apply_expense(session: Session, expense: Expense, data: ExpenseInput) -> No
     expense.date = data.date
     expense.category = category
     expense.title = data.title.strip()
+    expense.location = location
     expense.amount_cents = data.amount_cents
     expense.odometer_km = data.odometer_km
     expense.odometer_estimated = data.odometer_estimated and data.odometer_km is not None

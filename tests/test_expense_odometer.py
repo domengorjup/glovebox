@@ -121,66 +121,85 @@ def test_refuel_without_odometer_is_rejected(client: TestClient, car: int, engin
         assert s.scalar(select(Refuel.id)) is None
 
 
-def test_expense_form_shows_the_last_recorded_odometer(client: TestClient, car: int) -> None:
-    _post_refuel(client, "104163")
-    html = client.get("/expenses/new?kind=service").text
-    assert "Last recorded: 104,163&nbsp;km" in html
+def _odometer_value(html: str) -> str | None:
+    match = re.search(r'<input[^>]*name="odometer_km"[^>]*>', html)
+    value = re.search(r'value="([^"]*)"', match.group(0))
+    return (value.group(1) or None) if value else None
 
 
-def test_empty_odometer_is_estimated_and_warned(
-    client: TestClient, car: int, engine: Engine
-) -> None:
+def test_new_forms_prefill_the_last_recorded_odometer(client: TestClient, car: int) -> None:
     _post_refuel(client, "104163")
-    response = _post_service(client, "")
-    assert response.status_code == 303
+    for path in ("/expenses/new?kind=service", "/expenses/new", "/quick-service", "/quick-expense"):
+        html = client.get(path).text
+        assert _odometer_value(html) == "104163", path
+        assert "Last: 104,163&nbsp;km on " in html and "data-prefill" in html
+
+
+def test_saved_as_entered_not_estimated(client: TestClient, car: int, engine: Engine) -> None:
+    _post_refuel(client, "104163")
+    assert _post_service(client, "104163").status_code == 303
     page = client.get("/").text
-    assert "Odometer not entered" in page and "104,163" in page
-    assert "≈" in page and "104,163" in page.split("≈", 1)[1][:30]
+    assert "Odometer not entered" not in page and "estimate" not in page.lower()
     with make_session_factory(engine)() as s:
         item = s.scalars(select(Expense)).one()
-        assert (item.odometer_km, item.odometer_estimated) == (104163, True)
-    assert "Odometer not entered" not in client.get("/").text  # shown once
+        assert (item.odometer_km, item.odometer_estimated) == (104163, False)
 
 
-def test_typed_odometer_is_real_and_not_warned(
+def test_cleared_odometer_saves_empty_without_warning(
     client: TestClient, car: int, engine: Engine
 ) -> None:
     _post_refuel(client, "104163")
-    _post_service(client, "104500")
+    assert _post_service(client, "").status_code == 303
     page = client.get("/").text
-    assert "Odometer not entered" not in page and "≈" not in page
-    with make_session_factory(engine)() as s:
-        item = s.scalars(select(Expense)).one()
-        assert (item.odometer_km, item.odometer_estimated) == (104500, False)
-
-
-def test_no_earlier_reading_saves_empty_with_gentle_warning(
-    client: TestClient, car: int, engine: Engine
-) -> None:
-    assert "No earlier reading" in client.get("/expenses/new").text
-    _post_service(client, "")
-    assert "recommended" in client.get("/").text
+    assert "Odometer not entered" not in page and "recommended" not in page
     with make_session_factory(engine)() as s:
         item = s.scalars(select(Expense)).one()
         assert (item.odometer_km, item.odometer_estimated) == (None, False)
 
 
-def test_estimates_do_not_feed_the_next_estimate(
+def test_typed_odometer_is_stored(client: TestClient, car: int, engine: Engine) -> None:
+    _post_refuel(client, "104163")
+    _post_service(client, "104500")
+    with make_session_factory(engine)() as s:
+        item = s.scalars(select(Expense)).one()
+        assert (item.odometer_km, item.odometer_estimated) == (104500, False)
+
+
+def test_no_earlier_reading_leaves_the_field_empty(client: TestClient, car: int) -> None:
+    html = client.get("/expenses/new").text
+    assert _odometer_value(html) is None and "No earlier reading for this vehicle." in html
+
+
+def test_error_rerender_keeps_a_cleared_odometer(client: TestClient, car: int) -> None:
+    _post_refuel(client, "104163")
+    response = client.post(
+        "/expenses/new",
+        data={"vehicle_id": "1", "date": "2026-10-20", "category": "maintenance",
+              "title": "", "amount": "80", "odometer_km": ""},
+    )
+    assert response.status_code == 422
+    assert _odometer_value(response.text) is None and "data-prefill" not in response.text
+
+
+def test_edit_form_shows_the_saved_value_without_prefill(client: TestClient, car: int) -> None:
+    _post_refuel(client, "104163")
+    _post_service(client, "104500")
+    html = client.get("/expenses/1/edit").text
+    assert _odometer_value(html) == "104500" and "data-prefill" not in html
+
+
+def test_estimated_rows_keep_marker_and_note(
     client: TestClient, car: int, engine: Engine
 ) -> None:
-    _post_refuel(client, "100000", "2026-10-01")
-    _post_service(client, "", "2026-10-05")
-    _post_service(client, "", "2026-10-06")
-    with make_session_factory(engine)() as s:
-        assert [e.odometer_km for e in s.scalars(select(Expense))] == [100000, 100000]
-
-
-def test_editing_an_estimate_shows_the_field_empty(client: TestClient, car: int) -> None:
     _post_refuel(client, "104163")
-    _post_service(client, "")
+    with make_session_factory(engine)() as s:
+        _expense(s, 1, date(2026, 10, 20), odo=104163, estimated=True)
+        s.commit()
+    page = client.get("/").text
+    assert 'class="odo est"' in page and "~ 104,163" in page
+    assert "Estimated: the last known reading was used" in page
     html = client.get("/expenses/1/edit").text
-    assert re.search(r'name="odometer_km"[^>]*value=""|name="odometer_km"(?![^>]*value=)', html)
-    assert "is an estimate" in html
+    assert _odometer_value(html) is None and "is an estimate" in html
     assert _post_edit(client, "104400").status_code == 303
 
 

@@ -5,8 +5,8 @@
 # uploading the same file again. The
 # type of expense is kept as the title and mapped to a category; types the
 # map does not know (including your own custom types) become "other": add
-# them to the map and save your own preset. "Expense location", "Title",
-# "Discount" and the instalment columns are not imported.
+# them to the map and save your own preset. "Expense location" is imported as the
+# location. "Title", "Discount" and the instalment columns are not imported.
 # The Drivvo web export (History or vehicle menu → Export → CSV) holds the
 # same records and values (checked), so no separate preset is shipped: use
 # the phone export. The web file adds a "Vehicle Name" column and a
@@ -39,6 +39,7 @@ type = { value = "expense" }
 date = { column = "Date" }
 odometer_km = { column = "Odometer", missing_values = ["0", "0.0"] }
 title = { column = "Type of expense" }
+location = { column = "Expense location" }
 category = { column = "Type of expense", default = "other", map = { insurance = ["Insurance"], registration = ["Registration", "Licensing", "Vehicle tax", "Road tax"], maintenance = ["Repair", "Tires", "Tyres"] } }
 total = { column = "Total cost" }
 notes = { column = "Notes" }

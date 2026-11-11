@@ -76,7 +76,7 @@ FIELD_LABELS = {
     "type": "Record type", "date": "Date", "time": "Time", "vehicle": "Vehicle",
     "odometer_km": "Odometer", "fuel_l": "Fuel quantity", "price_per_l": "Price per litre",
     "total": "Total price", "full": "Full tank", "missed_previous": "Missed fill-up before",
-    "station": "Gas station", "category": "Category", "title": "Title", "notes": "Notes",
+    "station": "Gas station", "category": "Category", "title": "Title", "location": "Location", "notes": "Notes",
     "currency": "Currency", "station_location": "Station location",
     "station_brand": "Station brand", "coverage_start": "Coverage start",
     "coverage_end": "Coverage end", "derived": "Derived figure",

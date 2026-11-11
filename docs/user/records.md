@@ -28,13 +28,15 @@ See [First steps](first-steps.md#2-add-a-refuelling). The full form (all fields,
 
 ## Service
 
-**Service** opens a quick page too (`/quick-service`): vehicle choice (only with several vehicles), **What was done** with chips (the fixed *Regular service*, then the titles you used before with this vehicle, at most four in all), a big **Amount**, and the **Odometer**. The field starts empty and shows the last recorded reading as a grey suggestion, with the hint *Last: … km on …*. Leave it empty and that reading is saved as an estimate (marked with ≈, with a warning on the Timeline); type the real one if you know it. The full add form behaves the same. The date chip says *Today*; **More** adds notes. Saving returns to the Timeline with *Service saved* and **Undo**. Editing an entry opens the full form below.
+**Service** opens a quick page too (`/quick-service`): vehicle choice (only with several vehicles), **What was done** with chips (the fixed *Regular service*, then the titles you used before with this vehicle, at most four in all), a big **Amount**, the **Odometer** and an optional **Location**. A new form starts with the last recorded reading in the Odometer field, with the hint *Last: … km on …*; change it to the real one, or clear it to save no reading. Once you type, the hint shows *+N km since the last recorded reading* (red when the number is lower than the last one). The value is saved exactly as it stands: nothing is estimated for you. The full add form behaves the same. The date chip says *Today*; **More** adds notes. Saving returns to the Timeline with *Service saved* and **Undo**. Editing an entry opens the full form below.
 
-For maintenance: oil change, tyres, repairs. Fields: vehicle, date, odometer (optional), title (for example "Oil and filter change"), amount, notes. It is stored in the *maintenance* category.
+For maintenance: oil change, tyres, repairs. Fields: vehicle, date, odometer (optional), title (for example "Oil and filter change"), amount, location (optional), notes. It is stored in the *maintenance* category.
+
+**Location** is free text for the place where the work was done: a garage or workshop. While you type, the field suggests places you used before for services (on all vehicles, newest first). The Timeline shows it in the entry's second line, before the notes. Older entries whose odometer was filled in by the app are still marked with *~* and are ignored by statistics; edit them to enter the real reading.
 
 ## Expense
 
-**Expense** opens the quick page `/quick-expense`: choose the type (insurance, registration, other), then the title (chips of the titles used before for that type), the amount (full price paid) and the odometer as for a service. **More** adds the coverage dates (both or none) and notes. Saving shows *Expense saved* with **Undo**.
+**Expense** opens the quick page `/quick-expense`: choose the type (insurance, registration, other), then the title (chips of the titles used before for that type), the amount (full price paid), the odometer and an optional location as for a service. **More** adds the coverage dates (both or none) and notes. Saving shows *Expense saved* with **Undo**.
 
 For everything else. Choose a type with the **Type** switch:
 
@@ -42,7 +44,7 @@ For everything else. Choose a type with the **Type** switch:
 - **Registration**
 - **Other** (parking, tolls, car wash and so on; use the title for the detail)
 
-Fields: vehicle, date, title (required), amount, optional odometer, optional coverage dates, notes.
+Fields: vehicle, date, optional odometer (next to the date), title (required), amount, optional location (the insurer, office or shop; suggestions come from earlier expenses of the same type), optional coverage dates, notes.
 
 ### Coverage dates
 

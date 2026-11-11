@@ -963,6 +963,7 @@ def _new_expense(
         odometer_estimated=record.odometer_estimated,
         category=ExpenseCategory(record.category),
         title=record.title[:200],
+        location=(record.location or None) and record.location[:200],
         amount_cents=record.amount_cents,
         coverage_start=record.coverage_start,
         coverage_end=record.coverage_end,

@@ -7,7 +7,7 @@
 
 {# Filled text field. `calc` marks the three price fields the page script keeps in step. #}
 {% macro field(label, name, value='', type='text', suffix=None, inputmode=None, step=None,
-               required=False, calc=None, list=None, placeholder=None, copy=False, big=False, autofocus=False) %}
+               required=False, calc=None, list=None, placeholder=None, copy=False, big=False, autofocus=False, autocomplete=None) %}
   <div class="field{{ ' big' if big }}{{ ' has-suffix' if suffix }}{{ ' has-copy' if copy }}"{% if calc %} data-calc="{{ calc }}"{% endif %}>
     <label for="i-{{ name }}">{{ label }}</label>
     <input id="i-{{ name }}" name="{{ name }}" value="{{ value }}" type="{{ type }}"
@@ -16,10 +16,33 @@
       {%- if list %} list="{{ list }}"{% endif %}
       {%- if placeholder %} placeholder="{{ placeholder }}"{% endif %}
       {%- if required %} required{% endif %}
+      {%- if autocomplete %} autocomplete="{{ autocomplete }}"{% endif %}
       {%- if autofocus %} autofocus{% endif %}>
     {% if suffix %}<span class="suffix">{{ suffix }}</span>{% endif %}
     {% if copy %}<button type="button" class="icon-btn field-copy" data-copy="i-{{ name }}" aria-label="Copy {{ label }}" hidden>{{ icon('content-copy', 20) }}</button>{% endif %}
   </div>
+{% endmacro %}
+
+{# Grey help line under the Odometer field of a service or expense form; the page script
+   keeps it in step with the value, vehicle and date (new forms also follow the last reading). #}
+{% macro odometer_hint(quick=False) %}
+  <div class="help{{ ' qhint' if quick }}" data-odo-hint{{ ' data-prefill' if prefill_odometer }} data-steps='{{ odometer_steps }}'>
+    <span data-odo-text>
+    {% if not f.vehicle_id %}Choose a vehicle to see its last recorded odometer.
+    {% elif last_odometer %}Last: {{ last_odometer.km | km_grouped }}&nbsp;km{% if last_odometer.date %} on {{ last_odometer.date | short_date }}{% else %} (initial){% endif %}
+    {% else %}No earlier reading for this vehicle.{% endif %}
+    </span>
+    {% if estimated_km is not none %}The saved value ({{ estimated_km | km_grouped }}&nbsp;km) is an estimate; enter the real reading to replace it.{% endif %}
+  </div>
+{% endmacro %}
+
+{# Optional Location text field with the datalist of earlier places (one list per category;
+   the page script points the input at the list of the chosen category). #}
+{% macro location_field(placeholder='e.g. garage or workshop') %}
+  {{ field('Location', 'location', f.location, list='location-options-' ~ f.category, placeholder=placeholder, autocomplete='off') }}
+  {% for category, names in location_options.items() %}
+  <datalist id="location-options-{{ category }}">{% for name in names %}<option value="{{ name }}">{% endfor %}</datalist>
+  {% endfor %}
 {% endmacro %}
 
 {% macro textarea(label, name, value='', rows=2) %}

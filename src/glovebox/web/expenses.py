@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from dataclasses import replace
 from datetime import date
 from typing import Annotated
 
@@ -35,6 +34,7 @@ class ExpenseForm(BaseModel):
     date: str = ""
     category: str = ""
     title: str = ""
+    location: str = ""
     amount: str = ""
     odometer_km: str = ""
     coverage_start: str = ""
@@ -52,8 +52,9 @@ def _form_from_expense(expense: Expense) -> dict[str, str]:
         date=expense.date.isoformat(),
         category=expense.category.value,
         title=expense.title,
+        location=expense.location or "",
         amount=f"{expense.amount_cents / 100:.2f}",
-        # An estimated value is not shown as typed; saving it empty re-estimates.
+        # An estimated value is not shown as typed (the form notes the estimate).
         odometer_km=(
             ""
             if expense.odometer_km is None or expense.odometer_estimated
@@ -67,7 +68,8 @@ def _form_from_expense(expense: Expense) -> dict[str, str]:
 
 def _form_page(request: Request, session: Session, entered: dict[str, str],
                expense_id: int | None = None, status: int = 200,
-               errors: list[str] | None = None, quick: bool = False):
+               errors: list[str] | None = None, quick: bool = False,
+               prefill: bool = False):
     """Render the service or expense form (the quick page when ``quick``)."""
     chrome = load_chrome(session)
     vehicles = list(chrome.vehicles)
@@ -81,6 +83,8 @@ def _form_page(request: Request, session: Session, entered: dict[str, str],
         except ValueError:
             on_day = date.today()
         last = records.last_known_odometer(session, int(selected), on_day, expense_id)
+        if prefill and last is not None:
+            entered = {**entered, "odometer_km": formatting.format_km(last.km)}
     estimated = None
     if expense_id is not None:
         stored = records.get_expense(session, expense_id)
@@ -107,6 +111,12 @@ def _form_page(request: Request, session: Session, entered: dict[str, str],
             ).items()
         }),
         estimated_km=estimated,
+        # One suggestion list per category; the page script follows the type choice.
+        location_options={
+            c.value: records.recent_locations(session, c) for c in ExpenseCategory
+        },
+        # Only the first view of a new form follows vehicle and date (not a re-render).
+        prefill_odometer=prefill,
         **extra,
     )
 
@@ -126,7 +136,7 @@ def expense_new(
         date=date.today().isoformat(),
         category=category,
     ).model_dump()
-    return _form_page(request, session, entered)
+    return _form_page(request, session, entered, prefill=True)
 
 
 @router.get("/{expense_id}/edit")
@@ -177,6 +187,7 @@ def _parse_form(form: ExpenseForm) -> ExpenseInput:
         coverage_start=_optional_date(form.coverage_start, "Coverage start"),
         coverage_end=_optional_date(form.coverage_end, "Coverage end"),
         notes=form.notes.strip() or None,
+        location=form.location.strip() or None,
     )
 
 
@@ -196,16 +207,6 @@ def _save(request: Request, session: Session, form: ExpenseForm, expense_id: int
     created = None
     try:
         data = _parse_form(form)
-        notice = None
-        if data.odometer_km is None:
-            last = records.last_known_odometer(
-                session, data.vehicle_id, data.date, expense_id
-            )
-            if last is None:
-                notice = ("missing", None)
-            else:
-                data = replace(data, odometer_km=last.km, odometer_estimated=True)
-                notice = ("estimated", last.km)
         if expense_id is None:
             created = records.create_expense(session, data)
             if form.remind == "1":
@@ -218,9 +219,7 @@ def _save(request: Request, session: Session, form: ExpenseForm, expense_id: int
         return _form_page(request, session, form.model_dump(), expense_id, 422, messages,
                           quick=quick)
     if quick and created is not None:
-        _flash_saved(request, session, created, notice)
-    elif notice is not None:
-        preferences.set_flash(session, *notice)
+        _flash_saved(request, session, created)
     session.commit()
     sync_after_save(request)  # writes a new reminder to the calendar
     return redirect(request, "/")
@@ -302,14 +301,12 @@ def _quick_context(session: Session, entered: dict[str, str]) -> dict:
     }
 
 
-def _flash_saved(request: Request, session: Session, expense: Expense,
-                 notice: tuple[str, float | None] | None) -> None:
-    """Leave the Timeline snackbar (and the odometer notice, if any) once."""
+def _flash_saved(request: Request, session: Session, expense: Expense) -> None:
+    """Leave the Timeline snackbar once."""
     noun = "Service" if expense.category is ExpenseCategory.MAINTENANCE else "Expense"
     money = formatting.money(expense.amount_cents, request.app.state.settings.currency)
-    kind, km = notice or ("saved", None)
     preferences.set_flash(
-        session, kind, km, undo=f"/expenses/{expense.id}/undo",
+        session, "saved", None, undo=f"/expenses/{expense.id}/undo",
         text=f"{noun} saved \u00b7 {money}",
     )
 
@@ -324,7 +321,7 @@ def _quick_new(request: Request, session: Session, category: str, vehicle: str):
     entered = ExpenseForm(
         vehicle_id=default, date=date.today().isoformat(), category=category
     ).model_dump()
-    return _form_page(request, session, entered, quick=True)
+    return _form_page(request, session, entered, quick=True, prefill=True)
 
 
 def _quick_create(request: Request, session: Session, form: ExpenseForm):

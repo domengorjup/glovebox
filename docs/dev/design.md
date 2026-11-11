@@ -94,10 +94,12 @@ A card containing rows. A row is a whole-row link or button with a round badge, 
   <a class="row" href="..." data-dialog>
     <span class="badge t-refuel">{{ icon('gas-station', 22) }}</span>
     <span class="body"><span class="title">Refuelling</span><span class="detail">35.44 L</span></span>
-    <span class="side"><span class="amount">55.89 &euro;</span><span class="date">14 Oct</span></span>
+    <span class="side"><span class="amount">55.89 &euro;</span><span class="date">14 Oct</span><span class="odo">75,892&nbsp;km</span></span>
   </a>
 </div>
 ```
+
+**Odometer line (`.row .odo`).** The optional third line of the right column, under the date: the entry's odometer, muted, 12 px, no wrapping, formatted with the `km_grouped` filter (`75,892 km`). Shown for refuels, services and expenses that have a reading. An estimated reading (old rows only) is `.odo.est`: italic, slightly faded, written `~ 68,390 km`, with `title="Estimated: the last known reading was used"`.
 
 A row whose text must be read in full (presets) wraps its note with `.detail.wrap`; the row then holds an `a.row-link` plus icon buttons, and the link opens a detail dialog.
 
@@ -210,9 +212,11 @@ All forms open as a dialog: `.scrim` (click to close) containing `form.dialog.fo
 
 Dialog pages set `{% set dialog_page = true %}` so the page behind them gets no FAB.
 
+**Pinned foot on phones.** In the full-screen phone dialogs (`.dialog.form`: quick tabs and the full add/edit forms) the `.dialog-foot` does not scroll with the form: it is `flex: none; position: sticky; bottom: 0` with the card background and a thin top shadow, and `.dialog-body` (`min-height: 0`) scrolls above it, so Save stays visible above the on-screen keyboard. `.scrim` is `100dvh`, and the viewport meta in `base.html` carries `interactive-widget=resizes-content` so Chrome/Android shrinks the layout above the keyboard. iOS Safari ignores that key: a small `visualViewport` handler at the end of `app.js` sizes the scrim to the visible area and keeps the focused field in view. Desktop dialogs are unchanged. Check inside the HA Companion app and the Ingress iframe on a real phone.
+
 ### Messages
 
-`{{ messages(errors, warnings) }}` renders `.alert.error` and `.alert.warning` blocks at the top of a form or page. `.alert.success` reports the result of a finished action on the page it returns to (the import result: counts plus an outlined Undo button on the right, via `post_button`). Use it instead of a toast when the user needs to see what happened or reverse it. A field-level hint is `.help` (`.help.err` for an error). A notice that must survive a redirect (the odometer warning after saving an expense) is stored once with `preferences.set_flash` and shown by the Timeline as `.alert.warning`, because the page script reloads the page and ignores the redirect target. An estimated odometer in a list row is written as `≈ 104,163 km` in the `.detail` line; it needs no extra element.
+`{{ messages(errors, warnings) }}` renders `.alert.error` and `.alert.warning` blocks at the top of a form or page. `.alert.success` reports the result of a finished action on the page it returns to (the import result: counts plus an outlined Undo button on the right, via `post_button`). Use it instead of a toast when the user needs to see what happened or reverse it. A field-level hint is `.help` (`.help.err` for an error). A notice that must survive a redirect (the quick-add snackbar with Undo) is stored once with `preferences.set_flash` and shown by the Timeline, because the page script reloads the page and ignores the redirect target.
 
 ### Form fields, select and switch
 
@@ -225,6 +229,10 @@ Use the macros from `_macros.html`; they produce HA's filled text field (label a
 {{ switch('is_full', 'Full tank', 'Needed to work out consumption', f.is_full) }}
 {{ textarea('Notes', 'notes', f.notes) }}
 ```
+
+**Odometer on service and expense forms.** New forms prefill the last known reading as a real, editable value; the grey `.help` line below it (`odometer_hint()` in `_macros.html`, quick pages add `.qhint`) reads `Last: 75,892 km on 9 Oct`, then `+N km since the last recorded reading (9 Oct).` once the value differs, and a red `.help.err` `Lower than the last recorded reading (...). Check the number.` when it is lower. The script (`bindOdometerHint`) keeps the value following vehicle and date changes until the user edits it. On quick pages the field is `big`, as in quick Refuelling; on full forms Odometer sits next to Date in a `.grid2`.
+
+**Text field with suggestions.** `location_field()` in `_macros.html` is a normal `field` with `list=` pointing to a native `<datalist>` (one per expense category; the script points the input at the list of the chosen category) and `autocomplete="off"`. Use the same pattern for other free-text fields with earlier values.
 
 Lay fields out with `.grid2` / `.grid3` inside `.dialog-body`; plain forms on a page use `.card.card-pad.stack`. Currency and units are suffixes, not part of the label.
 

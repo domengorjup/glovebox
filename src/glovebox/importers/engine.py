@@ -1036,6 +1036,7 @@ class _RowReader:
             category=ExpenseCategory(category),
             amount_cents=scale_to_int(total, 100),
             title=title,
+            location=self.text("location"),
             odometer_km=odometer,
             # An estimate without a value means nothing; never invent one.
             odometer_estimated=odometer is not None and self.boolean("odometer_estimated"),

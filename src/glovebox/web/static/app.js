@@ -15,6 +15,7 @@
     bindCalc(overlay);
     bindStationSelect(overlay);
     bindOdometerHint(overlay);
+    bindLocationList(overlay);
     bindFuelType(overlay);
     bindCopy(overlay);
     bindQuick(overlay);
@@ -370,31 +371,58 @@
 
   function bindOdometerHint(root) {
     var hint = root.querySelector("[data-odo-hint]");
-    var vehicle = root.querySelector("#i-vehicle_id");
+    var vehicle = root.querySelector("[name=vehicle_id]");
     var day = root.querySelector("#i-date");
-    if (!hint || !vehicle || !day || hint.dataset.bound) { return; }
+    var input = root.querySelector("#i-odometer_km");
+    if (!hint || !vehicle || !day || !input || hint.dataset.bound) { return; }
     hint.dataset.bound = "1";
     var steps = {};
     try { steps = JSON.parse(hint.dataset.steps || "{}"); } catch (e) { return; }
     var text = hint.querySelector("[data-odo-text]");
-    var input = "placeholder" in hint.dataset ? root.querySelector("#i-odometer_km") : null;
+    var follow = "prefill" in hint.dataset;  // new form: the value follows the last reading until edited
+    function fmt(km) { return km.toLocaleString("en-US", { maximumFractionDigits: 1 }) + "\u00a0km"; }
+    function when(iso) {
+      return iso === "" ? "initial"
+        : parseInt(iso.slice(8), 10) + "\u00a0" + MONTHS[parseInt(iso.slice(5, 7), 10) - 1];
+    }
     function update() {
-      if (input) { input.placeholder = "0"; }
-      if (!vehicle.value) { text.textContent = "Choose a vehicle to see its last recorded odometer."; return; }
       var last = null;
       (steps[vehicle.value] || []).forEach(function (s) {
         if (s[0] === "" || (day.value && s[0] <= day.value)) { last = s; }
       });
-      if (!last) { text.textContent = "No earlier reading for this vehicle. Entering the odometer is recommended."; return; }
-      var km = last[1].toLocaleString("en-US", { maximumFractionDigits: 1 }) + "\u00a0km";
-      if (input) { input.placeholder = last[1].toLocaleString("en-US", { maximumFractionDigits: 1 }); }
-      var when = last[0] === "" ? "initial"
-        : parseInt(last[0].slice(8), 10) + "\u00a0" + MONTHS[parseInt(last[0].slice(5, 7), 10) - 1];
-      text.textContent = "Last recorded: " + km + " (" + when + "). Left empty, this is used and marked as estimated.";
+      if (follow) { input.value = last ? String(last[1]) : ""; }
+      hint.classList.remove("err");
+      if (!vehicle.value) { text.textContent = "Choose a vehicle to see its last recorded odometer."; return; }
+      if (!last) { text.textContent = "No earlier reading for this vehicle."; return; }
+      var km = number(input.value);
+      var where = last[0] === "" ? "initial" : when(last[0]);
+      if (km === null || km === last[1]) {
+        text.textContent = "Last: " + fmt(last[1]) + (last[0] === "" ? " (initial)" : " on " + when(last[0]));
+      } else if (km > last[1]) {
+        text.textContent = "+" + (km - last[1]).toLocaleString("en-US", { maximumFractionDigits: 1 }) +
+          "\u00a0km since the last recorded reading (" + where + ").";
+      } else {
+        text.textContent = "Lower than the last recorded reading (" + fmt(last[1]) + ", " + where + "). Check the number.";
+        hint.classList.add("err");
+      }
     }
+    input.addEventListener("input", function () { follow = false; update(); });
     vehicle.addEventListener("change", update);
     day.addEventListener("change", update);
     day.addEventListener("input", update);
+    update();
+  }
+
+  /* Expense forms: the Location suggestions are those of the chosen category. */
+  function bindLocationList(root) {
+    var input = root.querySelector("#i-location");
+    if (!input || input.dataset.bound) { return; }
+    input.dataset.bound = "1";
+    root.querySelectorAll("input[name=category]").forEach(function (radio) {
+      radio.addEventListener("change", function () {
+        if (radio.checked) { input.setAttribute("list", "location-options-" + radio.value); }
+      });
+    });
   }
 
   function chipDate(day, chip) {
@@ -408,12 +436,10 @@
   /* Quick service / expense: title chips, odometer hint, Save enabled when complete. */
   function bindQuickEntry(form) {
     var title = form.querySelector("#i-title"), amount = form.querySelector("#i-amount");
-    var odo = form.querySelector("#i-odometer_km"), save = form.querySelector("[data-quick-save]");
-    var hint = form.querySelector("[data-odo-quick]"), day = form.querySelector("#i-date");
+    var save = form.querySelector("[data-quick-save]");
+    var day = form.querySelector("#i-date");
     var groups = form.querySelectorAll("[data-title-chips]");
     var types = form.querySelectorAll("input[name=category]");
-    var initial = hint.textContent.trim();
-    var last = hint.dataset.lastKm === "" ? null : parseFloat(hint.dataset.lastKm);
     function category() {
       var picked = form.querySelector("input[name=category]:checked");
       return picked ? picked.value : "maintenance";
@@ -427,17 +453,6 @@
       });
     }
     function update() {
-      var km = number(odo.value);
-      hint.classList.remove("err", "warn");
-      if (last === null) { hint.textContent = initial; }
-      else if (km === null) { hint.textContent = initial; hint.classList.add("warn"); }
-      else if (km >= last) {
-        hint.textContent = "+" + (km - last).toLocaleString("en-US", { maximumFractionDigits: 1 }) +
-          "\u00a0km since the last recorded reading (" + (/\((.*)\)/.exec(hint.dataset.lastText) || [0, "initial"])[1] + ").";
-      } else {
-        hint.textContent = "Lower than the last recorded reading, " + hint.dataset.lastText.replace(/^([\d.,]+)/, "$1\u00a0km") + ". Check the number.";
-        hint.classList.add("err");
-      }
       save.disabled = !(title.value.trim() && number(amount.value) !== null);
     }
     groups.forEach(function (group) {
@@ -449,7 +464,7 @@
       });
     });
     types.forEach(function (type) { type.addEventListener("change", showChips); });
-    [title, amount, odo].forEach(function (input) { input.addEventListener("input", function () { showChips(); update(); }); });
+    [title, amount].forEach(function (input) { input.addEventListener("input", function () { showChips(); update(); }); });
     day.addEventListener("change", function () { chipDate(day, form.querySelector("[data-quick-date]")); });
     showChips(); update();
   }
@@ -494,6 +509,7 @@
   });
 
   bindOdometerHint(document);
+  bindLocationList(document);
   bindFuelType(document);
   bindQuick(document);
   bindCalc(document);
@@ -506,4 +522,21 @@
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(drawCharts, 150);
   });
+})();
+
+// Pinned dialog foot on iOS Safari: it ignores interactive-widget, so size the scrim to the
+// visual viewport (the area above the keyboard) and keep the focused field in view.
+(function () {
+  var vv = window.visualViewport;
+  if (!vv || !/iP(hone|ad|od)/.test(navigator.userAgent)) return;
+  function fit() {
+    var scrim = document.querySelector(".scrim");
+    if (!scrim || !window.matchMedia("(max-width: 699px)").matches) return;
+    scrim.style.height = vv.height + "px";
+    scrim.style.top = vv.offsetTop + "px";
+    var el = document.activeElement;
+    if (el && el.closest && el.closest(".dialog-body")) el.scrollIntoView({ block: "nearest" });
+  }
+  vv.addEventListener("resize", fit);
+  vv.addEventListener("scroll", fit);
 })();

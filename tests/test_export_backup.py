@@ -113,7 +113,7 @@ def test_backup_metadata(session: Session) -> None:
     descriptor = json.loads(files["datapackage.json"])
     meta = descriptor["glovebox"]
     assert meta["app_version"] == __version__
-    assert meta["schema_version"] == "0007"
+    assert meta["schema_version"] == "0008"
     assert meta["currency"] == "CHF"
     assert meta["exported_at"]
     assert [r["name"] for r in descriptor["resources"]] == [

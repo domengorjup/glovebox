@@ -234,6 +234,8 @@ class Expense(Base):
         _enum(ExpenseCategory, "expense_category")
     )
     title: Mapped[str] = mapped_column(String(200), default="")
+    # Where the work was done or who was paid (garage, insurer); free text.
+    location: Mapped[str | None] = mapped_column(String(200))
     amount_cents: Mapped[int] = mapped_column(Integer)
     coverage_start: Mapped[date | None] = mapped_column(Date)
     coverage_end: Mapped[date | None] = mapped_column(Date)

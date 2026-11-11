@@ -286,6 +286,7 @@ def _expense_values(
         "currency": settings.currency,
         "category": e.category.value,
         "title": e.title,
+        "location": e.location,
         "coverage_start": _date(e.coverage_start, u) if e.coverage_start else None,
         "coverage_end": _date(e.coverage_end, u) if e.coverage_end else None,
         "notes": e.notes,

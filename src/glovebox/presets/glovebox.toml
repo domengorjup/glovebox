@@ -34,6 +34,7 @@ station_location = { column = "station_location" }
 station_brand = { column = "station_brand" }
 category = { column = "category" }
 title = { column = "title" }
+location = { column = "location" }
 coverage_start = { column = "coverage_start" }
 coverage_end = { column = "coverage_end" }
 notes = { column = "notes" }

@@ -158,6 +158,11 @@ RECORD_FIELDS: tuple[StandardField, ...] = (
         applies_to=(EXPENSE,), required=REQUIRED_EXPENSE,
     ),
     StandardField(
+        "location", STRING,
+        "Where the work was done or who was paid: garage, insurer, office, shop.",
+        "Example Garage", applies_to=(EXPENSE,),
+    ),
+    StandardField(
         "coverage_start", DATE,
         "First day the expense covers (insurance, registration), YYYY-MM-DD.",
         "2026-01-01", applies_to=(EXPENSE,),

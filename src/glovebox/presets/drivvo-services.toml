@@ -8,8 +8,8 @@
 # zero_amount = "note" their names are added to the note of the first priced
 # item of the same visit (same date and odometer) as "Also: Oil filter, ...".
 # A free item without a priced one in its visit is skipped and counted.
-# "Service location", "Title", "Discount" and the instalment columns are not
-# imported.
+# "Service location" is imported as the location. "Title", "Discount" and the
+# instalment columns are not imported.
 # The Drivvo web export (History or vehicle menu → Export → CSV) holds the
 # same records and values (checked), so no separate preset is shipped: use
 # the phone export. The web file adds a "Vehicle Name" column and a
@@ -42,6 +42,7 @@ type = { value = "expense" }
 date = { column = "Date" }
 odometer_km = { column = "Odometer", missing_values = ["0", "0.0"] }
 title = { column = "Type of service" }
+location = { column = "Service location" }
 category = { value = "maintenance" }
 total = { column = "Total cost" }
 notes = { column = "Notes" }

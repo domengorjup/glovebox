@@ -196,16 +196,17 @@ def test_quick_service_saves_maintenance_with_snackbar_and_undo(
     golf = _vehicle(client, "Golf")
     _refuel(client, golf, None, 10, 1000)
     html = client.get("/quick-service").text
-    # The last reading is only a suggestion: placeholder and hint, empty value.
-    assert 'name="odometer_km" value=""' in html and 'placeholder="1,000"' in html
+    # The last reading is prefilled as a real, editable value.
+    assert 'name="odometer_km" value="1000"' in html
     assert "Last: 1,000&nbsp;km on" in html
-    # Left empty: saved as estimated, with the existing notice.
-    _post(client, "/quick-service", _entry(golf))
+    # Saved as entered (the form posts the prefilled value), never as an estimate.
+    _post(client, "/quick-service", _entry(golf, odometer_km="1000"))
     row = _expense_rows(engine)[0]
-    assert row.category.value == "maintenance" and row.odometer_estimated
+    assert row.category.value == "maintenance" and row.odometer_km == 1000
+    assert not row.odometer_estimated
     page = client.get("/").text
     assert "Service saved" in page and "189.90" in page and "Undo" in page
-    assert "used the last recorded" in page
+    assert "used the last recorded" not in page
     path = re.search(r'action="([^"]*/expenses/\d+/undo)"', page).group(1)
     _post(client, path, {})
     assert _expense_rows(engine) == []
@@ -266,18 +267,19 @@ def test_quick_pages_vehicle_choice(client: TestClient):
     assert 'aria-label="Vehicle choice"' in client.get("/quick-service").text
 
 
-def test_full_add_forms_suggest_the_last_odometer_only(client: TestClient):
+def test_full_add_forms_prefill_the_last_odometer(client: TestClient):
     golf = _vehicle(client, "Golf")
-    assert 'placeholder="1,000"' not in client.get("/expenses/new").text
+    assert 'name="odometer_km" value=""' in client.get("/expenses/new").text
     _refuel(client, golf, None, 10, 1000)
     for path in ("/expenses/new", "/expenses/new?kind=service"):
         html = client.get(path).text
-        assert 'name="odometer_km" value=""' in html and 'placeholder="1,000"' in html
-        assert "Last recorded: 1,000" in html and "data-placeholder" in html
-    # Editing shows no suggestion (an empty field there re-estimates).
+        assert 'name="odometer_km" value="1000"' in html
+        assert "Last: 1,000&nbsp;km on" in html and "data-prefill" in html
+    # Editing shows the stored value and does not follow the last reading.
     _post(client, "/expenses/new", {"vehicle_id": str(golf), "category": "other",
           "title": "x", "amount": "5", "date": date.today().isoformat(), "odometer_km": "1100"})
-    assert 'placeholder="1,000"' not in client.get("/expenses/1/edit").text
+    html = client.get("/expenses/1/edit").text
+    assert 'name="odometer_km" value="1100"' in html and "data-prefill" not in html
 
 
 def _set_fuel(client: TestClient, vehicle: int, fuel: str) -> None:

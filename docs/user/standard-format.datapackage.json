@@ -168,6 +168,12 @@
             "example": "Oil change"
           },
           {
+            "name": "location",
+            "type": "string",
+            "description": "Where the work was done or who was paid: garage, insurer, office, shop. Applies to expense rows only.",
+            "example": "Example Garage"
+          },
+          {
             "name": "coverage_start",
             "type": "date",
             "description": "First day the expense covers (insurance, registration), YYYY-MM-DD. Set both coverage_start and coverage_end, or neither. Applies to expense rows only.",

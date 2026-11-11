@@ -1,5 +1,5 @@
 {% extends layout %}
-{% from "_macros.html" import messages, reminder_rows with context %}
+{% from "_macros.html" import reminder_rows with context %}
 {% block title %}Timeline - Glovebox{% endblock %}
 {% set kind_icons = {'refuel': 'gas-station', 'service': 'wrench', 'expense': 'file-document-outline'} %}
 {% macro stat_card(key, c) %}
@@ -33,7 +33,6 @@
 </details>
 {% endmacro %}
 {% block content %}
-{{ messages(None, warnings) }}
 {% if not has_vehicles %}
 <div class="card empty">
   <p>No vehicles yet.</p>
@@ -118,7 +117,7 @@
       <span class="title">{{ e.title }}{% if chrome.selected == 'all' %}<span class="veh-tag">{{ e.vehicle }}</span>{% endif %}</span>
       <span class="detail">{{ e.detail }}</span>
     </span>
-    <span class="side"><span class="amount">{{ e.amount_cents | money }}</span><span class="date">{{ e.day | short_date }}</span></span>
+    <span class="side"><span class="amount">{{ e.amount_cents | money }}</span><span class="date">{{ e.day | short_date }}</span>{% if e.odometer_km is not none %}<span class="odo{{ ' est' if e.odometer_estimated }}"{% if e.odometer_estimated %} title="Estimated: the last known reading was used"{% endif %}>{{ '~ ' if e.odometer_estimated }}{{ e.odometer_km | km_grouped }}&nbsp;km</span>{% endif %}</span>
   </a>
   {% endfor %}
 </div>

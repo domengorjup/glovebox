@@ -438,7 +438,7 @@ a.row, a.row-link { text-decoration: none; color: inherit; }
 .login h1 { margin-bottom: var(--ha-space-4); }
 .stat .value, .row .amount, .row .date, .tbl td.num, .tbl th.num, .legend b { white-space: nowrap; }
 @media (max-width: 699px) { .wide { display: none; } }
-.row .title, .row .detail, .row .amount, .row .date { display: block; }
+.row .title, .row .detail, .row .amount, .row .date, .row .odo { display: block; }
 .row .title { display: flex; align-items: center; gap: 8px; }
 .brand { text-decoration: none; }
 .brand:visited { color: inherit; }
@@ -554,3 +554,17 @@ a.btn, a.icon-btn, a.chip, a.qtab, .seg a { text-decoration: none; }
 
 /* Manage page footer links */
 .manage-links { display: flex; justify-content: center; gap: 8px; margin: 24px 0 8px; }
+
+/* Pinned action bar in full-screen phone dialogs: the foot stays above the on-screen keyboard,
+   the body scrolls. interactive-widget=resizes-content (base.html) shrinks the dvh viewport. */
+@media (max-width: 699px) {
+  .scrim { height: 100vh; height: 100dvh; inset: auto 0 0 0; }
+  .dialog.form { height: 100%; }
+  .dialog-body { min-height: 0; scroll-padding-bottom: 24px; }
+  .dialog-foot { flex: none; position: sticky; bottom: 0; background: var(--card-background-color); box-shadow: 0 -2px 8px var(--shadow-color); }
+  .qfoot { padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* Odometer line under the date in a Timeline row (estimated readings in italics). */
+.row .odo { color: var(--secondary-text-color); font-size: 12px; white-space: nowrap; }
+.row .odo.est { font-style: italic; opacity: .8; }

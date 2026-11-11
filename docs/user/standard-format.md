@@ -58,6 +58,7 @@ Refuels and expenses. Used by every standard import and export.
 | `station_brand` | string |  | no | refuel | Station brand; used only when the station is created. | `OMV` |
 | `category` | enum |  | no | expense | Expense category. One of `maintenance`, `insurance`, `registration`, `other`. Empty means `other`. | `maintenance` |
 | `title` | string |  | expense rows | expense | Short label of the expense. | `Oil change` |
+| `location` | string |  | no | expense | Where the work was done or who was paid: garage, insurer, office, shop. | `Example Garage` |
 | `coverage_start` | date |  | no | expense | First day the expense covers (insurance, registration), YYYY-MM-DD. Set both coverage_start and coverage_end, or neither. | `2026-01-01` |
 | `coverage_end` | date |  | no | expense | Last day the expense covers, YYYY-MM-DD. Set both coverage_start and coverage_end, or neither. | `2026-12-31` |
 | `notes` | string |  | no | both | Free text. | `Winter tyres` |
@@ -119,9 +120,9 @@ Optional. Date reminders of the vehicles; see [Optional tables](#optional-tables
 One refuel and one expense (`records.csv`):
 
 ```csv
-type,vehicle,date,time,odometer_km,odometer_estimated,fuel_l,price_per_l,total,currency,full,missed_previous,station,station_location,station_brand,category,title,coverage_start,coverage_end,notes,derived,source,source_ref
-refuel,Golf,2026-05-02,14:30,98000,,45.200,1.459,65.95,EUR,true,false,OMV Celje,Celje,OMV,,,,,,,,
-expense,Golf,2026-05-10,,98400,,,,180.00,EUR,,,,,,maintenance,Oil change,,,Winter tyres,,,
+type,vehicle,date,time,odometer_km,odometer_estimated,fuel_l,price_per_l,total,currency,full,missed_previous,station,station_location,station_brand,category,title,location,coverage_start,coverage_end,notes,derived,source,source_ref
+refuel,Golf,2026-05-02,14:30,98000,,45.200,1.459,65.95,EUR,true,false,OMV Celje,Celje,OMV,,,,,,,,,
+expense,Golf,2026-05-10,,98400,,,,180.00,EUR,,,,,,maintenance,Oil change,,,,Winter tyres,,,
 ```
 
 ## Convert your own export

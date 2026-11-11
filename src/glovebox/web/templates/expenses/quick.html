@@ -1,6 +1,6 @@
 {# Quick service / expense page (phone-first). Service: category fixed to maintenance. #}
 {% extends layout %}
-{% from "_macros.html" import messages, field, textarea, dialog_head, quick_tabs, remind_switch with context %}
+{% from "_macros.html" import messages, field, textarea, dialog_head, quick_tabs, remind_switch, odometer_hint, location_field with context %}
 {% set dialog_page = true %}
 {% set noun = 'service' if is_service else 'expense' %}
 {% set page_path = '/quick-service' if is_service else '/quick-expense' %}
@@ -40,14 +40,10 @@
     </div>
     {{ field('Amount' if is_service else 'Amount (full price paid)', 'amount', f.amount, suffix=currency, inputmode='decimal', required=True, placeholder='0.00', big=True) }}
     <div class="qgroup">
-      {{ field('Odometer', 'odometer_km', f.odometer_km, suffix='km', inputmode='numeric', placeholder=(last_odometer.km | km_grouped) if last_odometer else '0') }}
-      <div class="help qhint{{ ' warn' if last_odometer }}" data-odo-quick
-           data-last-km="{{ last_odometer.km if last_odometer }}"
-           data-last-text="{{ last_odometer.km | km_grouped if last_odometer }}{{ ' (' ~ (last_odometer.date | short_date) ~ ')' if last_odometer and last_odometer.date }}">
-        {% if last_odometer %}Last: {{ last_odometer.km | km_grouped }}&nbsp;km{% if last_odometer.date %} on {{ last_odometer.date | short_date }}{% else %} (initial){% endif %}. Left empty, it is saved as an estimate.
-        {% else %}No earlier reading for this vehicle. Entering the odometer is recommended.{% endif %}
-      </div>
+      {{ field('Odometer', 'odometer_km', f.odometer_km, suffix='km', inputmode='numeric', placeholder='0', big=True) }}
+      {{ odometer_hint(quick=True) }}
     </div>
+    {{ location_field('e.g. garage or workshop' if is_service else 'e.g. insurer or office') }}
     <div class="chips qchips qmore">
       <label class="chip" for="q-open-date">{{ icon('calendar', 18) }}<span data-quick-date>{{ date_text }}</span></label>
       <label class="chip" for="q-open-more">{{ icon('tune-variant', 18) }}More</label>
