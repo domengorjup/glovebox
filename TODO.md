@@ -1,7 +1,7 @@
 # TODO
 
 ## Start here
-User checks 0.4.0 on their phone in the HA app: the Save button stays above the keyboard (Refuelling, Service, Expense; also iOS if available), prefilled odometer, Location suggestions.
+User checks 0.4.0/0.5.0 on their phone in the HA app: the Save button stays above the keyboard (Refuelling, Service, Expense; also iOS if available), prefilled odometer, Location suggestions, a calculation like `=12.50+3` in a cost field. `haos-test` is stopped (user's request, 2026-11-20); 0.5.0 was never run there.
 
 ## Next
 1. User-assisted checks on the home server for `add-reminders` 9.4 (own writable calendar) and 9.5 (blueprint notification, .ics on phone/Outlook), the blueprint-import badge; then archive `add-reminders` via the `openspec-archive` skill.
