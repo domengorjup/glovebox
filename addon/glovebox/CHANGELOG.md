@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.0
+
+- Cost fields (refuelling total and price per litre, service and expense amount) accept a calculation such as =12.50+3 or (30+20)*2: + - * /, brackets, leading = optional. The result is filled in when you leave the field.
+
 ## 0.4.0
 
 - Optional Location field on service and expense entries (garage, insurer), with suggestions from earlier entries of the same type; Drivvo import fills it; new `location` column in the standard format and backup. New service and expense entries start with the last odometer reading filled in; an empty field now saves no reading instead of an estimate. The Timeline shows each entry's odometer. On phones the Save button stays visible above the keyboard.
