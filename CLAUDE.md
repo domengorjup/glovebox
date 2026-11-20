@@ -38,6 +38,7 @@ Standing permissions for this loop: anything on the test VM `haos-test` (start/s
 ## Next steps
 - **Status (2026-10-27):** 0.3.0 released (reminders, quick-add type tabs with + opening quick refuelling, fuel type on refuel forms, Manage links, clean exit on SIGTERM). Test-VM checks passed with an unpublished local build (`local_glovebox_dev`, built from `/local_apps` on the VM): deep links, quick-add tabs, `add-reminders` 0.1 (security rating 7 with or without `homeassistant_api`), 9.1-9.3, 9.6. `add-reminders` is not archived: 9.4 and 9.5 are user-assisted and still open.
 - **Status (2026-11-11):** 0.4.0 released and running on `haos-test` (Location on service/expense, prefilled odometer instead of estimates, odometer on the Timeline, pinned phone Save bar).
+- **Status (2026-11-20):** 0.5.0 released (calculations like `=12.50+3` in cost fields, OpenSpec change `money-expressions`, grammar aligned with Cekar). Not deployed to `haos-test`: the VM was stopped at the user's request.
 - **Next:** see `TODO.md`.
 - **Small polish:** HA's "Update available" on the add-on page is only a status label (HA's UI, not ours); updating works through the Update button. Note: HA auto-updates add-ons only after a version is a day old (Supervisor checks every 16 h), so releases reach the user's home server 1-2 days later.
 - **v2 (new OpenSpec change, after v1 has been used for a while):**
