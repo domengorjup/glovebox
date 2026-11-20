@@ -16,7 +16,7 @@ from glovebox.services.records import ExpenseInput, ValidationError
 from glovebox.services.stats import StatsFilter
 from glovebox.web import formatting
 from glovebox.web.common import SessionDep, load_chrome, redirect, render
-from glovebox.web.formatting import parse_decimal, to_scaled_int
+from glovebox.web.formatting import parse_decimal, parse_money, to_scaled_int
 from glovebox.web.reminders import sync_after_save
 
 router = APIRouter(prefix="/expenses")
@@ -173,7 +173,7 @@ def _parse_form(form: ExpenseForm) -> ExpenseInput:
         category = ExpenseCategory(form.category)
     except ValueError:
         raise ValueError(f"Unknown category '{form.category}'") from None
-    amount = to_scaled_int(parse_decimal(form.amount, "Amount"), 100)
+    amount = to_scaled_int(parse_money(form.amount, "Amount"), 100)
     if amount is None:
         raise ValueError("Amount is required")
     odometer = parse_decimal(form.odometer_km, "Odometer")

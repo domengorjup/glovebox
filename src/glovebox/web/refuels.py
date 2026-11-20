@@ -17,7 +17,7 @@ from glovebox.services.records import RefuelInput, StationInput, ValidationError
 from glovebox.services.stats import StatsFilter
 from glovebox.web.common import SessionDep, load_chrome, redirect, render
 from glovebox.web import formatting
-from glovebox.web.formatting import parse_decimal, to_scaled_int
+from glovebox.web.formatting import parse_decimal, parse_money, to_scaled_int
 
 router = APIRouter(prefix="/refuels")
 # The phone-first quick-add page lives at /quick and shares the code below.
@@ -155,9 +155,9 @@ def _parse_form(form: RefuelForm) -> RefuelInput:
         odometer_km=float(odometer),
         litres_milli=to_scaled_int(parse_decimal(form.litres, "Litres"), 1000),
         price_per_litre_milli=to_scaled_int(
-            parse_decimal(form.price_per_litre, "Price per litre"), 1000
+            parse_money(form.price_per_litre, "Price per litre"), 1000
         ),
-        total_cents=to_scaled_int(parse_decimal(form.total, "Total"), 100),
+        total_cents=to_scaled_int(parse_money(form.total, "Total"), 100),
         station_id=int(form.station_id) if form.station_id.isdigit() else None,
         is_full=form.is_full == "1",
         missed_previous=form.missed_previous == "1",

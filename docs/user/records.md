@@ -51,6 +51,7 @@ Fields: vehicle, date, optional odometer (next to the date), title (required), a
 Insurance and registration usually cover a period, not just the payment day. Enter **Coverage start** and **Coverage end** to say which period the payment covers.
 
 - Set both dates or neither. The end must not be before the start. Both days are included.
+- **Calculations in cost fields:** Total, Price / litre and Amount accept a small sum such as `=120+45.50-10` or `12,5*2` (`+ - * /`, multiplication and division first, no brackets). When you leave the field the sum is replaced by its result.
 - The amount is always the full price you paid. Coverage dates only change how [Statistics](statistics.md#spread-or-as-paid) divides the cost over months.
 - Coverage is allowed on any expense.
 

@@ -12,6 +12,7 @@
     overlay.innerHTML = html;
     var first = overlay.querySelector("input:not([type=hidden]), select, textarea");
     if (first && !overlay.querySelector(".confirm")) { first.focus(); }
+    bindMoney(overlay);
     bindCalc(overlay);
     bindStationSelect(overlay);
     bindOdometerHint(overlay);
@@ -131,6 +132,67 @@
     return isFinite(value) ? value : null;
   }
 
+  /* Cost fields accept a calculation such as =12.50+3*(2-1) (same grammar as the server's
+     evaluate_expression). Floats here; the server re-evaluates exactly on save. */
+  var MONEY_FIELDS = "input[name=total], input[name=price_per_litre], input[name=amount]";
+  function isExpression(text) { return /^\s*=|[-+*/()]/.test(text.replace(/^\s*[-+]/, "")); }
+  function evaluate(text) {
+    var body = String(text).trim().replace(/^=/, "").replace(/\s+/g, "");
+    if (!body || body.length > 200) { return null; }
+    var pos = 0, bad = false;
+    function sum() {
+      var v = product();
+      while (body[pos] === "+" || body[pos] === "-") {
+        var sign = body[pos++], t = product();
+        v = sign === "+" ? v + t : v - t;
+      }
+      return v;
+    }
+    function product() {
+      var v = unary();
+      while (body[pos] === "*" || body[pos] === "/") {
+        var sign = body[pos++], f = unary();
+        if (sign === "*") { v *= f; } else if (f === 0) { bad = true; } else { v /= f; }
+      }
+      return v;
+    }
+    function unary() { if (body[pos] === "-") { pos += 1; return -unary(); } return atom(); }
+    function atom() {
+      if (body[pos] === "(") {
+        pos += 1;
+        var v = sum();
+        if (body[pos] !== ")") { bad = true; } else { pos += 1; }
+        return v;
+      }
+      var m = /^(?:[0-9]+(?:[.,][0-9]+)?|[.,][0-9]+)/.exec(body.slice(pos));
+      if (!m) { bad = true; return 0; }
+      pos += m[0].length;
+      return parseFloat(m[0].replace(",", "."));
+    }
+    var out = sum();
+    return bad || pos !== body.length || !isFinite(out) ? null : out;
+  }
+  function money(text) { return isExpression(String(text)) ? evaluate(text) : number(text); }
+
+  function bindMoney(root) {
+    root.querySelectorAll(MONEY_FIELDS).forEach(function (input) {
+      if (input.dataset.moneyBound) { return; }
+      input.dataset.moneyBound = "1";
+      var field = input.closest(".field");
+      input.addEventListener("input", function () { field.classList.remove("invalid"); });
+      input.addEventListener("change", function () {
+        if (!isExpression(input.value)) { return; }
+        var out = evaluate(input.value);
+        if (out === null) { field.classList.add("invalid"); return; }
+        input.value = out.toFixed(input.name === "price_per_litre" ? 3 : 2);
+        field.classList.remove("invalid");
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    });
+  }
+
+  function fieldNumber(input) { return input.matches(MONEY_FIELDS) ? money(input.value) : number(input.value); }
+
   function bindCalc(root) {
     var group = root.querySelector("[data-price-fields]");
     if (!group || group.dataset.bound) { return; }
@@ -146,7 +208,7 @@
       if (recent.length < 2) { return; }
       var inputs = recent.slice(-2);
       var target = ["litres", "price_per_litre", "total"].filter(function (n) { return inputs.indexOf(n) < 0; })[0];
-      var a = number(box[inputs[0]].value), b = number(box[inputs[1]].value);
+      var a = fieldNumber(box[inputs[0]]), b = fieldNumber(box[inputs[1]]);
       if (a === null || b === null) { return; }
       var v = {}; v[inputs[0]] = a; v[inputs[1]] = b;
       var out = null;
@@ -453,7 +515,7 @@
       });
     }
     function update() {
-      save.disabled = !(title.value.trim() && number(amount.value) !== null);
+      save.disabled = !(title.value.trim() && money(amount.value) !== null);
     }
     groups.forEach(function (group) {
       group.querySelectorAll(".chip").forEach(function (chip) {
@@ -493,7 +555,7 @@
           hint.classList.add("err");
         }
       } else { hint.textContent = initial; }
-      save.disabled = !(km !== null && number(litres.value) > 0 && number(total.value) > 0);
+      save.disabled = !(km !== null && number(litres.value) > 0 && money(total.value) > 0);
     }
     function dateText() { chipDate(day, chip); }
     [odo, litres, total, form.querySelector("#i-price_per_litre")].forEach(function (input) {
@@ -512,6 +574,7 @@
   bindLocationList(document);
   bindFuelType(document);
   bindQuick(document);
+  bindMoney(document);
   bindCalc(document);
   bindStationSelect(document);
   bindRevealSelect(document);

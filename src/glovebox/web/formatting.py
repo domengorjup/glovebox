@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import re
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from fractions import Fraction
 
 # Numbers and their units must never wrap onto two lines.
 NBSP = "\u00a0"
@@ -92,6 +94,113 @@ def parse_decimal(text: str | None, field_name: str) -> Decimal | None:
     if not value.is_finite():
         raise ValueError(f"{field_name}: '{text}' is not a number")
     return value
+
+
+_NUMBER = re.compile(r"[0-9]+(?:[.,][0-9]+)?|[.,][0-9]+")
+_MAX_EXPRESSION_LENGTH = 200  # also keeps the recursion shallow
+MALFORMED = "Not a valid calculation."
+DIVIDE_BY_ZERO = "Can't divide by zero."
+
+
+class _Calculator:
+    """Recursive-descent evaluator for ``+ - * /``, unary minus and parentheses."""
+
+    def __init__(self, text: str) -> None:
+        self._text = text
+        self._pos = 0
+
+    def evaluate(self) -> Fraction:
+        """Return the exact value of the whole text."""
+        value = self._sum()
+        if self._pos != len(self._text):
+            raise ValueError(MALFORMED)
+        return value
+
+    def _peek(self) -> str:
+        return self._text[self._pos : self._pos + 1]
+
+    def _sum(self) -> Fraction:
+        value = self._product()
+        while self._peek() in ("+", "-"):
+            sign = self._text[self._pos]
+            self._pos += 1
+            term = self._product()
+            value = value + term if sign == "+" else value - term
+        return value
+
+    def _product(self) -> Fraction:
+        value = self._unary()
+        while self._peek() in ("*", "/"):
+            sign = self._text[self._pos]
+            self._pos += 1
+            factor = self._unary()
+            if sign == "*":
+                value *= factor
+            elif factor == 0:
+                raise ValueError(DIVIDE_BY_ZERO)
+            else:
+                value /= factor
+        return value
+
+    def _unary(self) -> Fraction:
+        if self._peek() == "-":
+            self._pos += 1
+            return -self._unary()
+        return self._atom()
+
+    def _atom(self) -> Fraction:
+        if self._peek() == "(":
+            self._pos += 1
+            value = self._sum()
+            if self._peek() != ")":
+                raise ValueError(MALFORMED)
+            self._pos += 1
+            return value
+        match = _NUMBER.match(self._text, self._pos)
+        if match is None:
+            raise ValueError(MALFORMED)
+        self._pos = match.end()
+        return Fraction(match.group().replace(",", "."))
+
+
+def evaluate_expression(text: str) -> Fraction:
+    """
+    Evaluate ``12.50+3*(2-1)`` exactly.
+
+    Numbers with a decimal comma or point, ``+ - * /``, unary minus,
+    parentheses; an optional leading ``=`` and spaces are ignored; at most 200
+    characters. No ``eval``.
+
+    Raises
+    ------
+    ValueError
+        ``"Not a valid calculation."`` or ``"Can't divide by zero."``.
+    """
+    body = text.strip()
+    if body.startswith("="):
+        body = body[1:]
+    body = "".join(body.split())
+    if not body or len(body) > _MAX_EXPRESSION_LENGTH:
+        raise ValueError(MALFORMED)
+    return _Calculator(body).evaluate()
+
+
+def parse_money(text: str | None, field_name: str) -> Decimal | None:
+    """
+    Like :func:`parse_decimal`, but also accepts a calculation such as ``=12.50+3``.
+
+    A plain number is read exactly as :func:`parse_decimal` reads it. A
+    calculation is evaluated exactly; the caller rounds it like a typed value.
+    """
+    try:
+        return parse_decimal(text, field_name)
+    except ValueError:
+        pass
+    try:
+        value = evaluate_expression(text or "")
+    except ValueError as error:
+        raise ValueError(f"{field_name}: {error}") from None
+    return Decimal(value.numerator) / Decimal(value.denominator)
 
 
 def to_scaled_int(value: Decimal | None, scale: int) -> int | None:
