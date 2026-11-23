@@ -483,7 +483,7 @@
       (steps[vehicle.value] || []).forEach(function (s) {
         if (s[0] === "" || (day.value && s[0] <= day.value)) { last = s; }
       });
-      if (follow) { input.placeholder = last ? String(last[1]) : "0"; }
+      if (follow) { input.placeholder = last ? last[1].toLocaleString("en-US", { maximumFractionDigits: 1 }) : "0"; }
       hint.classList.remove("err");
       if (!vehicle.value) { text.textContent = "Choose a vehicle to see its last recorded odometer."; return; }
       if (!last) { text.textContent = "No earlier reading for this vehicle."; return; }

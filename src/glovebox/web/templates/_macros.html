@@ -94,7 +94,7 @@
   <div class="dialog-head">
     <a class="icon-btn" href="{{ url(request, close_path) }}" data-close aria-label="Close">{{ icon('close', 24) }}</a>
     <h3>{{ title }}</h3>
-    {% if save %}<button type="submit" class="btn head-save"{% if quick %} data-quick-save{% endif %}>{{ save }}</button>{% endif %}
+    {% if save %}<button type="submit" class="btn primary head-save"{% if quick %} data-quick-save{% endif %}>{{ save }}</button>{% endif %}
   </div>
 {% endmacro %}
 

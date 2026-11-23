@@ -138,7 +138,7 @@ def test_new_forms_show_the_last_odometer_in_grey(client: TestClient, car: int) 
     for path in ("/expenses/new?kind=service", "/expenses/new", "/quick-service", "/quick-expense"):
         html = client.get(path).text
         assert _odometer_value(html) is None, path
-        assert _odometer_placeholder(html) == "104163", path
+        assert _odometer_placeholder(html) == "104,163", path
         assert "Last: 104,163&nbsp;km on " in html and "data-prefill" in html
 
 
@@ -218,7 +218,7 @@ def test_error_rerender_keeps_a_cleared_odometer(client: TestClient, car: int) -
     )
     assert response.status_code == 422
     assert _odometer_value(response.text) is None
-    assert _odometer_placeholder(response.text) == "104163"
+    assert _odometer_placeholder(response.text) == "104,163"
 
 
 def test_edit_form_shows_the_saved_value_without_prefill(client: TestClient, car: int) -> None:

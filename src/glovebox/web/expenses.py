@@ -115,7 +115,7 @@ def _form_page(request: Request, session: Session, entered: dict[str, str],
         },
         # New forms show the last reading in grey and follow vehicle and date changes.
         prefill_odometer=expense_id is None,
-        odometer_placeholder=formatting.format_km(last.km) if last and expense_id is None else "",
+        odometer_placeholder=formatting.format_km(last.km, grouped=True) if last and expense_id is None else "",
         **extra,
     )
 

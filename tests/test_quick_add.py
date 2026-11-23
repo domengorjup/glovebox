@@ -198,7 +198,7 @@ def test_quick_service_saves_maintenance_with_snackbar_and_undo(
     _refuel(client, golf, None, 10, 1000)
     html = client.get("/quick-service").text
     # The last reading is shown in grey; the field itself is empty.
-    assert 'name="odometer_km" value=""' in html and 'placeholder="1000"' in html
+    assert 'name="odometer_km" value=""' in html and 'placeholder="1,000"' in html
     assert "Last: 1,000&nbsp;km on" in html
     # Left empty it is saved as that reading, never as an estimate.
     _post(client, "/quick-service", _entry(golf, odometer_km=""))
@@ -274,7 +274,7 @@ def test_full_add_forms_show_the_last_odometer_in_grey(client: TestClient):
     _refuel(client, golf, None, 10, 1000)
     for path in ("/expenses/new", "/expenses/new?kind=service"):
         html = client.get(path).text
-        assert 'name="odometer_km" value=""' in html and 'placeholder="1000"' in html
+        assert 'name="odometer_km" value=""' in html and 'placeholder="1,000"' in html
         assert "Last: 1,000&nbsp;km on" in html and "data-prefill" in html
     # Editing shows the stored value and does not follow the last reading.
     _post(client, "/expenses/new", {"vehicle_id": str(golf), "category": "other",

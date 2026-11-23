@@ -559,7 +559,7 @@ a.btn, a.icon-btn, a.chip, a.qtab, .seg a { text-decoration: none; }
    under the keyboard, also inside the HA Ingress iframe). The foot keeps only the other actions
    (Delete, Archive, ...) and disappears when none are left. */
 .head-save { display: none; font-weight: 600; padding: 8px 16px; }
-.head-save:disabled { color: var(--disabled-text-color); background: none; cursor: default; }
+.head-save:disabled { color: var(--disabled-text-color); background: color-mix(in srgb, var(--primary-text-color) 12%, transparent); filter: none; cursor: default; }
 @media (max-width: 699px) {
   .dialog.form .head-save { display: inline-flex; align-items: center; }
   .dialog.form .foot-save, .dialog.form .dialog-foot [data-close] { display: none; }
