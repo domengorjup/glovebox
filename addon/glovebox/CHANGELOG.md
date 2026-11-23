@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0
+
+- On phones the Save button sits in the top bar of every full-screen form, so the keyboard never covers it (also inside the Home Assistant app); pressing Enter in a field now saves. New refuellings show the last price per litre in grey: left as it is, it is used to work out litres or total. New service and expense entries show the last odometer reading in grey: left as it is, it is saved as the reading.
+
 ## 0.5.0
 
 - Cost fields (refuelling total and price per litre, service and expense amount) accept a calculation such as =12.50+3 or (30+20)*2: + - * /, brackets, leading = optional. The result is filled in when you leave the field.
