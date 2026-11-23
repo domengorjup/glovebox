@@ -7,7 +7,7 @@
 <div class="scrim" data-scrim>
 <form class="dialog form" method="post" role="dialog" aria-label="{{ heading }}"
       action="{{ url(request, ('/reminders/%d/edit' % reminder.id) if reminder else '/reminders/new') }}">
-  {{ dialog_head(request, heading, f.next) }}
+  {{ dialog_head(request, heading, f.next, save='Save') }}
   <div class="dialog-body">
     {{ messages(errors) }}
     <input type="hidden" name="next" value="{{ f.next }}">
@@ -43,7 +43,7 @@
             data-confirm="Delete this reminder?">Delete</button>
     {% endif %}
     <a class="btn" href="{{ url(request, f.next) }}" data-close>Cancel</a>
-    <button type="submit" class="btn primary">Save</button>
+    <button type="submit" class="btn primary foot-save">Save</button>
   </div>
 </form>
 </div>

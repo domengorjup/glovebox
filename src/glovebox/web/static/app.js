@@ -202,6 +202,31 @@
       box[f.getAttribute("data-calc")] = f.querySelector("input");
     });
     var recent = [];
+    var defaults = {};
+    try { defaults = JSON.parse(group.dataset.defaultPrices || "{}"); } catch (e) { defaults = {}; }
+    var vehicle = document.querySelector("[name=vehicle_id]");
+    // The grey price of the chosen vehicle (the price field's placeholder), or null.
+    function greyPrice() {
+      var v = parseFloat(vehicle ? defaults[vehicle.value] : "");
+      return v > 0 ? v : null;
+    }
+    function empty(name) { return box[name].value.trim() === "" || box[name].closest(".field").classList.contains("computed"); }
+    function setComputed(name, text) {
+      box[name].value = text;
+      box[name].closest(".field").classList.toggle("computed", text !== "");
+      box[name].dispatchEvent(new Event("calc", { bubbles: true }));
+    }
+    // Only litres or only total typed and no price typed: use the grey price.
+    function fromGrey(name) {
+      var grey = greyPrice(), other = name === "litres" ? "total" : "litres";
+      if (grey === null || !empty("price_per_litre") || !empty(other)) { return false; }
+      recent = [name];
+      var a = fieldNumber(box[name]);
+      if (a === null) { setComputed(other, ""); return true; }
+      var out = name === "litres" ? a * grey : a / grey;
+      setComputed(other, isFinite(out) ? out.toFixed(2) : "");
+      return true;
+    }
     function touch(name) {
       recent = recent.filter(function (n) { return n !== name; });
       recent.push(name);
@@ -220,9 +245,15 @@
         box[target].closest(".field").classList.add("computed");
       }
     }
+    if (vehicle) {
+      vehicle.addEventListener("change", function () {
+        box.price_per_litre.placeholder = defaults[vehicle.value] || "0.000";
+      });
+    }
     Object.keys(box).forEach(function (name) {
       box[name].addEventListener("input", function () {
         box[name].closest(".field").classList.remove("computed");
+        if (name !== "price_per_litre" && fromGrey(name)) { return; }
         touch(name);
       });
     });
@@ -441,7 +472,7 @@
     var steps = {};
     try { steps = JSON.parse(hint.dataset.steps || "{}"); } catch (e) { return; }
     var text = hint.querySelector("[data-odo-text]");
-    var follow = "prefill" in hint.dataset;  // new form: the value follows the last reading until edited
+    var follow = "prefill" in hint.dataset;  // new form: the grey placeholder follows the last reading
     function fmt(km) { return km.toLocaleString("en-US", { maximumFractionDigits: 1 }) + "\u00a0km"; }
     function when(iso) {
       return iso === "" ? "initial"
@@ -452,7 +483,7 @@
       (steps[vehicle.value] || []).forEach(function (s) {
         if (s[0] === "" || (day.value && s[0] <= day.value)) { last = s; }
       });
-      if (follow) { input.value = last ? String(last[1]) : ""; }
+      if (follow) { input.placeholder = last ? String(last[1]) : "0"; }
       hint.classList.remove("err");
       if (!vehicle.value) { text.textContent = "Choose a vehicle to see its last recorded odometer."; return; }
       if (!last) { text.textContent = "No earlier reading for this vehicle."; return; }
@@ -468,7 +499,7 @@
         hint.classList.add("err");
       }
     }
-    input.addEventListener("input", function () { follow = false; update(); });
+    input.addEventListener("input", update);
     vehicle.addEventListener("change", update);
     day.addEventListener("change", update);
     day.addEventListener("input", update);
@@ -495,10 +526,16 @@
     chip.textContent = iso === now ? "Today, " + short : short;
   }
 
+  /* Save buttons of a quick page (header on phones, foot on desktop): one `disabled` switch. */
+  function quickSave(form) {
+    var buttons = form.querySelectorAll("[data-quick-save]");
+    return { set disabled(value) { buttons.forEach(function (b) { b.disabled = value; }); } };
+  }
+
   /* Quick service / expense: title chips, odometer hint, Save enabled when complete. */
   function bindQuickEntry(form) {
     var title = form.querySelector("#i-title"), amount = form.querySelector("#i-amount");
-    var save = form.querySelector("[data-quick-save]");
+    var save = quickSave(form);
     var day = form.querySelector("#i-date");
     var groups = form.querySelectorAll("[data-title-chips]");
     var types = form.querySelectorAll("input[name=category]");
@@ -538,7 +575,7 @@
     form.dataset.bound = "1";
     if (form.dataset.quickKind) { bindQuickEntry(form); return; }
     var odo = form.querySelector("#i-odometer_km"), litres = form.querySelector("#i-litres");
-    var total = form.querySelector("#i-total"), save = form.querySelector("[data-quick-save]");
+    var total = form.querySelector("#i-total"), save = quickSave(form);
     var hint = form.querySelector("[data-quick-hint]"), day = form.querySelector("#i-date");
     var chip = form.querySelector("[data-quick-date]");
     var last = hint.dataset.lastKm === "" ? null : parseFloat(hint.dataset.lastKm);
@@ -562,6 +599,7 @@
       input.addEventListener("input", update);
     });
     day.addEventListener("change", dateText);
+    form.addEventListener("calc", update);  // the grey price filled in litres or total
     update();
   }
 
@@ -585,21 +623,4 @@
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(drawCharts, 150);
   });
-})();
-
-// Pinned dialog foot on iOS Safari: it ignores interactive-widget, so size the scrim to the
-// visual viewport (the area above the keyboard) and keep the focused field in view.
-(function () {
-  var vv = window.visualViewport;
-  if (!vv || !/iP(hone|ad|od)/.test(navigator.userAgent)) return;
-  function fit() {
-    var scrim = document.querySelector(".scrim");
-    if (!scrim || !window.matchMedia("(max-width: 699px)").matches) return;
-    scrim.style.height = vv.height + "px";
-    scrim.style.top = vv.offsetTop + "px";
-    var el = document.activeElement;
-    if (el && el.closest && el.closest(".dialog-body")) el.scrollIntoView({ block: "nearest" });
-  }
-  vv.addEventListener("resize", fit);
-  vv.addEventListener("scroll", fit);
 })();

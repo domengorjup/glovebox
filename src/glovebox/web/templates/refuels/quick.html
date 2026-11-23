@@ -7,7 +7,7 @@
 {% block content %}
 <div class="scrim" data-scrim>
 <form class="dialog form quick" method="post" role="dialog" aria-label="Refuel" action="{{ url(request, '/quick') }}">
-  {{ dialog_head(request, 'Add entry') }}
+  {{ dialog_head(request, 'Add entry', save=('Save anyway' if needs_confirm is defined else 'Save'), quick=true) }}
   {{ quick_tabs(request, 'refuel', f.vehicle_id) }}
   <div class="dialog-body">
     {{ messages(errors, warnings) }}
@@ -30,12 +30,12 @@
         {% if last_km is not none %}Last: {{ last_km_text }}&nbsp;km on {{ last_date_text }}{% else %}No earlier refuelling for this vehicle{% endif %}
       </div>
     </div>
-    <div data-price-fields class="qprice">
+    <div data-price-fields class="qprice"{% if default_prices %} data-default-prices='{{ default_prices | tojson }}'{% endif %}>
       <div class="grid2 qpair">
-        {{ field(litres_label, 'litres', f.litres, suffix='L', inputmode='decimal', calc='litres', required=True, placeholder='0.0', big=True) }}
-        {{ field('Total', 'total', f.total, suffix=currency, inputmode='decimal', calc='total', required=True, placeholder='0.00', big=True) }}
+        {{ field(litres_label, 'litres', f.litres, suffix='L', inputmode='decimal', calc='litres', required=not default_price, placeholder='0.0', big=True) }}
+        {{ field('Total', 'total', f.total, suffix=currency, inputmode='decimal', calc='total', required=not default_price, placeholder='0.00', big=True) }}
       </div>
-      {{ field('Price / litre (calculated, or type it)', 'price_per_litre', f.price_per_litre, suffix=currency ~ '/L', inputmode='decimal', calc='price_per_litre', placeholder='0.000') }}
+      {{ field('Price / litre (calculated, or type it)', 'price_per_litre', f.price_per_litre, suffix=currency ~ '/L', inputmode='decimal', calc='price_per_litre', placeholder=default_price or '0.000') }}
     </div>
     <div class="qgroup">
       <div class="qlabel">Station</div>
@@ -62,7 +62,7 @@
   </div>
   <div class="dialog-foot qfoot">
     {% if needs_confirm is defined %}<input type="hidden" name="confirm_warnings" value="1">{% endif %}
-    <button type="submit" class="btn primary big-btn" data-quick-save>{{ 'Save anyway' if needs_confirm is defined else 'Save refuelling' }}</button>
+    <button type="submit" class="btn primary big-btn foot-save" data-quick-save>{{ 'Save anyway' if needs_confirm is defined else 'Save refuelling' }}</button>
   </div>
 </form>
 </div>

@@ -7,7 +7,7 @@
 <div class="scrim" data-scrim>
 <form class="dialog form" method="post" role="dialog" aria-label="Edit station"
       action="{{ url(request, '/stations/%d/edit' % station.id) }}">
-  {{ dialog_head(request, 'Edit station', '/stations') }}
+  {{ dialog_head(request, 'Edit station', '/stations', save='Save') }}
   <div class="dialog-body">
     {{ messages(errors) }}
     {{ field('Name', 'name', v.name, required=True) }}
@@ -17,7 +17,7 @@
   <div class="dialog-foot">
     <a class="btn danger" href="{{ url(request, '/stations/%d/delete' % station.id) }}" data-dialog>Delete</a>
     <a class="btn" href="{{ url(request, '/stations') }}" data-close>Cancel</a>
-    <button type="submit" class="btn primary">Save</button>
+    <button type="submit" class="btn primary foot-save">Save</button>
   </div>
 </form>
 </div>

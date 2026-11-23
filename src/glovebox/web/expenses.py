@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import date
 from typing import Annotated
 
@@ -68,8 +69,7 @@ def _form_from_expense(expense: Expense) -> dict[str, str]:
 
 def _form_page(request: Request, session: Session, entered: dict[str, str],
                expense_id: int | None = None, status: int = 200,
-               errors: list[str] | None = None, quick: bool = False,
-               prefill: bool = False):
+               errors: list[str] | None = None, quick: bool = False):
     """Render the service or expense form (the quick page when ``quick``)."""
     chrome = load_chrome(session)
     vehicles = list(chrome.vehicles)
@@ -83,8 +83,6 @@ def _form_page(request: Request, session: Session, entered: dict[str, str],
         except ValueError:
             on_day = date.today()
         last = records.last_known_odometer(session, int(selected), on_day, expense_id)
-        if prefill and last is not None:
-            entered = {**entered, "odometer_km": formatting.format_km(last.km)}
     estimated = None
     if expense_id is not None:
         stored = records.get_expense(session, expense_id)
@@ -115,8 +113,9 @@ def _form_page(request: Request, session: Session, entered: dict[str, str],
         location_options={
             c.value: records.recent_locations(session, c) for c in ExpenseCategory
         },
-        # Only the first view of a new form follows vehicle and date (not a re-render).
-        prefill_odometer=prefill,
+        # New forms show the last reading in grey and follow vehicle and date changes.
+        prefill_odometer=expense_id is None,
+        odometer_placeholder=formatting.format_km(last.km) if last and expense_id is None else "",
         **extra,
     )
 
@@ -136,7 +135,7 @@ def expense_new(
         date=date.today().isoformat(),
         category=category,
     ).model_dump()
-    return _form_page(request, session, entered, prefill=True)
+    return _form_page(request, session, entered)
 
 
 @router.get("/{expense_id}/edit")
@@ -208,6 +207,11 @@ def _save(request: Request, session: Session, form: ExpenseForm, expense_id: int
     try:
         data = _parse_form(form)
         if expense_id is None:
+            if data.odometer_km is None:
+                # An empty field on a new entry means "use the shown reading".
+                last = records.last_known_odometer(session, data.vehicle_id, data.date)
+                if last is not None:
+                    data = replace(data, odometer_km=last.km)
             created = records.create_expense(session, data)
             if form.remind == "1":
                 _create_reminder(session, created, form.remind_days)
@@ -321,7 +325,7 @@ def _quick_new(request: Request, session: Session, category: str, vehicle: str):
     entered = ExpenseForm(
         vehicle_id=default, date=date.today().isoformat(), category=category
     ).model_dump()
-    return _form_page(request, session, entered, quick=True, prefill=True)
+    return _form_page(request, session, entered, quick=True)
 
 
 def _quick_create(request: Request, session: Session, form: ExpenseForm):

@@ -9,7 +9,7 @@
 <div class="scrim" data-scrim>
 <form class="dialog form quick" method="post" role="dialog" aria-label="{{ noun | capitalize }}" action="{{ url(request, page_path) }}"
       data-quick-kind="{{ noun }}">
-  {{ dialog_head(request, 'Add entry') }}
+  {{ dialog_head(request, 'Add entry', save='Save', quick=true) }}
   {{ quick_tabs(request, noun, f.vehicle_id) }}
   <div class="dialog-body">
     {{ messages(errors) }}
@@ -40,7 +40,7 @@
     </div>
     {{ field('Amount' if is_service else 'Amount (full price paid)', 'amount', f.amount, suffix=currency, inputmode='decimal', required=True, placeholder='0.00', big=True) }}
     <div class="qgroup">
-      {{ field('Odometer', 'odometer_km', f.odometer_km, suffix='km', inputmode='numeric', placeholder='0', big=True) }}
+      {{ field('Odometer', 'odometer_km', f.odometer_km, suffix='km', inputmode='numeric', placeholder=odometer_placeholder or '0', big=True) }}
       {{ odometer_hint(quick=True) }}
     </div>
     {{ location_field('e.g. garage or workshop' if is_service else 'e.g. insurer or office') }}
@@ -64,7 +64,7 @@
     </div>
   </div>
   <div class="dialog-foot qfoot">
-    <button type="submit" class="btn primary big-btn" data-quick-save>Save {{ noun }}</button>
+    <button type="submit" class="btn primary big-btn foot-save" data-quick-save>Save {{ noun }}</button>
   </div>
 </form>
 </div>

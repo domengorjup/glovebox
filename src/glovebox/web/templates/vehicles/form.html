@@ -25,7 +25,7 @@
 <div class="scrim" data-scrim>
 <form class="dialog form" method="post" role="dialog" aria-label="{{ heading }}"
       action="{{ url(request, ('/vehicles/%d/edit' % vehicle.id) if vehicle else '/vehicles/new') }}">
-  {{ dialog_head(request, heading, '/vehicles') }}
+  {{ dialog_head(request, heading, '/vehicles', save='Save') }}
   <div class="dialog-body">
     {{ messages(errors) }}
     {{ field('Name', 'name', v.name, required=True, placeholder='e.g. Golf') }}
@@ -67,7 +67,7 @@
             formaction="{{ url(request, '/vehicles/%d/archive' % vehicle.id) }}">{{ 'Unarchive' if vehicle.archived else 'Archive' }}</button>
     {% endif %}
     <a class="btn" href="{{ url(request, '/vehicles') }}" data-close>Cancel</a>
-    <button type="submit" class="btn primary">Save</button>
+    <button type="submit" class="btn primary foot-save">Save</button>
   </div>
 </form>
 </div>

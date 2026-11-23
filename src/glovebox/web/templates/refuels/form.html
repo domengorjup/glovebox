@@ -8,7 +8,7 @@
 <div class="scrim" data-scrim>
 <form class="dialog form" method="post" role="dialog" aria-label="{{ heading }}"
       action="{{ url(request, ('/refuels/%d/edit' % refuel_id) if refuel_id else '/refuels/new') }}">
-  {{ dialog_head(request, heading) }}
+  {{ dialog_head(request, heading, save=('Save anyway' if needs_confirm is defined else 'Save')) }}
   <div class="dialog-body">
     {{ messages(errors, warnings) }}
     {% if figures is defined %}
@@ -21,12 +21,12 @@
       {{ field('Time (optional)', 'time', f.time, type='time') }}
     </div>
     {{ field('Odometer', 'odometer_km', f.odometer_km, suffix='km', inputmode='decimal', required=True, placeholder='0') }}
-    <div class="grid3" data-price-fields>
+    <div class="grid3" data-price-fields{% if default_prices %} data-default-prices='{{ default_prices | tojson }}'{% endif %}>
       {{ field(litres_label, 'litres', f.litres, suffix='L', inputmode='decimal', calc='litres') }}
-      {{ field('Price / litre', 'price_per_litre', f.price_per_litre, suffix=currency, inputmode='decimal', calc='price_per_litre') }}
+      {{ field('Price / litre', 'price_per_litre', f.price_per_litre, suffix=currency, inputmode='decimal', calc='price_per_litre', placeholder=default_price) }}
       {{ field('Total', 'total', f.total, suffix=currency, inputmode='decimal', calc='total') }}
     </div>
-    <div class="help">Fill in any two; the third is calculated.</div>
+    <div class="help">Fill in any two; the third is calculated.{% if not refuel_id %} An empty price uses the last one (grey).{% endif %}</div>
     {% include "refuels/_station_picker.html" %}
     {{ switch('is_full', 'Full tank', 'Needed to work out consumption', f.is_full) }}
     {{ switch('missed_previous', 'Missed previous fill-up', 'Skips consumption for this entry', f.missed_previous) }}
@@ -40,9 +40,9 @@
     <a class="btn" href="{{ url(request, '/') }}" data-close>Cancel</a>
     {% if needs_confirm is defined %}
     <input type="hidden" name="confirm_warnings" value="1">
-    <button type="submit" class="btn primary">Save anyway</button>
+    <button type="submit" class="btn primary foot-save">Save anyway</button>
     {% else %}
-    <button type="submit" class="btn primary">Save</button>
+    <button type="submit" class="btn primary foot-save">Save</button>
     {% endif %}
   </div>
 </form>

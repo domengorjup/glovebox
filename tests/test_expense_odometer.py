@@ -127,11 +127,18 @@ def _odometer_value(html: str) -> str | None:
     return (value.group(1) or None) if value else None
 
 
-def test_new_forms_prefill_the_last_recorded_odometer(client: TestClient, car: int) -> None:
+def _odometer_placeholder(html: str) -> str | None:
+    match = re.search(r'<input[^>]*name="odometer_km"[^>]*>', html)
+    value = re.search(r'placeholder="([^"]*)"', match.group(0))
+    return value.group(1) if value else None
+
+
+def test_new_forms_show_the_last_odometer_in_grey(client: TestClient, car: int) -> None:
     _post_refuel(client, "104163")
     for path in ("/expenses/new?kind=service", "/expenses/new", "/quick-service", "/quick-expense"):
         html = client.get(path).text
-        assert _odometer_value(html) == "104163", path
+        assert _odometer_value(html) is None, path
+        assert _odometer_placeholder(html) == "104163", path
         assert "Last: 104,163&nbsp;km on " in html and "data-prefill" in html
 
 
@@ -145,7 +152,7 @@ def test_saved_as_entered_not_estimated(client: TestClient, car: int, engine: En
         assert (item.odometer_km, item.odometer_estimated) == (104163, False)
 
 
-def test_cleared_odometer_saves_empty_without_warning(
+def test_empty_odometer_saves_the_shown_reading_without_warning(
     client: TestClient, car: int, engine: Engine
 ) -> None:
     _post_refuel(client, "104163")
@@ -154,7 +161,39 @@ def test_cleared_odometer_saves_empty_without_warning(
     assert "Odometer not entered" not in page and "recommended" not in page
     with make_session_factory(engine)() as s:
         item = s.scalars(select(Expense)).one()
+        assert (item.odometer_km, item.odometer_estimated) == (104163, False)
+
+
+def test_empty_odometer_uses_the_reading_on_the_entry_date(
+    client: TestClient, car: int, engine: Engine
+) -> None:
+    _post_refuel(client, "104163", day="2026-10-18")
+    _post_refuel(client, "105000", day="2026-10-25")
+    assert _post_service(client, "", day="2026-10-20").status_code == 303
+    with make_session_factory(engine)() as s:
+        assert s.scalars(select(Expense)).one().odometer_km == 104163
+
+
+def test_empty_odometer_without_earlier_reading_stores_none(
+    client: TestClient, car: int, engine: Engine
+) -> None:
+    assert _post_service(client, "").status_code == 303
+    with make_session_factory(engine)() as s:
+        item = s.scalars(select(Expense)).one()
         assert (item.odometer_km, item.odometer_estimated) == (None, False)
+
+
+def test_edit_with_empty_odometer_stays_empty(client: TestClient, car: int, engine: Engine) -> None:
+    _post_refuel(client, "104163")
+    _post_service(client, "104500")
+    client.post(
+        "/expenses/1/edit",
+        data={"vehicle_id": "1", "date": "2026-10-20", "category": "maintenance",
+              "title": "Oil change", "amount": "80", "odometer_km": ""},
+        follow_redirects=False,
+    )
+    with make_session_factory(engine)() as s:
+        assert s.scalars(select(Expense)).one().odometer_km is None
 
 
 def test_typed_odometer_is_stored(client: TestClient, car: int, engine: Engine) -> None:
@@ -167,7 +206,7 @@ def test_typed_odometer_is_stored(client: TestClient, car: int, engine: Engine) 
 
 def test_no_earlier_reading_leaves_the_field_empty(client: TestClient, car: int) -> None:
     html = client.get("/expenses/new").text
-    assert _odometer_value(html) is None and "No earlier reading for this vehicle." in html
+    assert _odometer_value(html) is None and _odometer_placeholder(html) == "0" and "No earlier reading for this vehicle." in html
 
 
 def test_error_rerender_keeps_a_cleared_odometer(client: TestClient, car: int) -> None:
@@ -178,7 +217,8 @@ def test_error_rerender_keeps_a_cleared_odometer(client: TestClient, car: int) -
               "title": "", "amount": "80", "odometer_km": ""},
     )
     assert response.status_code == 422
-    assert _odometer_value(response.text) is None and "data-prefill" not in response.text
+    assert _odometer_value(response.text) is None
+    assert _odometer_placeholder(response.text) == "104163"
 
 
 def test_edit_form_shows_the_saved_value_without_prefill(client: TestClient, car: int) -> None:

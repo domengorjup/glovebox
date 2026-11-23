@@ -88,6 +88,13 @@ def _form_page(request, session, entered, refuel_id=None, status=200, quick=Fals
     stations = records.list_stations(session)
     # Read-only display: the fuel type belongs to the vehicle, not to the refuel.
     fuel_types = {str(v.id): v.fuel_type for v in vehicles if v.fuel_type}
+    # New refuels show each vehicle's last price per litre in grey (and use it, see _save).
+    default_prices: dict[str, str] = {}
+    if refuel_id is None:
+        for v in vehicles:
+            milli = records.last_price_per_litre(session, v.id)
+            if milli is not None:
+                default_prices[str(v.id)] = f"{milli / 1000:.3f}"
     if quick:
         extra.update(_quick_context(session, entered, stations))
     return render(
@@ -101,6 +108,8 @@ def _form_page(request, session, entered, refuel_id=None, status=200, quick=Fals
         vehicles=vehicles,
         fuel_types=fuel_types,
         fuel_type=fuel_types.get(selected, ""),
+        default_prices=default_prices,
+        default_price=default_prices.get(selected, ""),
         stations=stations,
         brands=sorted({s.brand for s in stations if s.brand}),
         errors=extra.pop("errors", []),
@@ -165,12 +174,27 @@ def _parse_form(form: RefuelForm) -> RefuelInput:
     )
 
 
+def _with_default_price(session: Session, data: RefuelInput) -> RefuelInput:
+    """
+    Use the vehicle's last price per litre when it was left empty and only one
+    of litres and total was given (the grey value of a new form).
+    """
+    if data.price_per_litre_milli is not None:
+        return data
+    if (data.litres_milli is None) == (data.total_cents is None):
+        return data  # Both given: the price is derived; none given: an error follows.
+    default = records.last_price_per_litre(session, data.vehicle_id)
+    return data if default is None else replace(data, price_per_litre_milli=default)
+
+
 def _save(request: Request, session: Session, form: RefuelForm, refuel_id: int | None,
           quick: bool = False):
     """Validate, show warnings once, then save (``quick``: the quick-add page)."""
     entered = form.model_dump()
     try:
         data = _parse_form(form)
+        if refuel_id is None:
+            data = _with_default_price(session, data)
         preview = records.preview_refuel(session, data, exclude_id=refuel_id)
         if preview.warnings and form.confirm_warnings != "1":
             return _form_page(request, session, entered, refuel_id, quick=quick,

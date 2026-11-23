@@ -13,10 +13,10 @@ To edit or delete a record, open it from the Timeline.
 
 - **Vehicle:** a choice at the top, shown only when you have more than one vehicle. It starts with the selected vehicle, else the last one used.
 - **Odometer** comes first and has the number keypad. Under it you see the last reading and, as you type, how far you have driven since then (red when the number is lower than the last one).
-- **Litres** and **Total** are the big fields; **Price / litre** is calculated, or type it and one of the others is calculated instead.
+- **Litres** and **Total** are the big fields; **Price / litre** shows the last price of this vehicle in grey. Type only the total (or only the litres) and the other is calculated with that price; type both and the price is calculated; type a price and it is used instead.
 - **Station:** chips with the last station used with this vehicle and its two most frequent ones, preselected the last one. **Other** shows the normal station list, including *New station…*.
 - **Full tank** is on. The date chip says *Today*; tap it to change the day. **More** adds *Missed previous fill-up* and notes. The time is the current time.
-- **Save refuelling** is greyed out until odometer, litres and total are filled.
+- **Save refuelling** is greyed out until the odometer, litres and total are filled (the missing one is calculated when a grey price is shown).
 
 After saving you are back on the Timeline, where a bar at the bottom shows the litres, the total and the consumption of this tank (when it can be worked out), with **Undo**. Undo deletes the refuelling you just saved. Tap the entry later to edit it with all fields.
 
@@ -28,7 +28,7 @@ See [First steps](first-steps.md#2-add-a-refuelling). The full form (all fields,
 
 ## Service
 
-**Service** opens a quick page too (`/quick-service`): vehicle choice (only with several vehicles), **What was done** with chips (the fixed *Regular service*, then the titles you used before with this vehicle, at most four in all), a big **Amount**, the **Odometer** and an optional **Location**. A new form starts with the last recorded reading in the Odometer field, with the hint *Last: … km on …*; change it to the real one, or clear it to save no reading. Once you type, the hint shows *+N km since the last recorded reading* (red when the number is lower than the last one). The value is saved exactly as it stands: nothing is estimated for you. The full add form behaves the same. The date chip says *Today*; **More** adds notes. Saving returns to the Timeline with *Service saved* and **Undo**. Editing an entry opens the full form below.
+**Service** opens a quick page too (`/quick-service`): vehicle choice (only with several vehicles), **What was done** with chips (the fixed *Regular service*, then the titles you used before with this vehicle, at most four in all), a big **Amount**, the **Odometer** and an optional **Location**. A new form shows the last recorded reading in grey in the Odometer field, with the hint *Last: … km on …*. Leave the field empty to save that reading, or type the real one. Once you type, the hint shows *+N km since the last recorded reading* (red when the number is lower than the last one). An empty field always saves the grey reading (you cannot save no reading while an earlier one exists); nothing is marked as estimated. The full add form behaves the same. The date chip says *Today*; **More** adds notes. Saving returns to the Timeline with *Service saved* and **Undo**. Editing an entry opens the full form below.
 
 For maintenance: oil change, tyres, repairs. Fields: vehicle, date, odometer (optional), title (for example "Oil and filter change"), amount, location (optional), notes. It is stored in the *maintenance* category.
 

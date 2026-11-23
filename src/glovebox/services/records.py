@@ -706,6 +706,16 @@ def last_known_odometer(
     return best
 
 
+def last_price_per_litre(session: Session, vehicle_id: int) -> int | None:
+    """Price per litre (milli-units) of the vehicle's newest refuel, ``None`` without one."""
+    return session.scalar(
+        select(Refuel.price_per_litre_milli)
+        .where(Refuel.vehicle_id == vehicle_id)
+        .order_by(Refuel.date.desc(), Refuel.odometer_km.desc(), Refuel.id.desc())
+        .limit(1)
+    )
+
+
 def odometer_steps(
     session: Session, vehicle_ids: Sequence[int], exclude_expense_id: int | None = None
 ) -> dict[int, list[tuple[date | None, float]]]:

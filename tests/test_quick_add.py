@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html as html_lib
 import re
 from datetime import date, timedelta
 
@@ -196,11 +197,11 @@ def test_quick_service_saves_maintenance_with_snackbar_and_undo(
     golf = _vehicle(client, "Golf")
     _refuel(client, golf, None, 10, 1000)
     html = client.get("/quick-service").text
-    # The last reading is prefilled as a real, editable value.
-    assert 'name="odometer_km" value="1000"' in html
+    # The last reading is shown in grey; the field itself is empty.
+    assert 'name="odometer_km" value=""' in html and 'placeholder="1000"' in html
     assert "Last: 1,000&nbsp;km on" in html
-    # Saved as entered (the form posts the prefilled value), never as an estimate.
-    _post(client, "/quick-service", _entry(golf, odometer_km="1000"))
+    # Left empty it is saved as that reading, never as an estimate.
+    _post(client, "/quick-service", _entry(golf, odometer_km=""))
     row = _expense_rows(engine)[0]
     assert row.category.value == "maintenance" and row.odometer_km == 1000
     assert not row.odometer_estimated
@@ -267,13 +268,13 @@ def test_quick_pages_vehicle_choice(client: TestClient):
     assert 'aria-label="Vehicle choice"' in client.get("/quick-service").text
 
 
-def test_full_add_forms_prefill_the_last_odometer(client: TestClient):
+def test_full_add_forms_show_the_last_odometer_in_grey(client: TestClient):
     golf = _vehicle(client, "Golf")
     assert 'name="odometer_km" value=""' in client.get("/expenses/new").text
     _refuel(client, golf, None, 10, 1000)
     for path in ("/expenses/new", "/expenses/new?kind=service"):
         html = client.get(path).text
-        assert 'name="odometer_km" value="1000"' in html
+        assert 'name="odometer_km" value=""' in html and 'placeholder="1000"' in html
         assert "Last: 1,000&nbsp;km on" in html and "data-prefill" in html
     # Editing shows the stored value and does not follow the last reading.
     _post(client, "/expenses/new", {"vehicle_id": str(golf), "category": "other",
@@ -356,3 +357,89 @@ def test_quick_tab_switch_posts_to_the_other_form(client: TestClient):
     _post(client, "/quick-service", {"vehicle_id": str(vid), "category": "maintenance",
                                      "title": "Oil", "amount": "80",
                                      "date": date.today().isoformat()})
+
+
+# --- grey default price per litre ---------------------------------------------
+
+
+def _price_refuel(client, vehicle, **fields):
+    data = {"vehicle_id": str(vehicle), "date": date.today().isoformat(),
+            "odometer_km": "2000", "is_full": "1"}  # fmt: skip
+    data.update(fields)
+    return client.post("/refuels/new", data=data, follow_redirects=False)
+
+
+def _refuel_rows(engine: Engine):
+    from glovebox.models import Refuel
+
+    with Session(engine) as session:
+        return session.scalars(select(Refuel).order_by(Refuel.id)).all()
+
+
+def _price_placeholder(html: str) -> str | None:
+    tag = re.search(r'<input[^>]*name="price_per_litre"[^>]*>', html).group(0)
+    found = re.search(r'placeholder="([^"]*)"', tag)
+    return found.group(1) if found else None
+
+
+def test_new_refuel_forms_show_the_last_price_in_grey(client: TestClient):
+    golf = _vehicle(client, "Golf")
+    assert _price_placeholder(client.get("/quick").text) == "0.000"
+    _post(client, "/refuels/new", {"vehicle_id": str(golf), "date": "2026-10-01",
+          "odometer_km": "1000", "litres": "40", "price_per_litre": "1.459"})  # fmt: skip
+    for path in ("/quick", "/refuels/new"):
+        html = client.get(path).text
+        assert _price_placeholder(html) == "1.459", path
+        assert 'name="price_per_litre" value=""' in html
+        assert "data-default-prices" in html
+    # Quick: with a grey price one of litres/total is enough.
+    assert not re.search(r'<input[^>]*name="litres"[^>]*required', client.get("/quick").text)
+    # Edit forms show the stored price and no grey default.
+    html = client.get("/refuels/1/edit").text
+    assert "data-default-prices" not in html and 'name="price_per_litre" value="1.459"' in html
+
+
+def test_empty_price_uses_the_last_one_for_the_missing_figure(client: TestClient, engine: Engine):
+    golf = _vehicle(client, "Golf")
+    _post(client, "/refuels/new", {"vehicle_id": str(golf), "date": "2026-10-01",
+          "odometer_km": "1000", "litres": "40", "price_per_litre": "1.459"})  # fmt: skip
+    assert _price_refuel(client, golf, litres="40").status_code == 303
+    assert _price_refuel(client, golf, total="50", odometer_km="3000").status_code == 303
+    rows = _refuel_rows(engine)
+    assert (rows[1].price_per_litre_milli, rows[1].total_cents) == (1459, 5836)
+    assert (rows[2].price_per_litre_milli, rows[2].litres_milli) == (1459, 34270)
+
+
+def test_litres_and_total_win_over_the_default(client: TestClient, engine: Engine):
+    golf = _vehicle(client, "Golf")
+    _post(client, "/refuels/new", {"vehicle_id": str(golf), "date": "2026-10-01",
+          "odometer_km": "1000", "litres": "40", "price_per_litre": "1.459"})  # fmt: skip
+    _price_refuel(client, golf, litres="40", total="60")
+    _price_refuel(client, golf, litres="40", price_per_litre="1.399", odometer_km="3000")
+    rows = _refuel_rows(engine)
+    assert rows[1].price_per_litre_milli == 1500
+    assert (rows[2].price_per_litre_milli, rows[2].total_cents) == (1399, 5596)
+
+
+def test_default_price_is_per_vehicle_and_not_used_without_history(
+    client: TestClient, engine: Engine
+):
+    golf = _vehicle(client, "Golf")
+    clio = _vehicle(client, "Clio")
+    _post(client, "/refuels/new", {"vehicle_id": str(golf), "date": "2026-10-01",
+          "odometer_km": "1000", "litres": "40", "price_per_litre": "1.459"})  # fmt: skip
+    assert _price_placeholder(client.get(f"/quick?vehicle={clio}").text) == "0.000"
+    response = _price_refuel(client, clio, litres="40")
+    assert response.status_code == 422 and "at least two" in response.text
+    assert len(_refuel_rows(engine)) == 1
+    # The full form carries every vehicle's price for the vehicle select.
+    assert f'"{golf}": "1.459"' in html_lib.unescape(client.get("/refuels/new").text)
+
+
+def test_edit_does_not_apply_the_default_price(client: TestClient):
+    golf = _vehicle(client, "Golf")
+    _post(client, "/refuels/new", {"vehicle_id": str(golf), "date": "2026-10-01",
+          "odometer_km": "1000", "litres": "40", "price_per_litre": "1.459"})  # fmt: skip
+    response = client.post("/refuels/1/edit", data={"vehicle_id": str(golf),
+          "date": "2026-10-01", "odometer_km": "1000", "litres": "40"})  # fmt: skip
+    assert response.status_code == 422

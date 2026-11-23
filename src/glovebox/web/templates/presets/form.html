@@ -7,7 +7,7 @@
 <div class="scrim" data-scrim>
 <form class="dialog form" method="post" role="dialog" aria-label="{{ preset.name }}"
       action="{{ url(request, '/presets/' ~ preset.id ~ '/edit') }}">
-  {{ dialog_head(request, preset.name, '/presets') }}
+  {{ dialog_head(request, preset.name, '/presets', save=('Save' if not locked)) }}
   <div class="dialog-body">
     {{ messages(errors) }}
     {% if locked %}
@@ -35,7 +35,7 @@
     {% if not locked %}
     <button type="submit" class="btn danger" formnovalidate data-confirm="Delete the preset {{ preset.name }}?" {{ post('/delete') }}>Delete</button>
     <a class="btn" href="{{ url(request, '/presets') }}" data-close>Cancel</a>
-    <button type="submit" class="btn primary">Save</button>
+    <button type="submit" class="btn primary foot-save">Save</button>
     {% else %}
     {% if not preset.shipped %}<button type="submit" class="btn" formnovalidate name="locked" value="0" {{ post('/lock') }}>Unlock</button>{% endif %}
     <button type="submit" class="btn" formnovalidate {{ post('/duplicate') }}>Duplicate</button>

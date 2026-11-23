@@ -555,14 +555,15 @@ a.btn, a.icon-btn, a.chip, a.qtab, .seg a { text-decoration: none; }
 /* Manage page footer links */
 .manage-links { display: flex; justify-content: center; gap: 8px; margin: 24px 0 8px; }
 
-/* Pinned action bar in full-screen phone dialogs: the foot stays above the on-screen keyboard,
-   the body scrolls. interactive-widget=resizes-content (base.html) shrinks the dvh viewport. */
+/* Full-screen phone dialogs: Save sits in the header at the right of the title (it cannot hide
+   under the keyboard, also inside the HA Ingress iframe). The foot keeps only the other actions
+   (Delete, Archive, ...) and disappears when none are left. */
+.head-save { display: none; font-weight: 600; padding: 8px 16px; }
+.head-save:disabled { color: var(--disabled-text-color); background: none; cursor: default; }
 @media (max-width: 699px) {
-  .scrim { height: 100vh; height: 100dvh; inset: auto 0 0 0; }
-  .dialog.form { height: 100%; }
-  .dialog-body { min-height: 0; scroll-padding-bottom: 24px; }
-  .dialog-foot { flex: none; position: sticky; bottom: 0; background: var(--card-background-color); box-shadow: 0 -2px 8px var(--shadow-color); }
-  .qfoot { padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+  .dialog.form .head-save { display: inline-flex; align-items: center; }
+  .dialog.form .foot-save, .dialog.form .dialog-foot [data-close] { display: none; }
+  .dialog.form .dialog-foot:not(:has(> :not(.foot-save):not([data-close]):not(input))) { display: none; }
 }
 
 /* Odometer line under the date in a Timeline row (estimated readings in italics). */

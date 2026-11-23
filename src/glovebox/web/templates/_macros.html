@@ -87,11 +87,14 @@
   </div>
 {% endmacro %}
 
-{# Head of a dialog: close link (works without the page script) and title. #}
-{% macro dialog_head(request, title, close_path='/') %}
+{# Head of a dialog: close link (works without the page script) and title. With `save`, a Save
+   button at the right (phones only; the foot's Save is hidden there). `quick` marks it for the
+   disabled-until-valid logic of the quick pages. #}
+{% macro dialog_head(request, title, close_path='/', save=none, quick=false) %}
   <div class="dialog-head">
     <a class="icon-btn" href="{{ url(request, close_path) }}" data-close aria-label="Close">{{ icon('close', 24) }}</a>
     <h3>{{ title }}</h3>
+    {% if save %}<button type="submit" class="btn head-save"{% if quick %} data-quick-save{% endif %}>{{ save }}</button>{% endif %}
   </div>
 {% endmacro %}
 
