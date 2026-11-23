@@ -5,7 +5,7 @@ TBD - created by archiving change configurable-csv-import-export. Update Purpose
 ## Requirements
 ### Requirement: Standard records format
 The system SHALL define a standard CSV format for records with one row per refuel or expense and these columns, in this order:
-`type`, `vehicle`, `date`, `time`, `odometer_km`, `odometer_estimated`, `fuel_l`, `price_per_l`, `total`, `currency`, `full`, `missed_previous`, `station`, `station_location`, `station_brand`, `category`, `title`, `coverage_start`, `coverage_end`, `notes`, `derived`, `source`, `source_ref`.
+`type`, `vehicle`, `date`, `time`, `odometer_km`, `odometer_estimated`, `fuel_l`, `price_per_l`, `total`, `currency`, `full`, `missed_previous`, `station`, `station_location`, `station_brand`, `category`, `title`, `location`, `coverage_start`, `coverage_end`, `notes`, `derived`, `source`, `source_ref`.
 
 - **File conventions:**
   - RFC 4180 CSV: comma delimiter, `"` quoting, CRLF line ends, one header row.
@@ -19,6 +19,7 @@ The system SHALL define a standard CSV format for records with one row per refue
   - `type` is `refuel` or `expense`. `vehicle`, `date` and `type` are required on every row.
   - A refuel requires `odometer_km` and at least two of `fuel_l`, `price_per_l` and `total`.
   - An expense requires `title` and a positive `total`. `category` is one of `maintenance`, `insurance`, `registration`, `other` and defaults to `other`. `coverage_start` and `coverage_end` are set both or neither.
+  - `location` applies to expenses only and is optional: where the work was done or who was paid, free text. It is not the same as `station_location`.
   - `odometer_estimated` applies to expenses only: true when the odometer was filled in by the app, not entered. It is optional, defaults to false, and is ignored when `odometer_km` is empty.
   - Columns that do not apply to a row's type SHALL be empty.
 - **`currency`:** a non-empty value that differs from the app currency SHALL make that row an error on import.
@@ -36,6 +37,19 @@ The system SHALL define a standard CSV format for records with one row per refue
 #### Scenario: Wrong currency
 - **WHEN** a standard file row has `currency` "USD" and the app currency is EUR
 - **THEN** the preview lists that row as an error and it is not imported
+
+#### Scenario: Expense row with a location
+- **WHEN** a service "Oil change" at "Example Garage", 120.00 €, is exported in the standard format
+- **THEN** its row has `title` "Oil change" and `location` "Example Garage"
+- **AND** `location` is empty on refuel rows
+
+#### Scenario: File without the location column
+- **WHEN** a standard file made before this column existed is imported
+- **THEN** it imports with no locations and no error
+
+#### Scenario: Generated documentation lists the column
+- **WHEN** the format documentation is generated
+- **THEN** `standard-format.md` and the Data Package descriptor list `location`, and the stale-documentation check passes
 
 ### Requirement: Lossless standard round trip
 Exporting all records in the standard format and importing that file into an empty database with the standard preset SHALL recreate every refuel and expense with identical values, including `derived` and `source`. The vehicles and stations SHALL be recreated by name, and stations also by location.
